@@ -1,0 +1,482 @@
+// Pinweb HRMS API Service
+// Connects React frontend directly to Laravel REST API (/api/v1)
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const TOKEN_STORAGE_KEY = 'hrms_api_token';
+const CACHED_USER_STORAGE_KEY = 'hrms_cached_user';
+
+let authToken = localStorage.getItem(TOKEN_STORAGE_KEY) || sessionStorage.getItem(TOKEN_STORAGE_KEY);
+const inFlightGetRequests = new Map();
+
+export function hasAuthToken() {
+  return Boolean(authToken);
+}
+
+export function setAuthToken(token, rememberMe = false) {
+  authToken = token;
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+  sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  if (token) {
+    const storage = rememberMe ? localStorage : sessionStorage;
+    storage.setItem(TOKEN_STORAGE_KEY, token);
+  }
+}
+
+export function getCachedUser() {
+  const serializedUser = localStorage.getItem(CACHED_USER_STORAGE_KEY)
+    || sessionStorage.getItem(CACHED_USER_STORAGE_KEY)
+    || localStorage.getItem('hrms_current_user')
+    || sessionStorage.getItem('hrms_current_user');
+
+  if (!serializedUser) return null;
+
+  try {
+    const user = JSON.parse(serializedUser);
+    if (
+      !user
+      || typeof user !== 'object'
+      || Array.isArray(user)
+      || typeof user.role !== 'string'
+      || (typeof user.id !== 'string' && typeof user.id !== 'number')
+    ) {
+      throw new TypeError('Cached user profile has an invalid shape.');
+    }
+    return user;
+  } catch (error) {
+    console.warn('[HRMS auth] Unable to restore cached user profile:', error.message);
+    localStorage.removeItem(CACHED_USER_STORAGE_KEY);
+    sessionStorage.removeItem(CACHED_USER_STORAGE_KEY);
+    localStorage.removeItem('hrms_current_user');
+    sessionStorage.removeItem('hrms_current_user');
+    return null;
+  }
+}
+
+export function setCachedUser(user, rememberMe) {
+  localStorage.removeItem(CACHED_USER_STORAGE_KEY);
+  sessionStorage.removeItem(CACHED_USER_STORAGE_KEY);
+  localStorage.removeItem('hrms_current_user');
+  sessionStorage.removeItem('hrms_current_user');
+  localStorage.removeItem('hrms_is_authenticated');
+  sessionStorage.removeItem('hrms_is_authenticated');
+
+  if (user) {
+    const useLocalStorage = rememberMe ?? Boolean(localStorage.getItem(TOKEN_STORAGE_KEY));
+    const storage = useLocalStorage ? localStorage : sessionStorage;
+    storage.setItem(CACHED_USER_STORAGE_KEY, JSON.stringify(user));
+  }
+}
+
+function request(endpoint, options = {}) {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const method = (options.method || 'GET').toUpperCase();
+  const requestToken = authToken;
+  const headers = new Headers(options.headers || {});
+  headers.set('Accept', 'application/json');
+  if (!(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+  if (requestToken) {
+    headers.set('Authorization', `Bearer ${requestToken}`);
+  }
+
+  const requestKey = method === 'GET' ? `${url}:${requestToken || ''}` : null;
+  if (requestKey && inFlightGetRequests.has(requestKey)) {
+    return inFlightGetRequests.get(requestKey);
+  }
+
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        method,
+        headers,
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        const error = new Error(data?.message || `API Error: ${response.status} ${response.statusText}`);
+        error.status = response.status;
+        error.data = data;
+        throw error;
+      }
+
+      return data;
+    } catch (err) {
+      console.warn(`[HRMS API] Request failed for ${endpoint}:`, err.message);
+      throw err;
+    }
+  })();
+
+  if (requestKey) {
+    inFlightGetRequests.set(requestKey, requestPromise);
+    requestPromise.then(
+      () => {
+        if (inFlightGetRequests.get(requestKey) === requestPromise) {
+          inFlightGetRequests.delete(requestKey);
+        }
+      },
+      () => {
+        if (inFlightGetRequests.get(requestKey) === requestPromise) {
+          inFlightGetRequests.delete(requestKey);
+        }
+      }
+    );
+  }
+
+  return requestPromise;
+}
+
+export const api = {
+  // Base Health Check
+  health: () => request('/health'),
+  login: (identifier, password, roleType) => request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier, password, role_type: roleType }),
+  }),
+  currentUser: () => request('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  changePassword: (currentPassword, password, passwordConfirmation) => request('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+  }),
+  requestOwnEmailChange: (currentPassword, email, emailConfirmation) => request('/auth/email-change-request', {
+    method: 'POST',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      email,
+      email_confirmation: emailConfirmation,
+    }),
+  }),
+  confirmEmailChange: (token) => request('/auth/email-change-confirm', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
+  }),
+  getEmployeeDocuments: (employeeId) =>
+    request(`/employee-documents${employeeId ? `?employee_id=${employeeId}` : ''}`),
+  getUploads: (module, recordId) => {
+    const query = new URLSearchParams({ module });
+    if (recordId) query.set('record_id', recordId);
+    return request(`/uploads?${query.toString()}`);
+  },
+  uploadFile: (file, module, { employeeId, recordId, documentType } = {}) => {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('module', module);
+    if (employeeId) body.append('employee_id', employeeId);
+    if (recordId) body.append('record_id', recordId);
+    if (documentType) body.append('document_type', documentType);
+    return request('/uploads', { method: 'POST', body });
+  },
+  getUploadDownload: (uploadId) => request(`/uploads/${uploadId}/download`),
+
+  // M02 Organization
+  getCompany: () => request('/organization/company'),
+  getBranches: () => request('/organization/branches'),
+  getDepartments: () => request('/organization/departments'),
+  getDesignations: () => request('/organization/designations'),
+  getHolidays: () => request('/organization/holidays'),
+
+  // M03 Employees Directory
+  getEmployees: () => request('/employees'),
+  createEmployee: (employeeData) => request('/employees', {
+    method: 'POST',
+    body: JSON.stringify(employeeData),
+  }),
+
+  // M05 Attendance & Web Punch
+  getAttendance: () => request('/attendance'),
+  getAttendanceImports: () => request('/attendance/imports'),
+  previewAttendanceImport: (uploadId) =>
+    request(`/attendance/imports/${uploadId}/preview`, { method: 'POST' }),
+  processAttendanceImport: (uploadId) =>
+    request(`/attendance/imports/${uploadId}/process`, { method: 'POST' }),
+  punchAttendance: (employeeId, location) => request('/attendance/punch', {
+    method: 'POST',
+    body: JSON.stringify({ employee_id: employeeId, location }),
+  }),
+  getRegularizations: () => request('/attendance/regularizations'),
+  requestRegularization: (regularization) => request('/attendance/regularizations', {
+    method: 'POST',
+    body: JSON.stringify(regularization),
+  }),
+  reviewRegularization: (requestId, status) => request(`/attendance/regularizations/${requestId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ status }),
+  }),
+
+  // M06 Leave Management
+  getLeaves: () => request('/leaves'),
+  getLeaveBalances: () => request('/leaves/balances'),
+  applyLeave: (leaveData) => request('/leaves/apply', {
+    method: 'POST',
+    body: JSON.stringify(leaveData),
+  }),
+  reviewLeave: (leaveId, decision) => request(`/leaves/${leaveId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ status: decision }),
+  }),
+
+  // M17 Projects & Deadlines
+  getProjects: (status) => request(status ? `/projects?status=${status}` : '/projects'),
+  createProject: (projectData) => request('/projects', {
+    method: 'POST',
+    body: JSON.stringify(projectData),
+  }),
+  getProjectPenaltyPolicy: () => request('/project-penalty-policy'),
+  updateProjectProgress: (assignmentId, progressPercent, note, version) =>
+    request(`/project-assignments/${assignmentId}/progress`, {
+      method: 'POST',
+      body: JSON.stringify({ progress_percent: progressPercent, note, version }),
+    }),
+  requestExtension: (assignmentId, requestedDueDate, reason, requestedBy) =>
+    request(`/project-assignments/${assignmentId}/extension-requests`, {
+      method: 'POST',
+      body: JSON.stringify({ requested_due_date: requestedDueDate, reason, requested_by: requestedBy }),
+    }),
+  approveExtension: (extensionId, decision, decisionNote, reviewedBy) =>
+    request(`/project-extension-requests/${extensionId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, decision_note: decisionNote, reviewed_by: reviewedBy }),
+    }),
+  submitProjectCompletion: (assignmentId, deliverableLink, submissionNote) =>
+    request(`/project-assignments/${assignmentId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ deliverable_link: deliverableLink, submission_note: submissionNote }),
+    }),
+  acceptProjectCompletion: (assignmentId, decision, remarks, acceptedBy) =>
+    request(`/project-assignments/${assignmentId}/accept`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, remarks, accepted_by: acceptedBy }),
+    }),
+  assessProjectPenalty: (assignmentId, reason) => request(`/project-assignments/${assignmentId}/penalties`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  }),
+  waiveProjectPenalty: (penaltyId, waiverReason) => request(`/project-penalties/${penaltyId}/waive`, {
+    method: 'POST',
+    body: JSON.stringify({ waiver_reason: waiverReason }),
+  }),
+
+  // M07 Payroll
+  getPayrollRuns: () => request('/payroll/runs'),
+  // M16 Reports & Analytics
+  getReportSummary: () => request('/reports/summary'),
+  getReportExport: (report, runId) => {
+    const query = runId ? `?run_id=${encodeURIComponent(runId)}` : '';
+    return request(`/reports/exports/${encodeURIComponent(report)}${query}`);
+  },
+  getMyPayslips: () => request('/payroll/payslips/mine'),
+  getPayrollRunPayslips: (runId) => request(`/payroll/runs/${runId}/payslips`),
+  reviewPayrollPayslip: (runId, payslipId, deductions) => request(`/payroll/runs/${runId}/payslips/${payslipId}/deductions`, {
+    method: 'PATCH',
+    body: JSON.stringify(deductions),
+  }),
+  generatePayrollRun: (year, month, scopeKey, monthName) => request('/payroll/runs', {
+    method: 'POST',
+    body: JSON.stringify({
+      period_year: year,
+      period_month: month,
+      scope_key: scopeKey,
+      month_name: monthName,
+    }),
+  }),
+  lockPayrollRun: (runId, approvedBy) => request(`/payroll/runs/${runId}/lock`, {
+    method: 'POST',
+    body: JSON.stringify({ approved_by: approvedBy }),
+  }),
+
+  // M11 Assets, M14 Helpdesk, M15 Announcements
+  getAssets: () => request('/assets'),
+  createAsset: (asset) => request('/assets', {
+    method: 'POST',
+    body: JSON.stringify(asset),
+  }),
+  assignAsset: (assetId, employeeId) => request(`/assets/${assetId}/assign`, {
+    method: 'POST',
+    body: JSON.stringify({ employee_id: employeeId }),
+  }),
+  returnAsset: (assetId) => request(`/assets/${assetId}/return`, {
+    method: 'POST',
+  }),
+  updateAssetStatus: (assetId, status) => request(`/assets/${assetId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  getTickets: () => request('/helpdesk/tickets'),
+  getTicket: (ticketId) => request(`/helpdesk/tickets/${ticketId}`),
+  createTicket: (ticket) => request('/helpdesk/tickets', {
+    method: 'POST',
+    body: JSON.stringify(ticket),
+  }),
+  addTicketMessage: (ticketId, body) => request(`/helpdesk/tickets/${ticketId}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  }),
+  updateTicketStatus: (ticketId, status) => request(`/helpdesk/tickets/${ticketId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  getAnnouncements: () => request('/announcements'),
+  createAnnouncement: (announcement) => request('/announcements', {
+    method: 'POST',
+    body: JSON.stringify(announcement),
+  }),
+  markAnnouncementRead: (announcementId) => request(`/announcements/${announcementId}/read`, {
+    method: 'POST',
+  }),
+  getLifecycleCases: () => request('/lifecycle/cases'),
+  createLifecycleCase: (lifecycleCase) => request('/lifecycle/cases', {
+    method: 'POST',
+    body: JSON.stringify(lifecycleCase),
+  }),
+  updateLifecycleTask: (taskId, status, notes) => request(`/lifecycle/tasks/${taskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status, notes }),
+  }),
+  getTraining: () => request('/training'),
+  createTrainingCourse: (course) => request('/training/courses', {
+    method: 'POST',
+    body: JSON.stringify(course),
+  }),
+  updateTrainingProgress: (enrollmentId, progressPercent) => request(`/training/enrollments/${enrollmentId}/progress`, {
+    method: 'PATCH',
+    body: JSON.stringify({ progress_percent: progressPercent }),
+  }),
+  reviewTrainingCompletion: (enrollmentId, decision, reviewNote) =>
+    request(`/training/enrollments/${enrollmentId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, review_note: reviewNote }),
+    }),
+  getPerformance: () => request('/performance'),
+  createPerformanceCycle: (year, quarter) => request('/performance/cycles', {
+    method: 'POST',
+    body: JSON.stringify({ year, quarter }),
+  }),
+  closePerformanceCycle: (cycleId) => request(`/performance/cycles/${cycleId}/close`, {
+    method: 'POST',
+  }),
+  createPerformanceObjective: (cycleId, objective) => request(`/performance/cycles/${cycleId}/objectives`, {
+    method: 'POST',
+    body: JSON.stringify(objective),
+  }),
+  updatePerformanceObjective: (objectiveId, objective) => request(`/performance/objectives/${objectiveId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(objective),
+  }),
+  deletePerformanceObjective: (objectiveId) => request(`/performance/objectives/${objectiveId}`, {
+    method: 'DELETE',
+  }),
+  submitPerformanceObjectives: (cycleId) => request(`/performance/cycles/${cycleId}/submit-objectives`, {
+    method: 'POST',
+  }),
+  reviewPerformanceObjective: (objectiveId, decision, managerNote) =>
+    request(`/performance/objectives/${objectiveId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, manager_note: managerNote }),
+    }),
+  updatePerformanceKeyResultProgress: (keyResultId, progressPercent) =>
+    request(`/performance/key-results/${keyResultId}/progress`, {
+      method: 'PATCH',
+      body: JSON.stringify({ progress_percent: progressPercent }),
+    }),
+  submitPerformanceSelfReview: (objectiveId, rating, reviewNote) =>
+    request(`/performance/objectives/${objectiveId}/self-review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rating, review_note: reviewNote }),
+    }),
+  submitPerformanceManagerReview: (objectiveId, rating, reviewNote) =>
+    request(`/performance/objectives/${objectiveId}/manager-review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rating, review_note: reviewNote }),
+    }),
+  getExpenses: () => request('/expenses'),
+  createExpenseClaim: (claim) => request('/expense-claims', {
+    method: 'POST',
+    body: JSON.stringify(claim),
+  }),
+  reviewExpenseClaim: (claimId, decision, decisionNote) => request(`/expense-claims/${claimId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, decision_note: decisionNote }),
+  }),
+  markExpenseClaimPaid: (claimId) => request(`/expense-claims/${claimId}/pay`, { method: 'POST' }),
+  createLoanRequest: (loanRequest) => request('/loan-requests', {
+    method: 'POST',
+    body: JSON.stringify(loanRequest),
+  }),
+  reviewLoanRequest: (loanId, decision, decisionNote) => request(`/loan-requests/${loanId}/review`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, decision_note: decisionNote }),
+  }),
+  getPolicies: () => request('/documents/policies'),
+  createPolicy: (policy) => request('/documents/policies', {
+    method: 'POST',
+    body: JSON.stringify(policy),
+  }),
+  acknowledgePolicy: (policyId) => request(`/documents/policies/${policyId}/acknowledge`, { method: 'POST' }),
+  archivePolicy: (policyId) => request(`/documents/policies/${policyId}/archive`, { method: 'POST' }),
+  getHrLetters: () => request('/hr-letters'),
+  createHrLetter: (letter) => request('/hr-letters', {
+    method: 'POST',
+    body: JSON.stringify(letter),
+  }),
+  reviewEmployeeDocument: (documentId, decision, reviewNote) =>
+    request(`/employee-documents/${documentId}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, review_note: reviewNote }),
+    }),
+
+  // M04 Recruitment
+  getRecruitment: () => request('/recruitment'),
+  createRecruitmentJob: (job) => request('/recruitment/jobs', {
+    method: 'POST',
+    body: JSON.stringify(job),
+  }),
+  updateRecruitmentJobStatus: (jobId, status) => request(`/recruitment/jobs/${jobId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  }),
+  createCandidate: (candidate) => request('/recruitment/candidates', {
+    method: 'POST',
+    body: JSON.stringify(candidate),
+  }),
+  updateCandidateStage: (candidateId, stage) => request(`/recruitment/candidates/${candidateId}/stage`, {
+    method: 'PATCH',
+    body: JSON.stringify({ stage }),
+  }),
+  evaluateCandidate: (candidateId, rating, evaluationNote) =>
+    request(`/recruitment/candidates/${candidateId}/evaluation`, {
+      method: 'PATCH',
+      body: JSON.stringify({ rating, evaluation_note: evaluationNote }),
+    }),
+  convertCandidate: (candidateId) => request(`/recruitment/candidates/${candidateId}/convert`, {
+    method: 'POST',
+  }),
+
+  // M00 Platform & Audit Logs
+  getAuditLogs: () => request('/platform/audit-logs'),
+  getSchedulerRuns: () => request('/platform/scheduler-runs'),
+  getAdminUsers: () => request('/admin/users'),
+  resetUserPassword: (userId, password, passwordConfirmation) => request(`/admin/users/${userId}/password`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+  }),
+  updateUserEmail: (userId, currentPassword, email, emailConfirmation) => request(`/admin/users/${userId}/email`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      current_password: currentPassword,
+      email,
+      email_confirmation: emailConfirmation,
+    }),
+  }),
+};
+
+export default api;
