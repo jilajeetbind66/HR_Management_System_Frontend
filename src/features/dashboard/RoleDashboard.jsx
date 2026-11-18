@@ -55,7 +55,13 @@ const panelCopy = {
   auditor: {
     title: 'Audit & Compliance Panel',
     description: 'Review audit activity and payroll records without changing them.',
-    links: [['platform', 'Audit Logs'], ['reports', 'View Reports'], ['payroll', 'Payroll Records']],
+    links: [
+      ['platform', 'Audit Logs'],
+      ['reports', 'View Reports'],
+      ['payroll', 'Payroll Records'],
+      ['employees', 'Employee Directory'],
+      ['organization', 'Company Masters'],
+    ],
   },
 };
 
@@ -126,6 +132,12 @@ export default function RoleDashboard({ onNavigate }) {
     ? [
       { title: 'Payroll Runs', value: payrollRuns.length, icon: Banknote, color: 'indigo' },
       { title: 'Runs Awaiting Review', value: payrollRuns.filter(run => run.status === 'review').length, icon: CalendarCheck, color: 'amber' },
+    ]
+    : role === 'auditor'
+    ? [
+      { title: 'Audit Trail Records', value: auditLogs.length, icon: ShieldCheck, color: 'indigo' },
+      { title: 'Payroll Cycles', value: payrollRuns.length, icon: Banknote, color: 'blue' },
+      { title: 'Total Employees', value: employeeCount, icon: Users, color: 'emerald' },
     ]
     : [
       { title: 'Audit Events', value: auditLogs.length, icon: ShieldCheck, color: 'indigo' },

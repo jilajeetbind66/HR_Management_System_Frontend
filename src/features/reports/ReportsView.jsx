@@ -345,7 +345,7 @@ export default function ReportsView() {
         </>
       )}
 
-      {!loading && !error && !workforce && !projects && !payroll && !training && (
+      {!loading && !loadError && !workforce && !projects && !payroll && !training && (
         <Card title="Reports unavailable" subtitle="No report data is assigned to this role.">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BarChart3 className="h-4 w-4" />

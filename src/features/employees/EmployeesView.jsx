@@ -159,7 +159,7 @@ export default function EmployeesView() {
       || Number(employee.id) === Number(selectedEmployee?.reporting_manager_id)
     )
   ));
-  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive', 'auditor'].includes(currentUser?.role);
   const canViewCompensation = ['super_admin', 'hr_admin'].includes(currentUser?.role);
   const departmentOptions = currentUser?.role === 'manager'
     ? [...new Set(employees.map((employee) => employee.department).filter(Boolean))]
