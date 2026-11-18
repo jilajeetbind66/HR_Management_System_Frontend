@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   Bell,
   Building2,
@@ -17,10 +18,23 @@ import { canReviewLeave } from '../../utils/leaveApproval';
 const dateKey = (date) => String(date || '').slice(0, 10);
 
 const formatDate = (date) => {
-  const parsedDate = new Date(`${dateKey(date)}T00:00:00`);
+  const key = dateKey(date);
+  if (!key) return 'Date not set';
+  const parsedDate = new Date(`${key}T00:00:00`);
   return Number.isNaN(parsedDate.getTime())
     ? 'Date not set'
     : parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatBadgeDate = (date) => {
+  const key = dateKey(date);
+  if (!key) return { day: '—', month: '—' };
+  const d = new Date(`${key}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return { day: '—', month: '—' };
+  return {
+    day: d.toLocaleDateString('en-IN', { day: 'numeric' }),
+    month: d.toLocaleDateString('en-IN', { month: 'short' }),
+  };
 };
 
 function ManagerStatCard({ title, value, note, badge, icon: Icon, tone, module, onNavigate }) {
@@ -100,12 +114,19 @@ export default function ManagerDashboard({ onNavigate }) {
       && String(record.status || '').toLowerCase() === 'present'
   ).length;
   const latestAnnouncements = announcements.slice(0, 4);
-  const upcomingDeadlines = activeTeamProjects
+  const activeTeamProjectsWithDeadlines = activeTeamProjects
     .map((project) => ({
       ...project,
       deadline: dateKey(project.active_due_date || project.planned_end_date),
     }))
-    .filter((project) => project.deadline && project.deadline >= todayKey)
+    .filter((project) => Boolean(project.deadline));
+
+  const overdueTeamProjects = activeTeamProjectsWithDeadlines
+    .filter((project) => project.deadline < todayKey)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+  const upcomingDeadlines = activeTeamProjectsWithDeadlines
+    .filter((project) => project.deadline >= todayKey)
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
     .slice(0, 4);
 
@@ -206,33 +227,65 @@ export default function ManagerDashboard({ onNavigate }) {
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <PanelHeader
             icon={CalendarDays}
-            title="Upcoming Team Deadlines"
+            title="Team Project Deadlines"
             action="View Projects"
             onAction={() => onNavigate('projects')}
           />
-          <p className="mt-1 text-xs text-slate-500">Due dates from active projects assigned to your direct reports</p>
+          <p className="mt-1 text-xs text-slate-500">Active project milestones and delivery dates for your direct reports</p>
+
+          {overdueTeamProjects.length > 0 && (
+            <div className="mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
+              <div className="flex items-center justify-between font-bold text-rose-800">
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  {overdueTeamProjects.length} Overdue Project{overdueTeamProjects.length > 1 ? 's' : ''} Need Review
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('projects')}
+                  className="text-xs font-semibold text-rose-700 underline hover:text-rose-900"
+                >
+                  Manage
+                </button>
+              </div>
+              <div className="divide-y divide-rose-100">
+                {overdueTeamProjects.slice(0, 3).map((project) => (
+                  <div key={`overdue-${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="py-1.5 flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-rose-950 truncate max-w-[220px]">
+                      {project.name} <span className="font-normal text-rose-700">({project.assigned_employee_name || 'Staff'})</span>
+                    </span>
+                    <span className="text-rose-700 font-semibold shrink-0">Due {formatDate(project.deadline)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {upcomingDeadlines.length ? (
             <div className="mt-4 divide-y divide-slate-100">
-              {upcomingDeadlines.map((project) => (
-                <div key={`${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
-                  <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-teal-50 text-[9px] font-bold leading-tight text-teal-800">
-                    <span>{formatDate(project.deadline).split(' ')[0]}</span>
-                    <span>{formatDate(project.deadline).split(' ')[1]}</span>
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-800">{project.name || 'Team project'}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">
-                      {project.assigned_employee_name || 'Team member'} · Due {formatDate(project.deadline)}
-                    </p>
+              {upcomingDeadlines.map((project) => {
+                const badge = formatBadgeDate(project.deadline);
+                return (
+                  <div key={`${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
+                    <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-teal-50 text-[9px] font-bold leading-tight text-teal-800">
+                      <span>{badge.day}</span>
+                      <span>{badge.month}</span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{project.name || 'Team project'}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {project.assigned_employee_name || 'Team member'} · Due {formatDate(project.deadline)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold capitalize text-teal-800">
+                      {String(project.status || 'Active').replaceAll('_', ' ')}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold capitalize text-teal-800">
-                    {String(project.status || 'Active').replaceAll('_', ' ')}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <p role="status" className="mt-4 rounded-xl bg-slate-50 px-4 py-10 text-center text-xs text-slate-500">
+            <p role="status" className="mt-4 rounded-xl bg-slate-50 px-4 py-8 text-center text-xs text-slate-500">
               No upcoming deadlines found for active team projects.
             </p>
           )}

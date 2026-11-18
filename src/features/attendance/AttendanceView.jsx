@@ -369,6 +369,11 @@ export default function AttendanceView() {
                     </Button>
                   </div>
                 )}
+                {req.status === 'pending' && Number(req.employee_id) === Number(currentUser?.employee_id) && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                    Your request · Awaiting approval
+                  </span>
+                )}
               </div>
             ))}
           </div>

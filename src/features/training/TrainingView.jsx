@@ -419,6 +419,7 @@ export default function TrainingView() {
         type: 'success',
         text: decision === 'approved' ? 'Completion approved and certificate issued.' : 'Completion returned to the employee.',
       });
+      await refreshTraining();
     } catch (error) {
       setFeedback({ type: 'error', text: errorText(error) });
     } finally {

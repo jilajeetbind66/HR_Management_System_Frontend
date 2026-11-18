@@ -158,6 +158,7 @@ export default function ProjectsView() {
     )
   );
   const canRecordPenaltyReview = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canWaivePenaltyReview = ['super_admin', 'manager'].includes(currentUser?.role);
 
   useEffect(() => {
     if (!selectedProject?.assignment_id) {
@@ -738,7 +739,7 @@ export default function ProjectsView() {
                           <AlertTriangle className="w-4 h-4 text-rose-600" />
                           Assessed Penalty Record (Non-Monetary Baseline)
                         </span>
-                        {canRecordPenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && (
+                        {canWaivePenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && Number(project.assigned_employee_id) !== Number(currentUser?.employee_id) && (
                           <button
                             onClick={() => {
                               setSelectedProject(project);
