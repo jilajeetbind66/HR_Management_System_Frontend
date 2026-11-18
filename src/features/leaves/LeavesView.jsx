@@ -585,10 +585,10 @@ export default function LeavesView() {
               onChange={(e) => setLeaveType(e.target.value)}
               className="w-full p-2 rounded-lg border border-slate-200 bg-white"
             >
-              <option value="Casual Leave (CL)">Casual Leave (CL) - {myBalance.cl} days balance</option>
-              <option value="Sick Leave (SL)">Sick Leave (SL) - {myBalance.sl} days balance</option>
-              <option value="Privilege Leave (PL)">Privilege Leave (PL) - {myBalance.pl} days balance</option>
-              <option value="Compensatory Off">Compensatory Off - {myBalance.comp_off} days balance</option>
+              <option value="Casual Leave (CL)">Casual Leave (CL) - {formatDays(myBalance.cl_available ?? myBalance.cl)} days available</option>
+              <option value="Sick Leave (SL)">Sick Leave (SL) - {formatDays(myBalance.sl_available ?? myBalance.sl)} days available</option>
+              <option value="Privilege Leave (PL)">Privilege Leave (PL) - {formatDays(myBalance.pl_available ?? myBalance.pl)} days available</option>
+              <option value="Compensatory Off">Compensatory Off - {formatDays(myBalance.comp_off_available ?? myBalance.comp_off)} days available</option>
               <option value="Leave Without Pay (LOP)">Leave Without Pay (LOP) - unpaid</option>
             </select>
           </div>

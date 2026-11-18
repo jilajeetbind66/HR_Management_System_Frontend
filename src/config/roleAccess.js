@@ -3,6 +3,7 @@ const allModules = [
   'developer_space',
   'my_projects',
   'projects',
+  'leads',
   'employees',
   'organization',
   'documents',
@@ -33,11 +34,11 @@ const modulesByRole = {
     'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
   ],
   hr_admin: [
-    'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
+    'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
     'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   hr_executive: [
-    'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
+    'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
     'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'account'],
@@ -61,6 +62,7 @@ const moduleLabels = {
   developer_space: 'My Workspace',
   my_projects: 'My Projects',
   projects: 'Projects & Deadlines',
+  leads: 'Lead Management',
   employees: 'Employees Directory',
   organization: 'Organization & Branches',
   documents: 'Documents & Policies',
@@ -101,9 +103,19 @@ const permissions = {
   'attendance.approve': ['manager', 'hr_admin', 'hr_executive', 'super_admin'],
   'leaves.approve': ['manager', 'hr_admin', 'hr_executive', 'super_admin'],
   'announcements.create': ['hr_admin', 'super_admin'],
+  'leads.manage': ['hr_admin', 'hr_executive', 'super_admin'],
+  'leads.view': ['employee', 'hr_admin', 'hr_executive', 'super_admin'],
 };
 
-export function canAccessModule(role, module) {
+export function canAccessModule(userOrRole, module) {
+  const role = typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.role : userOrRole;
+  if (module === 'leads') {
+    if (['super_admin', 'hr_admin', 'hr_executive'].includes(role)) return true;
+    if (role === 'employee') {
+      return Boolean(typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.has_lead_access : false);
+    }
+    return false;
+  }
   return Boolean(modulesByRole[role]?.includes(module));
 }
 
@@ -117,8 +129,20 @@ export function getModuleLabel(role, module) {
     : moduleLabels[module] || module;
 }
 
-export function getRoleMenuItems(role) {
-  return (modulesByRole[role] || []).map((module) => ({
+export function getRoleMenuItems(userOrRole) {
+  const role = typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.role : userOrRole;
+  let modules = [...(modulesByRole[role] || [])];
+  if (role === 'employee' && typeof userOrRole === 'object' && userOrRole?.has_lead_access) {
+    if (!modules.includes('leads')) {
+      const idx = modules.indexOf('my_projects');
+      if (idx !== -1) {
+        modules.splice(idx + 1, 0, 'leads');
+      } else {
+        modules.push('leads');
+      }
+    }
+  }
+  return modules.map((module) => ({
     module,
     label: getModuleLabel(role, module),
   }));

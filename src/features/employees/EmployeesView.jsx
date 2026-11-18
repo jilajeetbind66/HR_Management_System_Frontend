@@ -30,7 +30,8 @@ import {
   Eye,
   CheckCircle2,
   XCircle,
-  UserRound
+  UserRound,
+  TrendingUp,
 } from 'lucide-react';
 
 export default function EmployeesView() {
@@ -80,6 +81,9 @@ export default function EmployeesView() {
   });
   const showAddModal = pathname.replace(/\/+$/, '') === '/employees/create';
   const [activeProfileTab, setActiveProfileTab] = useState('job'); // 'job' | 'statutory' | 'salary'
+  const [isUpdatingLeadAccess, setIsUpdatingLeadAccess] = useState(false);
+  const [leadAccessSuccess, setLeadAccessSuccess] = useState('');
+  const canManageLeadAccess = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
   const [successToast, setSuccessToast] = useState(null);
@@ -345,6 +349,21 @@ export default function EmployeesView() {
       );
     } finally {
       setIsSavingCompensation(false);
+    }
+  };
+
+  const handleToggleLeadAccess = async (employeeId, nextValue) => {
+    setIsUpdatingLeadAccess(true);
+    setLeadAccessSuccess('');
+    try {
+      await api.updateEmployeeLeadAccess(employeeId, nextValue);
+      setSelectedEmployee((prev) => (prev ? { ...prev, has_lead_access: nextValue } : null));
+      setLeadAccessSuccess(`Lead Management access ${nextValue ? 'granted' : 'revoked'} successfully.`);
+      setTimeout(() => setLeadAccessSuccess(''), 3500);
+    } catch (err) {
+      alert(err?.data?.message || err.message || 'Failed to update lead access');
+    } finally {
+      setIsUpdatingLeadAccess(false);
     }
   };
 
@@ -659,10 +678,17 @@ export default function EmployeesView() {
                   </td>
 
                   <td className="px-4 py-3">
-                    <Badge variant={emp.status === 'active' ? 'success' : 'warning'} size="sm">
-                      <span className={`w-1.5 h-1.5 rounded-full ${emp.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'} mr-1`} />
-                      {(emp.status || 'unknown').replace('_', ' ')}
-                    </Badge>
+                    <div className="flex flex-col gap-1 items-start">
+                      <Badge variant={emp.status === 'active' ? 'success' : 'warning'} size="sm">
+                        <span className={`w-1.5 h-1.5 rounded-full ${emp.status === 'active' ? 'bg-emerald-500' : 'bg-amber-500'} mr-1`} />
+                        {(emp.status || 'unknown').replace('_', ' ')}
+                      </Badge>
+                      {Boolean(emp.has_lead_access) && (
+                        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 border border-indigo-200">
+                          <TrendingUp className="w-2.5 h-2.5" /> Leads
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   <td className="px-4 py-3 text-right">
@@ -965,6 +991,59 @@ export default function EmployeesView() {
                   </div>
                 )}
               </form>
+            )}
+
+            {activeProfileTab === 'job' && canManageLeadAccess && selectedEmployee && (
+              <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 rounded-lg bg-teal-600 p-2 text-white shadow-sm">
+                      <TrendingUp className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                          Lead Management Access
+                        </span>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          selectedEmployee.has_lead_access
+                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                            : 'bg-slate-200 text-slate-700 border border-slate-300'
+                        }`}>
+                          {selectedEmployee.has_lead_access ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-xs text-teal-800">
+                        When enabled, the Lead Management section appears in this employee's dashboard and sidebar navigation, permitting them to manage assigned leads.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <button
+                      type="button"
+                      disabled={isUpdatingLeadAccess}
+                      onClick={() => handleToggleLeadAccess(selectedEmployee.id, !selectedEmployee.has_lead_access)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 ${
+                        selectedEmployee.has_lead_access ? 'bg-teal-600' : 'bg-slate-300'
+                      }`}
+                      role="switch"
+                      aria-checked={Boolean(selectedEmployee.has_lead_access)}
+                      aria-label="Toggle Lead Management Access"
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          selectedEmployee.has_lead_access ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+                {leadAccessSuccess && (
+                  <div className="mt-2.5 rounded-lg bg-emerald-100/90 px-3 py-1.5 text-xs font-semibold text-emerald-900">
+                    ✓ {leadAccessSuccess}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* TAB CONTENT: STATUTORY (Architecture Section 7.4 & 8) */}

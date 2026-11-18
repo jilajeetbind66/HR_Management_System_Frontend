@@ -25,6 +25,7 @@ import {
   Code2,
   UserRound,
   LogOut,
+  TrendingUp,
 } from 'lucide-react';
 
 function SidebarShell({
@@ -109,7 +110,7 @@ function SidebarShell({
 }
 
 function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjectCount }) {
-  const { logout } = useAuth();
+  const { currentUser, logout } = useAuth();
   const links = [
     { id: 'dashboard', icon: LayoutDashboard },
     { id: 'developer_space', icon: Users },
@@ -117,6 +118,7 @@ function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjec
     { id: 'leaves', icon: CalendarCheck2 },
     { id: 'payslips', icon: Banknote },
     { id: 'my_projects', icon: FolderGit2 },
+    ...(currentUser?.has_lead_access ? [{ id: 'leads', icon: TrendingUp }] : []),
     { id: 'performance', icon: BarChart3 },
     { id: 'training', icon: GraduationCap },
     { id: 'documents', icon: FileText },
@@ -222,6 +224,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
     },
     {
       items: [
+        { id: 'leads', icon: TrendingUp },
         { id: 'employees', icon: Users },
         { id: 'organization', icon: Building },
         { id: 'documents', icon: FileText }
@@ -259,12 +262,12 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
   const visibleGroups = navigationGroups
     .map(group => ({
       ...group,
-      items: group.items.filter(item => canAccessModule(currentUser.role, item.id)),
+      items: group.items.filter(item => canAccessModule(currentUser, item.id)),
     }))
     .filter(group => group.items.length > 0);
   const visibleItems = visibleGroups.flatMap((group) => group.items);
   const hrNavigationOrder = [
-    'dashboard', 'employees', 'organization', 'documents', 'attendance', 'leaves',
+    'dashboard', 'leads', 'employees', 'organization', 'documents', 'attendance', 'leaves',
     'payslips', 'recruitment', 'lifecycle', 'training', 'helpdesk', 'projects',
     'developer_space', 'payroll', 'expenses', 'performance', 'reports', 'announcements', 'account',
   ];

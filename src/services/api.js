@@ -233,6 +233,10 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(compensation),
   }),
+  updateEmployeeLeadAccess: (employeeId, hasLeadAccess) => request(`/employees/${employeeId}/lead-access`, {
+    method: 'PATCH',
+    body: JSON.stringify({ has_lead_access: Boolean(hasLeadAccess) }),
+  }),
 
   // M05 Attendance & Web Punch
   getAttendance: () => request('/attendance'),
@@ -573,6 +577,35 @@ export const api = {
       email,
       email_confirmation: emailConfirmation,
     }),
+  }),
+
+  // M17 Lead Management
+  getLeads: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.status && params.status !== 'all') query.set('status', params.status);
+    if (params.employee_id) query.set('employee_id', params.employee_id);
+    if (params.date_from) query.set('date_from', params.date_from);
+    if (params.date_to) query.set('date_to', params.date_to);
+    if (params.follow_up_due_today) query.set('follow_up_due_today', '1');
+    const qs = query.toString();
+    return request(`/leads${qs ? `?${qs}` : ''}`);
+  },
+  getLead: (id) => request(`/leads/${id}`),
+  createLead: (data) => request('/leads', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateLead: (id, data) => request(`/leads/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  deleteLead: (id) => request(`/leads/${id}`, {
+    method: 'DELETE',
+  }),
+  updateLeadProgress: (id, data) => request(`/leads/${id}/progress`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   }),
 };
 

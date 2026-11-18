@@ -30,6 +30,7 @@ import EmailChangeVerificationPage from './features/account/EmailChangeVerificat
 import EmployeeAccountSetupPage from './features/account/EmployeeAccountSetupPage';
 
 const EmployeesView = lazy(() => import('./features/employees/EmployeesView'));
+const LeadManagementView = lazy(() => import('./features/leads/LeadManagementView'));
 const PlatformView = lazy(() => import('./features/platform/PlatformView'));
 const EmployeePayslipsView = lazy(() => import('./features/payroll/EmployeePayslipsView'));
 const AccountSettingsView = lazy(() => import('./features/account/AccountSettingsView'));
@@ -39,6 +40,7 @@ const TAB_ROUTES = {
   developer_space: '/developer-space',
   my_projects: '/my-projects',
   projects: '/projects',
+  leads: '/leads',
   employees: '/employees',
   organization: '/organization',
   documents: '/documents',
@@ -80,7 +82,7 @@ function MainApp() {
     : ROUTE_TABS[currentPath] || 'dashboard';
   const canAccessCurrentPath = currentPath === '/employees/create'
     ? hasRolePermission(currentUser?.role, 'employees.manage')
-    : canAccessModule(currentUser?.role, activeTab);
+    : canAccessModule(currentUser, activeTab);
 
   useEffect(() => {
     if (isPublicAccountAction) return;
@@ -107,7 +109,7 @@ function MainApp() {
 
   const handleTabSelect = (tab) => {
     const route = TAB_ROUTES[tab];
-    if (route && canAccessModule(currentUser?.role, tab) && currentPath !== route) {
+    if (route && canAccessModule(currentUser, tab) && currentPath !== route) {
       navigate(route);
     }
   };
@@ -140,6 +142,8 @@ function MainApp() {
         return <MyProjectsView />;
       case 'projects':
         return <ProjectsView />;
+      case 'leads':
+        return <LeadManagementView />;
       case 'employees':
         return <EmployeesView />;
       case 'organization':
