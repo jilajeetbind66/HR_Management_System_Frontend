@@ -389,8 +389,10 @@ export default function EmployeeDashboard({ onNavigate }) {
     { label: 'Apply Leave', module: 'leaves', icon: CalendarDays, color: 'bg-blue-50 text-blue-600' },
     { label: 'My Attendance', module: 'attendance', icon: Clock3, color: 'bg-violet-50 text-violet-600' },
     { label: 'My Payslips', module: 'payslips', icon: WalletCards, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Raise Request', module: 'expenses', icon: ReceiptText, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'My Projects', module: 'my_projects', icon: FolderKanban, color: 'bg-teal-50 text-teal-700' },
+    { label: 'My Training', module: 'training', icon: BriefcaseBusiness, color: 'bg-amber-50 text-amber-700' },
+    { label: 'My Performance', module: 'performance', icon: ChartNoAxesColumnIncreasing, color: 'bg-indigo-50 text-indigo-600' },
+    { label: 'Raise Request', module: 'expenses', icon: ReceiptText, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'View Policies', module: 'documents', icon: FileText, color: 'bg-purple-50 text-purple-600' },
     { label: 'Get Support', module: 'helpdesk', icon: CircleHelp, color: 'bg-sky-50 text-sky-600' },
   ];
