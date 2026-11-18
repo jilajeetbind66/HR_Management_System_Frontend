@@ -20,14 +20,14 @@ export default function PlatformView() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+          <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
             Platform & Governance
           </span>
           <span className="text-xs text-slate-500 font-medium">Activity Audits, Number Sequences & Background Jobs</span>
         </div>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Platform, Audit Logs & System Cron</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Immutable Spatie-equivalent activity logs, sequence number generators, and scheduled job monitor.
+          Activity audit records, sequence number generators, and scheduled job monitor.
         </p>
       </div>
 
@@ -36,7 +36,7 @@ export default function PlatformView() {
         <button
           onClick={() => setActiveTab('audit')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'audit' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'audit' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <History className="w-4 h-4" /> Spatie Audit Log Stream ({auditLogs.length})
@@ -45,7 +45,7 @@ export default function PlatformView() {
         <button
           onClick={() => setActiveTab('sequences')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'sequences' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'sequences' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Hash className="w-4 h-4" /> Number Sequences
@@ -54,7 +54,7 @@ export default function PlatformView() {
         <button
           onClick={() => setActiveTab('scheduler')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'scheduler' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'scheduler' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Server className="w-4 h-4" /> Scheduler Runs & Cron
@@ -63,7 +63,7 @@ export default function PlatformView() {
           <button
             onClick={() => setActiveTab('users')}
             className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'users' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'users' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <KeyRound className="w-4 h-4" /> User Access
@@ -91,7 +91,7 @@ export default function PlatformView() {
                   <tr key={log.id} className="hover:bg-slate-50 font-mono text-[11px]">
                     <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{log.created_at}</td>
                     <td className="px-4 py-3 font-sans font-semibold text-slate-900">{log.actor}</td>
-                    <td className="px-4 py-3 font-sans text-indigo-600 font-medium">{log.module}</td>
+                    <td className="px-4 py-3 font-sans text-teal-600 font-medium">{log.module}</td>
                     <td className="px-4 py-3">
                       <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold text-[10px]">
                         {log.action}

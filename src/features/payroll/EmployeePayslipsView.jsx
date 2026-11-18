@@ -28,17 +28,32 @@ function escapeHtml(value) {
 
 function buildPrintDocument(payslip) {
   const employeeName = `${payslip.first_name} ${payslip.last_name}`;
+  const componentEarnings = Array.isArray(payslip.component_breakdown?.earnings)
+    ? payslip.component_breakdown.earnings
+    : [
+      { name: 'Basic Salary', amount: payslip.basic_salary },
+      { name: 'House Rent Allowance', amount: payslip.hra },
+      { name: 'Special Allowance', amount: payslip.special_allowance },
+    ];
+  const employerCosts = Array.isArray(payslip.component_breakdown?.employer_costs)
+    ? payslip.component_breakdown.employer_costs
+    : [];
   const earnings = [
     ['Gross Salary', payslip.gross_salary],
-    ['Basic Salary', payslip.basic_salary],
-    ['House Rent Allowance', payslip.hra],
-    ['Special Allowance', payslip.special_allowance],
+    ...componentEarnings.map(component => [component.name, component.amount]),
+  ];
+  const employerCostEntries = [
+    ...employerCosts.map(component => [component.name, component.amount]),
+    ['Total employer cost', payslip.employer_cost_total],
+    ['Monthly CTC', payslip.total_ctc_monthly],
+    ['Annual CTC', payslip.ctc_annual],
   ];
   const deductions = [
     ['Employee Provident Fund', payslip.pf_employee],
     ['Employee State Insurance', payslip.esi_employee],
     ['Professional Tax', payslip.professional_tax],
     ['Tax Deducted at Source', payslip.tds],
+    [`Leave Without Pay (${Number(payslip.lop_days || 0)} days)`, payslip.lop_deduction],
     ['Total Deductions', payslip.total_deductions],
   ];
   const rows = entries => entries.map(([label, amount]) => (
@@ -72,6 +87,8 @@ function buildPrintDocument(payslip) {
           <div><strong>Period:</strong> ${escapeHtml(payslip.period_month)}/${escapeHtml(payslip.period_year)}</div>
         </section>
         <table><tbody>${rows(earnings)}</tbody></table>
+        <h2>Employer cost information (not deducted from employee pay)</h2>
+        <table><tbody>${rows(employerCostEntries)}</tbody></table>
         <table><tbody>${rows(deductions)}</tbody></table>
         <p class="net">Net salary: ${escapeHtml(formatAmount(payslip.net_salary))}</p>
         <p>Confidential employee document. Tax and professional tax amounts are recorded as reviewed by Payroll.</p>
@@ -155,7 +172,11 @@ export default function EmployeePayslipsView() {
       )}
 
       <div className="space-y-4">
-        {payslips.map(payslip => (
+        {payslips.map(payslip => {
+          const componentBreakdown = payslip.component_breakdown || {};
+          const componentEarnings = Array.isArray(componentBreakdown.earnings) ? componentBreakdown.earnings : [];
+          const employerCosts = Array.isArray(componentBreakdown.employer_costs) ? componentBreakdown.employer_costs : [];
+          return (
           <Card
             key={payslip.id}
             title={payslip.month_name}
@@ -174,6 +195,7 @@ export default function EmployeePayslipsView() {
                 ['Employee ESI', payslip.esi_employee],
                 ['Professional tax', payslip.professional_tax],
                 ['TDS', payslip.tds],
+                [`LOP deduction (${Number(payslip.lop_days || 0)} days)`, payslip.lop_deduction],
                 ['Total deductions', payslip.total_deductions],
               ].map(([label, amount]) => (
                 <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
@@ -186,8 +208,41 @@ export default function EmployeePayslipsView() {
                 <strong className="mt-1 block text-lg text-emerald-800">{formatAmount(payslip.net_salary)}</strong>
               </div>
             </div>
+            {(componentEarnings.length > 0 || employerCosts.length > 0) && (
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <section className="rounded-lg border border-slate-200 p-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Salary component breakdown</h3>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {componentEarnings.map(component => (
+                      <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
+                        <span>{component.name}</span>
+                        <span>{formatAmount(component.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+                <section className="rounded-lg border border-teal-200 bg-teal-50/50 p-3">
+                  <h3 className="text-sm font-semibold text-slate-800">Employer cost (not deducted from your pay)</h3>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {employerCosts.map(component => (
+                      <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
+                        <span>{component.name}</span>
+                        <span>{formatAmount(component.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-2 space-y-1 border-t border-teal-100 pt-2 text-sm font-semibold text-slate-800">
+                    <p className="flex justify-between gap-3"><span>Total employer cost</span><span>{formatAmount(payslip.employer_cost_total)}</span></p>
+                    <p className="flex justify-between gap-3"><span>Monthly CTC</span><span>{formatAmount(payslip.total_ctc_monthly)}</span></p>
+                    <p className="flex justify-between gap-3"><span>Annual CTC</span><span>{formatAmount(payslip.ctc_annual)}</span></p>
+                  </div>
+                </section>
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-              <p className="text-xs text-slate-500">TDS and professional tax were reviewed before publication.</p>
+              <p className="text-xs text-slate-500">
+                TDS and professional tax were reviewed before publication. LOP uses monthly gross divided by calendar days in the payroll month.
+              </p>
               <Button
                 type="button"
                 variant="secondary"
@@ -201,7 +256,8 @@ export default function EmployeePayslipsView() {
               </Button>
             </div>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {!isLoading && !error && payslips.length > 0 && (

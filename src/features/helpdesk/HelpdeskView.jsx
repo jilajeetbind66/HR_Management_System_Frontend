@@ -148,7 +148,7 @@ export default function HelpdeskView() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-indigo-600">
+            <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-teal-600">
               Support &amp; Services
             </span>
             <span className="text-xs font-medium text-slate-500">Ticket conversations and service-level tracking</span>
@@ -201,7 +201,7 @@ export default function HelpdeskView() {
                 {tickets.map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-slate-50">
                     <td className="px-5 py-3">
-                      <span className="mr-1.5 font-mono font-semibold text-indigo-600">{ticket.ticket_code}</span>
+                      <span className="mr-1.5 font-mono font-semibold text-teal-600">{ticket.ticket_code}</span>
                       <span className="font-semibold text-slate-900">{ticket.title}</span>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{ticket.category}</td>
@@ -211,7 +211,7 @@ export default function HelpdeskView() {
                     <td className="px-4 py-3 text-slate-700">{ticket.created_by}</td>
                     <td className="px-4 py-3 text-slate-600">{ticket.assigned_to}</td>
                     <td className={`px-4 py-3 font-semibold ${
-                      ['Overdue', 'Breached'].includes(ticket.sla_status) ? 'text-rose-700' : 'text-indigo-700'
+                      ['Overdue', 'Breached'].includes(ticket.sla_status) ? 'text-rose-700' : 'text-teal-700'
                     }`}>
                       <span className="inline-flex items-center gap-1">
                         {ticket.sla_status === 'Overdue' || ticket.sla_status === 'Breached'
@@ -386,7 +386,7 @@ export default function HelpdeskView() {
                       key={message.id}
                       className={`rounded-lg border p-3 ${
                         message.type === 'status'
-                          ? 'border-indigo-100 bg-indigo-50/60'
+                          ? 'border-teal-100 bg-teal-50/60'
                           : 'border-slate-200 bg-white'
                       }`}
                     >

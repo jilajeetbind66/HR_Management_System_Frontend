@@ -135,8 +135,21 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ identifier, password, role_type: roleType }),
   }),
+  completeAccountSetup: (email, token, password, passwordConfirmation) => request('/auth/complete-account-setup', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      token,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+  }),
   currentUser: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
+  getNotifications: () => request('/notifications'),
+  markNotificationRead: (notificationId) => request(`/notifications/${notificationId}/read`, {
+    method: 'POST',
+  }),
   changePassword: (currentPassword, password, passwordConfirmation) => request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({
@@ -188,6 +201,38 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(employeeData),
   }),
+  getEmployeeArchiveImpact: (employeeId) => request(`/employees/${employeeId}/archive-impact`),
+  archiveEmployee: (employeeId, reassignments = {}) => request(`/employees/${employeeId}`, {
+    method: 'DELETE',
+    body: JSON.stringify(reassignments),
+  }),
+  previewEmployeeImport: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return request('/employees/import/preview', { method: 'POST', body });
+  },
+  importEmployees: (file) => {
+    const body = new FormData();
+    body.append('file', file);
+    return request('/employees/import', { method: 'POST', body });
+  },
+  getEmployeeStaffingRequests: () => request('/employee-staffing-requests'),
+  createEmployeeStaffingRequest: (data) => request('/employee-staffing-requests', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  reviewEmployeeStaffingRequest: (requestId, data) => request(`/employee-staffing-requests/${requestId}/review`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+  updateEmployeeHierarchy: (employeeId, profile) => request(`/employees/${employeeId}/hierarchy`, {
+    method: 'PATCH',
+    body: JSON.stringify(profile),
+  }),
+  updateEmployeeCompensation: (employeeId, compensation) => request(`/employees/${employeeId}/compensation`, {
+    method: 'PATCH',
+    body: JSON.stringify(compensation),
+  }),
 
   // M05 Attendance & Web Punch
   getAttendance: () => request('/attendance'),
@@ -211,19 +256,23 @@ export const api = {
   }),
 
   // M06 Leave Management
-  getLeaves: () => request('/leaves'),
-  getLeaveBalances: () => request('/leaves/balances'),
+  getLeaves: (scope) => request(scope ? `/leaves?scope=${encodeURIComponent(scope)}` : '/leaves'),
+  getLeaveBalances: (scope) => request(scope ? `/leaves/balances?scope=${encodeURIComponent(scope)}` : '/leaves/balances'),
   applyLeave: (leaveData) => request('/leaves/apply', {
     method: 'POST',
     body: JSON.stringify(leaveData),
   }),
-  reviewLeave: (leaveId, decision) => request(`/leaves/${leaveId}/review`, {
+  reviewLeave: (leaveId, decision, remarks) => request(`/leaves/${leaveId}/review`, {
     method: 'POST',
-    body: JSON.stringify({ status: decision }),
+    body: JSON.stringify({ status: decision, remarks }),
+  }),
+  cancelLeave: (leaveId) => request(`/leaves/${leaveId}/cancel`, {
+    method: 'POST',
   }),
 
   // M17 Projects & Deadlines
   getProjects: (status) => request(status ? `/projects?status=${status}` : '/projects'),
+  getMyProjects: () => request('/projects/mine'),
   createProject: (projectData) => request('/projects', {
     method: 'POST',
     body: JSON.stringify(projectData),
@@ -273,6 +322,37 @@ export const api = {
   },
   getMyPayslips: () => request('/payroll/payslips/mine'),
   getPayrollRunPayslips: (runId) => request(`/payroll/runs/${runId}/payslips`),
+  getPayrollComponents: () => request('/payroll/components'),
+  createPayrollComponent: (component) => request('/payroll/components', {
+    method: 'POST',
+    body: JSON.stringify(component),
+  }),
+  updatePayrollComponent: (componentId, component) => request(`/payroll/components/${componentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(component),
+  }),
+  getPayrollStatutoryConfig: () => request('/payroll/statutory-config'),
+  createPayrollContributionConfig: (config) => request('/payroll/statutory-config/contributions', {
+    method: 'POST',
+    body: JSON.stringify(config),
+  }),
+  createProfessionalTaxRules: (rules) => request('/payroll/statutory-config/professional-tax', {
+    method: 'POST',
+    body: JSON.stringify(rules),
+  }),
+  createIncomeTaxRules: (rules) => request('/payroll/statutory-config/income-tax', {
+    method: 'POST',
+    body: JSON.stringify(rules),
+  }),
+  updateBranchProfessionalTax: (branchId, enabled) => request(`/payroll/statutory-config/branches/${branchId}/professional-tax`, {
+    method: 'PATCH',
+    body: JSON.stringify({ pt_applicable: enabled }),
+  }),
+  getPayrollTaxDeclarations: () => request('/payroll/tax-declarations'),
+  updatePayrollTaxDeclaration: (employeeId, declaration) => request(`/payroll/tax-declarations/${employeeId}`, {
+    method: 'PUT',
+    body: JSON.stringify(declaration),
+  }),
   reviewPayrollPayslip: (runId, payslipId, deductions) => request(`/payroll/runs/${runId}/payslips/${payslipId}/deductions`, {
     method: 'PATCH',
     body: JSON.stringify(deductions),
@@ -285,6 +365,12 @@ export const api = {
       scope_key: scopeKey,
       month_name: monthName,
     }),
+  }),
+  verifyPayrollRun: (runId) => request(`/payroll/runs/${runId}/verify`, {
+    method: 'POST',
+  }),
+  publishPayrollRun: (runId) => request(`/payroll/runs/${runId}/publish`, {
+    method: 'POST',
   }),
   lockPayrollRun: (runId, approvedBy) => request(`/payroll/runs/${runId}/lock`, {
     method: 'POST',
@@ -343,6 +429,17 @@ export const api = {
   createTrainingCourse: (course) => request('/training/courses', {
     method: 'POST',
     body: JSON.stringify(course),
+  }),
+  updateTrainingCourse: (courseId, course) => request(`/training/courses/${courseId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(course),
+  }),
+  deleteTrainingCourse: (courseId) => request(`/training/courses/${courseId}`, {
+    method: 'DELETE',
+  }),
+  assignTrainingEmployees: (courseId, employeeIds) => request(`/training/courses/${courseId}/enrollments`, {
+    method: 'POST',
+    body: JSON.stringify({ employee_ids: employeeIds }),
   }),
   updateTrainingProgress: (enrollmentId, progressPercent) => request(`/training/enrollments/${enrollmentId}/progress`, {
     method: 'PATCH',

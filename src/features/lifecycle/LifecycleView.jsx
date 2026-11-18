@@ -162,7 +162,7 @@ export default function LifecycleView() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+          <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
             People Operations
           </span>
           <span className="text-xs text-slate-500 font-medium">Onboarding journeys and offboarding clearances</span>
@@ -180,7 +180,7 @@ export default function LifecycleView() {
           aria-selected={activeTab === 'onboarding'}
           onClick={() => changeType('onboarding')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'onboarding' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'onboarding' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <UserCheck className="w-4 h-4" /> New Joiner Induction
@@ -191,7 +191,7 @@ export default function LifecycleView() {
           aria-selected={activeTab === 'offboarding'}
           onClick={() => changeType('offboarding')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'offboarding' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'offboarding' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <FileCheck className="w-4 h-4" /> Resignation &amp; Clearances
@@ -303,7 +303,7 @@ export default function LifecycleView() {
             <button
               type="submit"
               disabled={saving || employees.length === 0}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? 'Saving…' : activeTab === 'onboarding' ? 'Create onboarding checklist' : 'Create offboarding case'}
             </button>
@@ -355,7 +355,7 @@ export default function LifecycleView() {
                       </div>
                     </div>
                     <progress
-                      className="mt-3 h-1.5 w-full accent-indigo-600"
+                      className="mt-3 h-1.5 w-full accent-teal-600"
                       value={closedTasks}
                       max={Math.max(tasks.length, 1)}
                       aria-label={`${closedTasks} of ${tasks.length} tasks complete`}
@@ -416,7 +416,7 @@ export default function LifecycleView() {
                                 type="button"
                                 disabled={savingTaskId === task.id}
                                 onClick={() => saveTask(task)}
-                                className="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50"
+                                className="rounded-lg border border-teal-200 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-50 disabled:opacity-50"
                               >
                                 {savingTaskId === task.id ? 'Saving…' : 'Save task'}
                               </button>

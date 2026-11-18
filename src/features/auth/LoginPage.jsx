@@ -281,8 +281,8 @@ export default function LoginPage() {
       >
         <div className="space-y-4 text-xs">
           <p className="text-slate-600">
-            HR will create your employee record and linked login account, then share your work email or employee code and a temporary password.
-            Select Employee when signing in; you will be asked to change that password before using the portal.
+            HR will create your employee record and linked login account, then send a one-time password setup link to your work email.
+            Use that link to create your password, then sign in with your work email or employee code.
           </p>
           <a
             href={hrContactHref}

@@ -11,6 +11,7 @@ const responseDataArray = (response) => Array.isArray(response?.data) ? response
 const ROUTE_TABS = {
   '/dashboard': 'dashboard',
   '/developer-space': 'developer_space',
+  '/my-projects': 'my_projects',
   '/projects': 'projects',
   '/employees': 'employees',
   '/organization': 'organization',
@@ -32,20 +33,21 @@ const ROUTE_TABS = {
 };
 
 const DASHBOARD_DATA_BY_ROLE = {
-  employee: ['projects', 'attendance', 'leaves', 'leaveBalances', 'regularizations', 'announcements'],
+  employee: ['myProjects', 'attendance', 'leaves', 'leaveBalances', 'regularizations', 'announcements'],
   manager: ['employees', 'projects', 'attendance', 'leaves', 'announcements', 'branches'],
   super_admin: ['employees', 'projects', 'attendance', 'leaves', 'payrollRuns', 'branches', 'announcements'],
-  hr_admin: ['employees', 'attendance', 'leaves', 'branches', 'announcements'],
-  hr_executive: ['employees', 'attendance', 'leaves', 'branches', 'announcements'],
+  hr_admin: ['employees', 'projects', 'attendance', 'leaves', 'branches', 'announcements'],
+  hr_executive: ['employees', 'projects', 'attendance', 'leaves', 'branches', 'announcements'],
   recruiter: ['announcements'],
   payroll_admin: ['payrollRuns'],
   auditor: ['auditLogs', 'payrollRuns', 'branches'],
 };
 
 const MODULE_DATA = {
-  developer_space: ['projects', 'attendance', 'leaveBalances'],
+  developer_space: ['myProjects', 'attendance', 'leaves', 'leaveBalances'],
+  my_projects: ['myProjects'],
   projects: ['projects', 'employees', 'penaltyPolicy'],
-  employees: ['employees', 'branches', 'departments'],
+  employees: ['employees', 'branches', 'departments', 'designations'],
   organization: ['company', 'branches', 'departments', 'designations', 'holidays'],
   documents: ['employees'],
   attendance: ['attendance', 'regularizations', 'employees'],
@@ -70,6 +72,8 @@ export function HRMSProvider({ children }) {
   const [holidays, setHolidays] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [myProjects, setMyProjects] = useState([]);
+  const [selectedPersonaId, setSelectedPersonaId] = useState(null);
   const [penaltyPolicy, setPenaltyPolicy] = useState(null);
   const [attendance, setAttendance] = useState([]);
   const [regularizationRequests, setRegularizationRequests] = useState([]);
@@ -79,6 +83,7 @@ export function HRMSProvider({ children }) {
   const [recruitment, setRecruitment] = useState(emptyRecruitment);
   const [tickets, setTickets] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [assets, setAssets] = useState([]);
   const [backendStatus, setBackendStatus] = useState('checking');
@@ -97,9 +102,12 @@ export function HRMSProvider({ children }) {
     setBranches([]);
     setDepartments([]);
     setDesignations([]);
+    setDesignations([]);
     setHolidays([]);
     setEmployees([]);
     setProjects([]);
+    setMyProjects([]);
+    setSelectedPersonaId(null);
     setPenaltyPolicy(null);
     setAttendance([]);
     setRegularizationRequests([]);
@@ -109,6 +117,7 @@ export function HRMSProvider({ children }) {
     setRecruitment(emptyRecruitment());
     setTickets([]);
     setAnnouncements([]);
+    setNotifications([]);
     setAuditLogs([]);
     setAssets([]);
   }, []);
@@ -117,8 +126,19 @@ export function HRMSProvider({ children }) {
     const role = currentUser?.role;
     const canViewOrganization = ['super_admin', 'hr_admin', 'hr_executive', 'manager', 'auditor'].includes(role);
     const canViewEmployees = ['super_admin', 'hr_admin', 'hr_executive', 'manager', 'auditor'].includes(role);
-    const canViewProjects = ['employee', 'manager', 'super_admin'].includes(role);
-    const canViewWorkforce = ['employee', 'manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
+    const canViewProjects = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
+    const canReviewLeaves = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
+    const canViewMyProjects = [
+      'employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter',
+      'payroll_admin', 'auditor', 'super_admin',
+    ].includes(role);
+    const canViewWorkforce = [
+      'employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter',
+      'payroll_admin', 'auditor', 'super_admin',
+    ].includes(role);
+    const canViewRegularizations = [
+      'employee', 'manager', 'hr_admin', 'hr_executive', 'super_admin',
+    ].includes(role);
     const canViewAssets = role === 'super_admin';
     const canViewHelpdesk = ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'super_admin'].includes(role);
     const canViewAnnouncements = ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'super_admin'].includes(role);
@@ -136,8 +156,9 @@ export function HRMSProvider({ children }) {
       employees: canViewEmployees,
       projects: canViewProjects,
       penaltyPolicy: canViewProjects,
+      myProjects: canViewMyProjects,
       attendance: canViewWorkforce,
-      regularizations: canViewWorkforce,
+      regularizations: canViewRegularizations,
       leaves: canViewWorkforce,
       leaveBalances: canViewWorkforce,
       payrollRuns: canViewPayroll,
@@ -145,6 +166,7 @@ export function HRMSProvider({ children }) {
       recruitment: canViewRecruitment,
       tickets: canViewHelpdesk,
       announcements: canViewAnnouncements,
+      notifications: true,
       assets: canViewAssets,
     };
     const resourceLoaders = {
@@ -162,6 +184,7 @@ export function HRMSProvider({ children }) {
       holidays: async () => responseDataArray(await api.getHolidays()),
       employees: async () => responseDataArray(await api.getEmployees()),
       projects: async () => responseDataArray(await api.getProjects()),
+      myProjects: async () => responseDataArray(await api.getMyProjects()),
       penaltyPolicy: async () => (await api.getProjectPenaltyPolicy())?.data || null,
       attendance: async () => responseDataArray(await api.getAttendance()),
       regularizations: async () => responseDataArray(await api.getRegularizations()),
@@ -172,15 +195,23 @@ export function HRMSProvider({ children }) {
       recruitment: async () => (await api.getRecruitment())?.data || emptyRecruitment(),
       tickets: async () => responseDataArray(await api.getTickets()),
       announcements: async () => responseDataArray(await api.getAnnouncements()),
+      notifications: async () => responseDataArray(await api.getNotifications()),
       assets: async () => responseDataArray(await api.getAssets()),
     };
 
-    const moduleResources = tab === 'employees' && role === 'manager'
-      ? ['employees', 'branches']
-      : MODULE_DATA[tab] || [];
+    const moduleResources = tab === 'payroll' && role === 'hr_admin'
+      ? []
+      : tab === 'employees' && role === 'manager'
+        ? ['employees', 'branches']
+        : tab === 'developer_space' && role === 'super_admin'
+          ? [...MODULE_DATA[tab], 'projects', 'employees']
+          : MODULE_DATA[tab] || [];
     const requestedResources = new Set([
       ...(tab === 'dashboard' ? DASHBOARD_DATA_BY_ROLE[role] || [] : []),
       ...moduleResources,
+      ...(canViewProjects ? ['projects'] : []),
+      ...(canReviewLeaves ? ['leaves'] : []),
+      'notifications',
       'health',
     ]);
     const resourcesToLoad = [...requestedResources].filter(
@@ -218,6 +249,7 @@ export function HRMSProvider({ children }) {
       if ('holidays' in loadedData) setHolidays(loadedData.holidays);
       if ('employees' in loadedData) setEmployees(loadedData.employees);
       if ('projects' in loadedData) setProjects(loadedData.projects);
+      if ('myProjects' in loadedData) setMyProjects(loadedData.myProjects);
       if ('penaltyPolicy' in loadedData) setPenaltyPolicy(loadedData.penaltyPolicy);
       if ('attendance' in loadedData) setAttendance(loadedData.attendance);
       if ('regularizations' in loadedData) setRegularizationRequests(loadedData.regularizations);
@@ -228,6 +260,7 @@ export function HRMSProvider({ children }) {
       if ('recruitment' in loadedData) setRecruitment(loadedData.recruitment);
       if ('tickets' in loadedData) setTickets(loadedData.tickets);
       if ('announcements' in loadedData) setAnnouncements(loadedData.announcements);
+      if ('notifications' in loadedData) setNotifications(loadedData.notifications);
       if ('assets' in loadedData) setAssets(loadedData.assets);
       resourcesToLoad.forEach((key) => loadedResources.current.add(key));
       setBackendStatus('connected');
@@ -257,30 +290,65 @@ export function HRMSProvider({ children }) {
     loadedResources.current.add('projects');
   };
 
-  const refreshAttendance = async () => {
-    const [attendanceResponse, regularizationsResponse] = await Promise.all([
-      api.getAttendance(),
-      api.getRegularizations(),
-    ]);
-    setAttendance(Array.isArray(attendanceResponse?.data) ? attendanceResponse.data : []);
-    setRegularizationRequests(Array.isArray(regularizationsResponse?.data) ? regularizationsResponse.data : []);
-    loadedResources.current.add('attendance');
-    loadedResources.current.add('regularizations');
+  const refreshMyProjects = async () => {
+    const response = await api.getMyProjects();
+    setMyProjects(Array.isArray(response?.data) ? response.data : []);
+    loadedResources.current.add('myProjects');
   };
 
-  const refreshLeaveData = async () => {
-    const [leavesResponse, leaveBalancesResponse] = await Promise.all([
-      api.getLeaves(),
-      api.getLeaveBalances(),
+  const refreshProjectData = async () => {
+    await refreshMyProjects();
+    if (['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(currentUser?.role)) {
+      await refreshProjects();
+    }
+  };
+
+  const refreshAttendance = useCallback(async () => {
+    const canViewRegularizations = [
+      'employee', 'manager', 'hr_admin', 'hr_executive', 'super_admin',
+    ].includes(currentUser?.role);
+    const [attendanceResponse, regularizationsResponse] = await Promise.all([
+      api.getAttendance(),
+      canViewRegularizations ? api.getRegularizations() : Promise.resolve(null),
     ]);
-    setLeaveRequests(Array.isArray(leavesResponse?.data) ? leavesResponse.data : []);
-    setLeaveBalances(leaveBalancesResponse?.data || {});
+    setAttendance(Array.isArray(attendanceResponse?.data) ? attendanceResponse.data : []);
+    if (regularizationsResponse) {
+      setRegularizationRequests(Array.isArray(regularizationsResponse?.data) ? regularizationsResponse.data : []);
+    }
+    loadedResources.current.add('attendance');
+    if (regularizationsResponse) loadedResources.current.add('regularizations');
+  }, [currentUser?.role]);
+
+  const refreshLeaveData = async () => {
+    if (currentUser?.role === 'manager') {
+      const [mine, approvals, teamBalances, ownBalances] = await Promise.all([
+        api.getLeaves('mine'),
+        api.getLeaves('approvals'),
+        api.getLeaveBalances('approvals'),
+        api.getLeaveBalances('mine'),
+      ]);
+      const requests = [...(mine?.data || []), ...(approvals?.data || [])];
+      setLeaveRequests([...new Map(requests.map((leave) => [Number(leave.id), leave])).values()]);
+      setLeaveBalances({ ...(teamBalances?.data || {}), ...(ownBalances?.data || {}) });
+    } else {
+      const [leavesResponse, leaveBalancesResponse] = await Promise.all([
+        api.getLeaves(),
+        api.getLeaveBalances(),
+      ]);
+      setLeaveRequests(Array.isArray(leavesResponse?.data) ? leavesResponse.data : []);
+      setLeaveBalances(leaveBalancesResponse?.data || {});
+    }
     loadedResources.current.add('leaves');
     loadedResources.current.add('leaveBalances');
   };
 
+  const findProject = (projectId) => (
+    projects.find((item) => Number(item.id) === Number(projectId))
+    || myProjects.find((item) => Number(item.id) === Number(projectId))
+  );
+
   const findAssignmentId = (projectId) => {
-    const project = projects.find((item) => Number(item.id) === Number(projectId));
+    const project = findProject(projectId);
     if (!project?.assignment_id) {
       throw new Error('Project assignment was not found. Reload the project list and try again.');
     }
@@ -293,16 +361,17 @@ export function HRMSProvider({ children }) {
       description: projectData.description,
       deliverable: projectData.deliverable,
       priority: projectData.priority || 'Medium',
+      project_type: projectData.project_type || null,
       assigned_employee_id: Number(projectData.assigned_employee_id),
       start_date: projectData.start_date,
       planned_end_date: projectData.planned_end_date,
     });
-    await refreshProjects();
+    await refreshProjectData();
     return response?.data;
   };
 
   const updateProjectProgress = async (projectId, progressPercent, note) => {
-    const project = projects.find((item) => Number(item.id) === Number(projectId));
+    const project = findProject(projectId);
     if (!project) {
       throw new Error('Project was not found. Reload the project list and try again.');
     }
@@ -312,22 +381,22 @@ export function HRMSProvider({ children }) {
       note,
       project.version || 1
     );
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const requestExtension = async (projectId, requestedDueDate, reason) => {
     await api.requestExtension(findAssignmentId(projectId), requestedDueDate, reason);
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const reviewExtension = async (_projectId, extensionId, decision, decisionNote) => {
     await api.approveExtension(extensionId, decision, decisionNote);
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const submitProjectCompletion = async (projectId, submissionNote, deliverableLink) => {
     await api.submitProjectCompletion(findAssignmentId(projectId), deliverableLink, submissionNote);
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const reviewProjectCompletion = async (projectId, decision, reviewNote) => {
@@ -336,17 +405,17 @@ export function HRMSProvider({ children }) {
       decision === 'accept' ? 'accept' : 'return',
       reviewNote
     );
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const assessPenalty = async (projectId, penaltyData) => {
     await api.assessProjectPenalty(findAssignmentId(projectId), penaltyData.reason);
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const waivePenalty = async (_projectId, penaltyId, waiverReason) => {
     await api.waiveProjectPenalty(penaltyId, waiverReason);
-    await refreshProjects();
+    await refreshProjectData();
   };
 
   const punchAttendance = async (employeeId, location = 'Web Client Portal') => {
@@ -386,19 +455,34 @@ export function HRMSProvider({ children }) {
   };
 
   const applyLeave = async (leaveData) => {
+    let certificateUploadId = leaveData.certificate_upload_id;
+    if (leaveData.certificate_file) {
+      const upload = await api.uploadFile(leaveData.certificate_file, 'leave_certificates', {
+        employeeId: Number(leaveData.employee_id),
+      });
+      certificateUploadId = upload?.data?.id;
+      if (!certificateUploadId) {
+        throw new Error('Certificate upload completed without an upload ID.');
+      }
+    }
+
     const response = await api.applyLeave({
       employee_id: Number(leaveData.employee_id),
       leave_type: leaveData.leave_type,
       from_date: leaveData.from_date,
       to_date: leaveData.to_date,
-      days: Number(leaveData.days),
       reason: leaveData.reason,
+      is_half_day: Boolean(leaveData.is_half_day),
+      half_day_period: leaveData.half_day_period || null,
+      certificate_upload_id: certificateUploadId || null,
+      ...(leaveData.days !== undefined ? { days: Number(leaveData.days) } : {}),
     });
     const savedLeave = response?.data
       ? {
         ...response.data,
         employee_name: [response.data.first_name, response.data.last_name].filter(Boolean).join(' ')
           || leaveData.employee_name,
+        warnings: response?.warnings || [],
       }
       : null;
     if (savedLeave) {
@@ -411,8 +495,20 @@ export function HRMSProvider({ children }) {
     return savedLeave;
   };
 
-  const reviewLeave = async (leaveId, decision) => {
-    await api.reviewLeave(leaveId, decision);
+  const reviewLeave = async (leaveId, decision, remarks) => {
+    try {
+      await api.reviewLeave(leaveId, decision, remarks);
+    } catch (error) {
+      if (error?.status === 403 || error?.status === 409) {
+        await refreshLeaveData();
+      }
+      throw error;
+    }
+    await refreshLeaveData();
+  };
+
+  const cancelLeave = async (leaveId) => {
+    await api.cancelLeave(leaveId);
     await refreshLeaveData();
   };
 
@@ -421,6 +517,24 @@ export function HRMSProvider({ children }) {
     const runs = Array.isArray(response?.data) ? response.data : [];
     setPayrollRuns(runs);
     return runs;
+  };
+
+  const refreshNotifications = useCallback(async () => {
+    const response = await api.getNotifications();
+    const items = responseDataArray(response);
+    setNotifications(items);
+    loadedResources.current.add('notifications');
+    return items;
+  }, []);
+
+  const markNotificationRead = async (notificationId) => {
+    const response = await api.markNotificationRead(notificationId);
+    if (response?.data) {
+      setNotifications((previous) => previous.map((item) => (
+        Number(item.id) === Number(response.data.id) ? response.data : item
+      )));
+    }
+    return response?.data;
   };
 
   const runPayroll = async (monthName, year, scopeKey = 'company') => {
@@ -445,6 +559,8 @@ export function HRMSProvider({ children }) {
       gender: employeeData.gender,
       date_of_birth: employeeData.date_of_birth,
       branch_id: Number(employeeData.branch_id),
+      department_id: employeeData.department_id ? Number(employeeData.department_id) : null,
+      designation_id: employeeData.designation_id ? Number(employeeData.designation_id) : null,
       designation: employeeData.designation,
       department: employeeData.department,
       date_of_joining: employeeData.date_of_joining || new Date().toISOString().substring(0, 10),
@@ -466,7 +582,49 @@ export function HRMSProvider({ children }) {
     return {
       ...response?.data,
       credentials: response?.credentials,
+      warnings: response?.warnings || [],
     };
+  };
+
+  const updateEmployeeHierarchy = async (employeeId, profile) => {
+    const response = await api.updateEmployeeHierarchy(employeeId, profile);
+    if (!response?.data) {
+      throw new Error('The employee profile was updated, but the latest profile was not returned.');
+    }
+
+    setEmployees((previous) => previous.map((employee) => (
+      Number(employee.id) === Number(employeeId) ? response.data : employee
+    )));
+    return {
+      ...response.data,
+      warnings: response?.warnings || [],
+    };
+  };
+
+  const updateEmployeeCompensation = async (employeeId, compensation) => {
+    const response = await api.updateEmployeeCompensation(employeeId, compensation);
+    if (!response?.data) {
+      throw new Error('Compensation was updated, but the latest employee profile was not returned.');
+    }
+
+    setEmployees((previous) => previous.map((employee) => (
+      Number(employee.id) === Number(employeeId) ? response.data : employee
+    )));
+    return response.data;
+  };
+
+  const archiveEmployee = async (employeeId, reassignments = {}) => {
+    await api.archiveEmployee(employeeId, reassignments);
+    setEmployees((previous) => previous.filter(
+      (employee) => Number(employee.id) !== Number(employeeId)
+    ));
+  };
+
+  const importEmployees = async (file) => {
+    const response = await api.importEmployees(file);
+    const employeesResponse = await api.getEmployees();
+    setEmployees(Array.isArray(employeesResponse?.data) ? employeesResponse.data : []);
+    return response?.data;
   };
 
   const updateEmployeeAvatar = (employeeId, avatarUrl) => {
@@ -597,8 +755,15 @@ export function HRMSProvider({ children }) {
       holidays,
       employees,
       addEmployee,
+      archiveEmployee,
+      importEmployees,
+      updateEmployeeHierarchy,
+      updateEmployeeCompensation,
       updateEmployeeAvatar,
       projects,
+      myProjects,
+      selectedPersonaId,
+      setSelectedPersonaId,
       createProject,
       updateProjectProgress,
       requestExtension,
@@ -617,6 +782,7 @@ export function HRMSProvider({ children }) {
       leaveRequests,
       applyLeave,
       reviewLeave,
+      cancelLeave,
       payrollRuns,
       refreshPayrollRuns,
       runPayroll,
@@ -633,6 +799,9 @@ export function HRMSProvider({ children }) {
       addTicketMessage,
       updateTicketStatus,
       announcements,
+      notifications,
+      refreshNotifications,
+      markNotificationRead,
       createAnnouncement,
       markAnnouncementRead,
       auditLogs,
@@ -644,6 +813,7 @@ export function HRMSProvider({ children }) {
       backendStatus,
       backendError,
       syncWithBackend,
+      refreshAttendance,
       api,
     }}>
       {children}

@@ -63,8 +63,8 @@ const statusClass = (status) => {
 
 function EmployeeHero({ firstName }) {
   return (
-    <section className="relative isolate flex min-h-[130px] overflow-hidden rounded-2xl bg-[#0b1533] px-5 py-5 text-white shadow-sm sm:px-7">
-      <div aria-hidden="true" className="absolute inset-0 -z-20 bg-gradient-to-r from-[#0b1533] via-[#0d2860] to-[#1d5595]" />
+    <section className="hrms-dashboard-hero relative isolate flex min-h-[130px] overflow-hidden rounded-2xl px-5 py-5 text-white shadow-sm sm:px-7">
+      <div aria-hidden="true" className="absolute inset-0 -z-20 bg-gradient-to-r from-[#0f766e] via-[#0f9488] to-[#059669]" />
       <svg
         aria-hidden="true"
         viewBox="0 0 480 180"
@@ -73,26 +73,26 @@ function EmployeeHero({ firstName }) {
       >
         <defs>
           <linearGradient id="employee-building-sky" x1="0" x2="1" y1="0" y2="1">
-            <stop offset="0" stopColor="#5ba8ff" />
-            <stop offset="1" stopColor="#173d82" />
+            <stop offset="0" stopColor="#5de0cb" />
+            <stop offset="1" stopColor="#176c63" />
           </linearGradient>
           <pattern id="employee-building-windows" width="17" height="16" patternUnits="userSpaceOnUse">
-            <rect x="3" y="3" width="8" height="8" rx="1" fill="#9dcaff" fillOpacity=".52" />
+            <rect x="3" y="3" width="8" height="8" rx="1" fill="#9fefe1" fillOpacity=".52" />
           </pattern>
         </defs>
-        <path d="M170 180 294 24l186 19v137Z" fill="#123774" />
+        <path d="M170 180 294 24l186 19v137Z" fill="#0b6257" />
         <path d="M235 180V61l122-44 123 26v137Z" fill="url(#employee-building-sky)" />
         <path d="M249 180V69l104-37v148Z" fill="url(#employee-building-windows)" />
-        <path d="M371 180V48l90 18v114Z" fill="#2869ad" />
+        <path d="M371 180V48l90 18v114Z" fill="#168b79" />
         <path d="M383 180V57l70 14v109Z" fill="url(#employee-building-windows)" />
-        <path d="M205 180 274 82v98Z" fill="#17437f" fillOpacity=".85" />
-        <path d="M211 180h269" stroke="#90c6ff" strokeOpacity=".6" strokeWidth="2" />
+        <path d="M205 180 274 82v98Z" fill="#0f766e" fillOpacity=".85" />
+        <path d="M211 180h269" stroke="#a7f3e7" strokeOpacity=".6" strokeWidth="2" />
       </svg>
-      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0b1533] via-[#0b1533]/95 to-transparent" />
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-gradient-to-r from-[#0f766e] via-[#0f766e]/95 to-transparent" />
       <div className="relative z-10 flex min-w-0 flex-1 flex-col justify-center">
-        <p className="text-[11px] font-semibold tracking-wide text-blue-100">Welcome back,</p>
+        <p className="text-[11px] font-semibold tracking-wide text-teal-50">Welcome back,</p>
         <h1 className="mt-0.5 truncate text-xl font-extrabold tracking-tight sm:text-2xl">
-          <span className="text-sky-400">{firstName}!</span>
+          <span className="text-teal-100">{firstName}!</span>
           <span aria-hidden="true" className="ml-2">👋</span>
         </h1>
         <p className="mt-1 text-xs font-medium text-slate-200">Keep up the great work!</p>
@@ -100,10 +100,10 @@ function EmployeeHero({ firstName }) {
       <div className="relative z-10 hidden w-[34%] items-center justify-center pr-2 text-center md:flex">
         <p className="text-sm font-bold italic leading-snug text-white drop-shadow sm:text-base">
           “Dream Big,<br />Work Smart”
-          <span aria-hidden="true" className="mx-auto mt-2 block h-1 w-12 -skew-x-12 rounded-full bg-orange-400" />
+          <span aria-hidden="true" className="mx-auto mt-2 block h-1 w-12 -skew-x-12 rounded-full bg-teal-300" />
         </p>
       </div>
-      <span aria-hidden="true" className="absolute bottom-0 left-7 h-1 w-16 bg-orange-500" />
+      <span aria-hidden="true" className="absolute bottom-0 left-7 h-1 w-16 bg-teal-300" />
     </section>
   );
 }
@@ -222,7 +222,7 @@ function AttendanceTrend({ months, maxCount }) {
 function PanelHeading({ icon: Icon, title, action, onAction, tone = 'blue' }) {
   const tones = {
     blue: 'text-blue-600 bg-blue-50',
-    orange: 'text-orange-600 bg-orange-50',
+    teal: 'text-teal-700 bg-teal-50',
     green: 'text-emerald-600 bg-emerald-50',
   };
   return (
@@ -250,7 +250,7 @@ function PanelHeading({ icon: Icon, title, action, onAction, tone = 'blue' }) {
 export default function EmployeeDashboard({ onNavigate }) {
   const { currentUser } = useAuth();
   const {
-    projects,
+    myProjects: projects,
     attendance,
     leaveRequests,
     leaveBalances,
@@ -277,7 +277,8 @@ export default function EmployeeDashboard({ onNavigate }) {
   const halfDays = monthAttendance.filter(
     (record) => String(record.status || '').toLowerCase().includes('half')
   ).length;
-  const otherDays = Math.max(0, monthAttendance.length - presentDays - absentDays - halfDays);
+  const shortHoursDays = getStatusCount('short hours');
+  const otherDays = Math.max(0, monthAttendance.length - presentDays - absentDays - halfDays - shortHoursDays);
   const attendancePercentage = monthAttendance.length
     ? Math.round((presentDays / monthAttendance.length) * 100)
     : 0;
@@ -314,6 +315,7 @@ export default function EmployeeDashboard({ onNavigate }) {
     { label: 'Present', count: presentDays },
     { label: 'Absent', count: absentDays },
     { label: 'Half Day', count: halfDays },
+    { label: 'Short Hours', count: shortHoursDays },
     { label: 'Other', count: otherDays },
   ];
 
@@ -388,7 +390,7 @@ export default function EmployeeDashboard({ onNavigate }) {
     { label: 'My Attendance', module: 'attendance', icon: Clock3, color: 'bg-violet-50 text-violet-600' },
     { label: 'My Payslips', module: 'payslips', icon: WalletCards, color: 'bg-emerald-50 text-emerald-600' },
     { label: 'Raise Request', module: 'expenses', icon: ReceiptText, color: 'bg-emerald-50 text-emerald-600' },
-    { label: 'My Projects', module: 'projects', icon: FolderKanban, color: 'bg-orange-50 text-orange-600' },
+    { label: 'My Projects', module: 'my_projects', icon: FolderKanban, color: 'bg-teal-50 text-teal-700' },
     { label: 'View Policies', module: 'documents', icon: FileText, color: 'bg-purple-50 text-purple-600' },
     { label: 'Get Support', module: 'helpdesk', icon: CircleHelp, color: 'bg-sky-50 text-sky-600' },
   ];
@@ -446,29 +448,29 @@ export default function EmployeeDashboard({ onNavigate }) {
           <p className="relative mt-1 text-2xl font-extrabold tracking-tight text-slate-900">{pendingRequests}</p>
         </article>
 
-        <article className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-[#fff0df] p-4 shadow-sm">
-          <ChartNoAxesColumnIncreasing aria-hidden="true" className="absolute -right-2 -top-1 h-20 w-20 text-orange-200/60" />
+        <article className="relative overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-br from-teal-50 to-[#d9f7f1] p-4 shadow-sm">
+          <ChartNoAxesColumnIncreasing aria-hidden="true" className="absolute -right-2 -top-1 h-20 w-20 text-teal-200/60" />
           <div className="relative flex items-start justify-between gap-2">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-100 text-teal-700">
               <BriefcaseBusiness className="h-5 w-5" />
             </span>
-            <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold text-orange-700">{activeProjects} active</span>
+            <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-bold text-teal-700">{activeProjects} active</span>
           </div>
           <h2 className="relative mt-3 text-xs font-bold text-slate-900">Performance & Goals</h2>
           <p className="relative mt-0.5 text-[11px] text-slate-600">Your assigned work</p>
           <button
             type="button"
             onClick={() => onNavigate('performance')}
-            className="relative mt-1 text-left text-sm font-extrabold text-slate-900 hover:text-orange-700"
+            className="relative mt-1 text-left text-sm font-extrabold text-slate-900 hover:text-teal-700"
           >
-            View progress <ArrowRight className="ml-1 inline h-3.5 w-3.5 text-orange-600" />
+            View progress <ArrowRight className="ml-1 inline h-3.5 w-3.5 text-teal-700" />
           </button>
         </article>
       </section>
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-[1.05fr_1.2fr_0.95fr]">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <PanelHeading icon={ChartNoAxesColumnIncreasing} title="Attendance Overview" tone="orange" />
+          <PanelHeading icon={ChartNoAxesColumnIncreasing} title="Attendance Overview" tone="teal" />
           <p className="mt-1 text-[10px] text-slate-500">This month · {monthAttendance.length} recorded days</p>
           <div className="mt-4">
             <AttendanceDonut
@@ -492,7 +494,7 @@ export default function EmployeeDashboard({ onNavigate }) {
         </article>
 
         <article className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="bg-[#101a38] px-4 py-3 text-white">
+          <div className="bg-[#0f172a] px-4 py-3 text-white">
             <div className="flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-xs font-bold">
                 <CalendarDays className="h-4 w-4 text-blue-300" />
@@ -535,14 +537,14 @@ export default function EmployeeDashboard({ onNavigate }) {
 
       <section className="grid grid-cols-1 gap-3 xl:grid-cols-[1.05fr_1.35fr_1fr]">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <PanelHeading icon={Sparkles} title="Quick Actions" tone="orange" />
+          <PanelHeading icon={Sparkles} title="Quick Actions" tone="teal" />
           <div className="mt-3 grid grid-cols-2 gap-2">
             {quickActions.map(({ label, module, icon: Icon, color }) => (
               <button
                 type="button"
                 key={module}
                 onClick={() => onNavigate(module)}
-                className="group flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-xl border border-transparent px-2 py-2 text-center transition hover:border-orange-200 hover:bg-orange-50 focus:outline-none focus:ring-2 focus:ring-orange-300"
+                className="group flex min-h-[76px] flex-col items-center justify-center gap-1.5 rounded-xl border border-transparent px-2 py-2 text-center transition hover:border-teal-200 hover:bg-teal-50 focus:outline-none focus:ring-2 focus:ring-teal-300"
               >
                 <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${color} transition group-hover:scale-105`}>
                   <Icon className="h-[18px] w-[18px]" />
@@ -559,7 +561,7 @@ export default function EmployeeDashboard({ onNavigate }) {
             title="Recent Activities"
             action="View all"
             onAction={() => onNavigate('developer_space')}
-            tone="orange"
+            tone="teal"
           />
           {activities.length ? (
             <div className="mt-2 divide-y divide-slate-100">
@@ -597,7 +599,7 @@ export default function EmployeeDashboard({ onNavigate }) {
             {currentUser?.avatar ? (
               <img src={currentUser.avatar} alt="" className="h-20 w-20 shrink-0 rounded-full border-4 border-slate-100 object-cover" />
             ) : (
-              <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-[#101a38] text-xl font-bold text-white">
+              <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border-4 border-slate-100 bg-[#0f172a] text-xl font-bold text-white">
                 {getInitials(currentUser)}
               </span>
             )}

@@ -24,26 +24,45 @@ import {
 export default function DeveloperDashboard({ onNavigate }) {
   const { currentUser } = useAuth();
   const {
+    employees,
     projects,
+    myProjects: assignedProjects,
     updateProjectProgress,
     requestExtension,
     submitProjectCompletion,
     attendance,
     punchAttendance,
+    leaveRequests,
     leaveBalances,
-    applyLeave
+    applyLeave,
+    selectedPersonaId,
   } = useHRMS();
 
-  // Find projects assigned to current user
-  const myProjects = projects.filter(p => Number(p.assigned_employee_id) === Number(currentUser.employee_id));
+  const selectedPersona = currentUser.role === 'super_admin' && selectedPersonaId
+    ? employees.find((employee) => Number(employee.id) === Number(selectedPersonaId))
+    : null;
+  const workspaceUser = selectedPersona
+    ? { ...currentUser, ...selectedPersona, employee_id: selectedPersona.id }
+    : currentUser;
+  const workspaceEmployeeId = Number(workspaceUser.employee_id);
+  const isViewingOwnWorkspace = workspaceEmployeeId === Number(currentUser.employee_id);
+  const projectSource = currentUser.role === 'super_admin' ? projects : assignedProjects;
+  const myProjects = projectSource.filter(
+    (project) => Number(project.assigned_employee_id) === workspaceEmployeeId
+  );
+  const myLeaveRequests = leaveRequests.filter(
+    (leave) => Number(leave.employee_id) === workspaceEmployeeId
+  );
+  const canUpdateMyProjects = ['employee', 'manager', 'super_admin'].includes(currentUser.role);
+  const openMyLeave = () => setShowMyLeaveRequests(true);
 
   // Today's punch
   const today = getIndiaDateString();
-  const myPunch = attendance.find(a => Number(a.employee_id) === Number(currentUser.employee_id) && a.date === today);
+  const myPunch = attendance.find(a => Number(a.employee_id) === workspaceEmployeeId && a.date === today);
   const isPunchComplete = Boolean(myPunch?.punch_out);
 
   // Balances
-  const myBalance = { cl: 0, sl: 0, pl: 0, comp_off: 0, ...leaveBalances[currentUser.employee_id] };
+  const myBalance = { cl: 0, sl: 0, pl: 0, comp_off: 0, ...leaveBalances[workspaceEmployeeId] };
 
   // Modals state
   const [selectedProject, setSelectedProject] = useState(null);
@@ -60,9 +79,14 @@ export default function DeveloperDashboard({ onNavigate }) {
   const [submissionNote, setSubmissionNote] = useState('');
 
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showMyLeaveRequests, setShowMyLeaveRequests] = useState(false);
   const [leaveType, setLeaveType] = useState('Casual Leave (CL)');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [isHalfDay, setIsHalfDay] = useState(false);
+  const [halfDayPeriod, setHalfDayPeriod] = useState('first_half');
+  const [sickCertificateFile, setSickCertificateFile] = useState(null);
+  const [leaveWarning, setLeaveWarning] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [workflowError, setWorkflowError] = useState('');
 
@@ -111,30 +135,36 @@ export default function DeveloperDashboard({ onNavigate }) {
     e.preventDefault();
     if (!fromDate || !toDate || !leaveReason) return;
     try {
-      await applyLeave({
-        employee_id: currentUser.employee_id,
-        employee_name: `${currentUser.first_name} ${currentUser.last_name}`,
+      const saved = await applyLeave({
+        employee_id: workspaceEmployeeId,
+        employee_name: `${workspaceUser.first_name} ${workspaceUser.last_name}`,
         leave_type: leaveType,
         from_date: fromDate,
         to_date: toDate,
-        days: 1,
-        reason: leaveReason
-      }, `${currentUser.first_name} ${currentUser.last_name}`);
+        is_half_day: isHalfDay,
+        half_day_period: isHalfDay ? halfDayPeriod : null,
+        certificate_file: sickCertificateFile,
+        reason: leaveReason,
+      }, `${workspaceUser.first_name} ${workspaceUser.last_name}`);
+      setLeaveWarning(saved?.warnings?.join(' ') || '');
       setShowLeaveModal(false);
       setFromDate('');
       setToDate('');
       setLeaveReason('');
+      setSickCertificateFile(null);
+      setIsHalfDay(false);
     } catch (err) {
       setWorkflowError(err?.data?.message || err.message || 'Unable to save the leave request.');
     }
   };
 
   const handleDeveloperPunch = async () => {
+    if (!isViewingOwnWorkspace) return;
     if (isPunchComplete) return;
 
     try {
       setWorkflowError('');
-      await punchAttendance(currentUser.employee_id, currentUser.branch_name || 'Web Portal');
+      await punchAttendance(workspaceEmployeeId, workspaceUser.branch_name || 'Web Portal');
     } catch (err) {
       setWorkflowError(err?.data?.message || err.message || 'Unable to save the attendance punch.');
     }
@@ -147,21 +177,26 @@ export default function DeveloperDashboard({ onNavigate }) {
           {workflowError}
         </div>
       )}
+      {leaveWarning && (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+          {leaveWarning}
+        </div>
+      )}
       {/* Developer Hero */}
-      <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 p-6 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="hrms-dashboard-hero rounded-2xl p-6 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <img
-            src={currentUser.avatar}
+            src={workspaceUser.avatar}
             alt=""
-            className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-400 shadow-lg"
+            className="w-16 h-16 rounded-2xl object-cover border-2 border-teal-400 shadow-lg"
           />
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-indigo-300">Developer Workstation</span>
-              <span className="text-xs bg-indigo-500/30 text-indigo-200 px-2 py-0.5 rounded-full">{currentUser.employee_code}</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-teal-50">My Workspace</span>
+              <span className="text-xs bg-white/15 text-teal-50 px-2 py-0.5 rounded-full">{workspaceUser.employee_code}</span>
             </div>
-            <h1 className="text-2xl font-bold mt-0.5 text-white">{currentUser.first_name} {currentUser.last_name}</h1>
-            <p className="text-xs text-indigo-200">{currentUser.designation} • {currentUser.branch_name}</p>
+            <h1 className="text-2xl font-bold mt-0.5 text-white">{workspaceUser.first_name} {workspaceUser.last_name}</h1>
+            <p className="text-xs text-teal-50">{workspaceUser.designation} • {workspaceUser.branch_name}</p>
           </div>
         </div>
 
@@ -169,7 +204,26 @@ export default function DeveloperDashboard({ onNavigate }) {
           <Button
             variant="secondary"
             size="sm"
+            icon={CalendarCheck}
+            onClick={openMyLeave}
+          >
+            My Leave
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={FileText}
+            disabled={!isViewingOwnWorkspace}
+            title={!isViewingOwnWorkspace ? 'Payslips are available only for your signed-in account.' : undefined}
+            onClick={() => onNavigate('payslips')}
+          >
+            My Payslips
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
             icon={CalendarPlus}
+            disabled={!isViewingOwnWorkspace}
             onClick={() => setShowLeaveModal(true)}
           >
             Apply Leave
@@ -178,9 +232,10 @@ export default function DeveloperDashboard({ onNavigate }) {
             variant={isPunchComplete ? "secondary" : "primary"}
             size="sm"
             icon={Clock}
-            disabled={isPunchComplete}
+            disabled={!isViewingOwnWorkspace || isPunchComplete}
+            title={!isViewingOwnWorkspace ? 'Punch actions are available only for your signed-in account.' : undefined}
             onClick={handleDeveloperPunch}
-            className={isPunchComplete ? '' : 'bg-indigo-600 hover:bg-indigo-500 shadow'}
+            className={isPunchComplete ? '' : 'bg-teal-600 hover:bg-teal-500 shadow'}
           >
             {isPunchComplete ? "Punch Completed" : myPunch ? "Punch Out" : "Punch In"}
           </Button>
@@ -208,7 +263,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            <span className="font-mono text-xs font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded border border-teal-100">
                               {project.project_code}
                             </span>
                             <h3 className="font-bold text-slate-900 text-base">{project.name}</h3>
@@ -240,12 +295,12 @@ export default function DeveloperDashboard({ onNavigate }) {
                       <div>
                         <div className="flex justify-between items-center text-xs font-semibold text-slate-700 mb-1">
                           <span>Delivery Progress</span>
-                          <span className="text-indigo-600 font-bold">{project.progress_percent}%</span>
+                          <span className="text-teal-600 font-bold">{project.progress_percent}%</span>
                         </div>
                         <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                           <div
                             className={`h-full rounded-full transition-all duration-300 ${
-                              isComplete ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-indigo-600'
+                              isComplete ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-teal-600'
                             }`}
                             style={{ width: `${project.progress_percent}%` }}
                           />
@@ -264,7 +319,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px] uppercase font-bold">Active Deadline</span>
-                          <span className={`font-bold ${isOverdue ? "text-rose-600" : "text-indigo-600"}`}>
+                          <span className={`font-bold ${isOverdue ? "text-rose-600" : "text-teal-600"}`}>
                             {project.active_due_date}
                           </span>
                         </div>
@@ -275,7 +330,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                       </div>
 
                       {/* Developer Actions (Buttons) */}
-                      {!isComplete && (
+                      {!isComplete && canUpdateMyProjects && (
                         <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           <Button
                             size="sm"
@@ -322,7 +377,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             ) : (
               <div className="text-center py-10 text-slate-400 text-xs">
                 <FolderGit2 className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                No active projects assigned to you. Select another employee from the top persona switcher to view their projects.
+                No projects are currently assigned to you.
               </div>
             )}
           </Card>
@@ -366,9 +421,22 @@ export default function DeveloperDashboard({ onNavigate }) {
             title="Leave Balances"
             subtitle="Accrued Leave Balance"
             action={
-              <button onClick={() => setShowLeaveModal(true)} className="text-xs text-indigo-600 font-semibold hover:underline">
-                + Apply
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={openMyLeave}
+                  className="text-xs text-teal-600 font-semibold hover:underline"
+                >
+                  {myLeaveRequests.length ? `${myLeaveRequests.length} leave request(s)` : 'My Leave'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveModal(true)}
+                  className="text-xs text-teal-600 font-semibold hover:underline"
+                >
+                  + Apply
+                </button>
+              </div>
             }
           >
             <div className="grid grid-cols-2 gap-3 text-xs">
@@ -396,19 +464,19 @@ export default function DeveloperDashboard({ onNavigate }) {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">PAN Number</span>
-                <span className="font-mono font-semibold text-slate-800">{currentUser.pan}</span>
+                <span className="font-mono font-semibold text-slate-800">{workspaceUser.pan}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">EPF UAN</span>
-                <span className="font-mono font-semibold text-slate-800">{currentUser.uan}</span>
+                <span className="font-mono font-semibold text-slate-800">{workspaceUser.uan}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Tax Regime</span>
-                <span className="font-semibold text-indigo-600">{currentUser.tax_regime} Regime</span>
+                <span className="font-semibold text-teal-600">{workspaceUser.tax_regime} Regime</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Salary Bank</span>
-                <span className="font-semibold text-slate-800">{currentUser.bank_name}</span>
+                <span className="font-semibold text-slate-800">{workspaceUser.bank_name}</span>
               </div>
             </div>
           </Card>
@@ -426,7 +494,7 @@ export default function DeveloperDashboard({ onNavigate }) {
           <div>
             <div className="flex justify-between font-semibold text-slate-700 mb-1">
               <span>Progress Percentage:</span>
-              <span className="text-indigo-600 font-bold text-sm">{progressVal}%</span>
+              <span className="text-teal-600 font-bold text-sm">{progressVal}%</span>
             </div>
             <input
               type="range"
@@ -435,7 +503,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               step="5"
               value={progressVal}
               onChange={(e) => setProgressVal(e.target.value)}
-              className="w-full accent-indigo-600 cursor-pointer"
+              className="w-full accent-teal-600 cursor-pointer"
             />
           </div>
 
@@ -447,7 +515,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               value={progressNote}
               onChange={(e) => setProgressNote(e.target.value)}
               placeholder="Detail what was built, modules tested, blockers resolved..."
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -456,6 +524,36 @@ export default function DeveloperDashboard({ onNavigate }) {
             <Button type="submit" variant="primary">Save Progress Update</Button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={showMyLeaveRequests}
+        onClose={() => setShowMyLeaveRequests(false)}
+        title="My Leave Requests"
+        subtitle="Your personal leave history"
+      >
+        {myLeaveRequests.length ? (
+          <div className="space-y-3">
+            {myLeaveRequests.map((leave) => (
+              <article key={leave.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-800">{leave.leave_type}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {leave.from_date} to {leave.to_date} · {leave.days} day(s)
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium capitalize text-slate-700">
+                    {leave.status}
+                  </span>
+                </div>
+                {leave.reason && <p className="mt-2 text-xs text-slate-600">{leave.reason}</p>}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">You have no leave requests yet.</p>
+        )}
       </Modal>
 
       {/* MODAL 2: Request Extension */}
@@ -480,7 +578,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               required
               value={requestedDate}
               onChange={(e) => setRequestedDate(e.target.value)}
-              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -492,7 +590,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               value={extensionReason}
               onChange={(e) => setExtensionReason(e.target.value)}
               placeholder="Explain technical impediments, third-party API dependencies, scope expansions..."
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -518,7 +616,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               value={submissionDeliverable}
               onChange={(e) => setSubmissionDeliverable(e.target.value)}
               placeholder="e.g. https://github.com/company/repo/pull/42 or staging URL"
-              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -530,7 +628,7 @@ export default function DeveloperDashboard({ onNavigate }) {
               value={submissionNote}
               onChange={(e) => setSubmissionNote(e.target.value)}
               placeholder="Highlight deliverable acceptance criteria met, test coverage, and documentation..."
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -554,12 +652,13 @@ export default function DeveloperDashboard({ onNavigate }) {
             <select
               value={leaveType}
               onChange={(e) => setLeaveType(e.target.value)}
-              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               <option value="Casual Leave (CL)">Casual Leave (CL) - {myBalance.cl} available</option>
               <option value="Sick Leave (SL)">Sick Leave (SL) - {myBalance.sl} available</option>
               <option value="Privilege Leave (PL)">Privilege Leave (PL) - {myBalance.pl} available</option>
               <option value="Comp-Off">Comp-Off - {myBalance.comp_off} available</option>
+              <option value="Leave Without Pay (LOP)">Leave Without Pay (LOP) - unpaid</option>
             </select>
           </div>
 
@@ -585,6 +684,61 @@ export default function DeveloperDashboard({ onNavigate }) {
               />
             </div>
           </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <label className="flex items-center gap-2 font-semibold text-slate-700">
+              <input
+                type="checkbox"
+                checked={isHalfDay}
+                onChange={(event) => setIsHalfDay(event.target.checked)}
+              />
+              Request half-day leave
+            </label>
+            {isHalfDay && (
+              <label className="mt-3 block font-semibold text-slate-700">
+                Half-day period
+                <select
+                  value={halfDayPeriod}
+                  onChange={(event) => setHalfDayPeriod(event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2"
+                >
+                  <option value="first_half">First half</option>
+                  <option value="second_half">Second half</option>
+                </select>
+              </label>
+            )}
+            <p className="mt-2 text-[11px] text-slate-500">
+              Days are calculated from working days, applicable holidays, and the sandwich rule.
+            </p>
+          </div>
+
+          <label className="block font-semibold text-slate-700">
+            Medical certificate (required for sick leave over 2 days)
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(event) => {
+                const file = event.target.files?.[0] || null;
+                if (!file) {
+                  setSickCertificateFile(null);
+                  return;
+                }
+                const extension = file.name.split('.').pop()?.toLowerCase();
+                if (file.size > 10 * 1024 * 1024 || !['pdf', 'jpg', 'jpeg', 'png'].includes(extension)) {
+                  setWorkflowError('Choose a PDF, JPG, or PNG certificate up to 10 MB.');
+                  event.target.value = '';
+                  setSickCertificateFile(null);
+                  return;
+                }
+                setWorkflowError('');
+                setSickCertificateFile(file);
+              }}
+              className="mt-1 block w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
+            />
+            <span className="mt-1 block text-[11px] font-normal text-slate-500">
+              PDF/JPG/PNG only; maximum 10 MB. The uploaded file is private.
+            </span>
+          </label>
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Reason for Leave:</label>

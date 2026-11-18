@@ -181,14 +181,14 @@ export default function AttendanceView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+            <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
               Time & Attendance
             </span>
             <span className="text-xs text-slate-500 font-medium">Web Punches, Biometrics & Regularization</span>
           </div>
           <h1 className="text-2xl font-bold text-slate-900 mt-1">Attendance & Time Tracking</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Web clock punch in/out, geolocation logging, monthly attendance ledger, and missed-punch regularization approvals.
+            One punch-in/out session is supported per employee per India date. Use regularization to correct a missed or incorrect punch; additional sessions are not supported.
           </p>
         </div>
 
@@ -212,9 +212,9 @@ export default function AttendanceView() {
       </div>
 
       {punchFeedback && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs px-4 py-2.5 rounded-xl font-medium flex items-center justify-between animate-fadeIn">
+        <div className="bg-teal-50 border border-teal-200 text-teal-700 text-xs px-4 py-2.5 rounded-xl font-medium flex items-center justify-between animate-fadeIn">
           <span>{punchFeedback}</span>
-          <span className="text-[10px] text-indigo-500 font-mono">Saved in MySQL Database</span>
+          <span className="text-[10px] text-teal-500 font-mono">Saved in MySQL Database</span>
         </div>
       )}
       {workflowError && (
@@ -228,7 +228,7 @@ export default function AttendanceView() {
         <button
           onClick={() => setActiveTab('punches')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'punches' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'punches' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Clock className="w-4 h-4" /> Daily Punch Ledger ({attendance.length})
@@ -237,7 +237,7 @@ export default function AttendanceView() {
         <button
           onClick={() => setActiveTab('regularization')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'regularization' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'regularization' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <UserCheck className="w-4 h-4" /> Regularization Requests ({regularizationRequests.length})
@@ -247,7 +247,7 @@ export default function AttendanceView() {
           <button
             onClick={() => setActiveTab('import')}
             className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'import' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'import' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <Upload className="w-4 h-4" /> CSV Biometric Punch Import
@@ -424,7 +424,7 @@ export default function AttendanceView() {
                           type="button"
                           disabled={busyImportId !== null}
                           onClick={() => handlePreviewImport(file)}
-                          className="rounded-lg bg-indigo-600 px-3 py-2 font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+                          className="rounded-lg bg-teal-600 px-3 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
                         >
                           {busy ? 'Validating…' : 'Preview'}
                         </button>

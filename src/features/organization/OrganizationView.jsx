@@ -5,6 +5,7 @@ import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import Modal from '../../components/common/Modal';
+import api from '../../services/api';
 import {
   Building2,
   Building,
@@ -19,19 +20,35 @@ import {
 } from 'lucide-react';
 
 export default function OrganizationView() {
-  const { company, branches, departments, designations, holidays } = useHRMS();
+  const { currentUser } = useAuth();
+  const { company, branches, departments, designations, holidays, syncWithBackend } = useHRMS();
   const [activeTab, setActiveTab] = useState('company'); // 'company' | 'branches' | 'departments' | 'holidays'
   const [selectedHolidayBranch, setSelectedHolidayBranch] = useState('all');
+  const [updatingPtBranchId, setUpdatingPtBranchId] = useState(null);
+  const [branchError, setBranchError] = useState('');
   const visibleHolidays = holidays.filter(
     holiday => selectedHolidayBranch === 'all' || holiday.branches?.includes(Number(selectedHolidayBranch))
   );
+
+  const toggleBranchPt = async (branch) => {
+    setBranchError('');
+    setUpdatingPtBranchId(branch.id);
+    try {
+      await api.updateBranchProfessionalTax(branch.id, !branch.pt_applicable);
+      await syncWithBackend('organization');
+    } catch (error) {
+      setBranchError(error?.data?.message || error.message || 'Unable to update branch PT applicability.');
+    } finally {
+      setUpdatingPtBranchId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+          <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
             Company Structure
           </span>
           <span className="text-xs text-slate-500 font-medium">Single Company & Regional Branches</span>
@@ -47,7 +64,7 @@ export default function OrganizationView() {
         <button
           onClick={() => setActiveTab('company')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'company' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'company' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Building2 className="w-4 h-4" /> Company Master Profile
@@ -56,7 +73,7 @@ export default function OrganizationView() {
         <button
           onClick={() => setActiveTab('branches')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'branches' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'branches' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Building className="w-4 h-4" /> Branches ({branches.length})
@@ -65,7 +82,7 @@ export default function OrganizationView() {
         <button
           onClick={() => setActiveTab('departments')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'departments' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'departments' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Layers className="w-4 h-4" /> Departments & Designations
@@ -74,7 +91,7 @@ export default function OrganizationView() {
         <button
           onClick={() => setActiveTab('holidays')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'holidays' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'holidays' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Calendar className="w-4 h-4" /> Indian Holiday Calendars
@@ -126,7 +143,7 @@ export default function OrganizationView() {
 
             <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
               <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-indigo-600" />
+                <MapPin className="w-4 h-4 text-teal-600" />
                 <span><strong>Registered Office:</strong> {company.headquarters}</span>
               </div>
               <div className="flex items-center gap-4">
@@ -143,7 +160,13 @@ export default function OrganizationView() {
 
       {/* TAB 2: BRANCHES */}
       {activeTab === 'branches' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          {branchError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+              {branchError}
+            </p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {branches.map(branch => (
             <Card key={branch.id} title={branch.name} subtitle={`Branch Code: ${branch.code}`}>
               <div className="space-y-3 text-xs">
@@ -154,17 +177,30 @@ export default function OrganizationView() {
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Active Staff Count</span>
-                  <span className="font-bold text-indigo-600">{branch.employees_count} Employees</span>
+                  <span className="font-bold text-teal-600">{branch.employees_count} Employees</span>
                 </div>
 
                 <div className="flex items-center justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Professional Tax (PT)</span>
                   {branch.pt_applicable ? (
-                    <Badge variant="primary" size="sm">Applicable ({branch.state} Slab)</Badge>
+                    <Badge variant="primary" size="sm">Enabled · {branch.state} rule required</Badge>
                   ) : (
-                    <Badge variant="neutral" size="sm">Exempt ({branch.state})</Badge>
+                    <Badge variant="neutral" size="sm">Disabled for this branch</Badge>
                   )}
                 </div>
+
+                {['super_admin', 'hr_admin'].includes(currentUser?.role) && (
+                  <Button
+                    size="sm"
+                    variant={branch.pt_applicable ? 'secondary' : 'primary'}
+                    disabled={updatingPtBranchId === branch.id}
+                    onClick={() => toggleBranchPt(branch)}
+                  >
+                    {updatingPtBranchId === branch.id
+                      ? 'Saving…'
+                      : branch.pt_applicable ? 'Disable PT for branch' : 'Enable PT for branch'}
+                  </Button>
+                )}
 
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500">Status</span>
@@ -173,6 +209,7 @@ export default function OrganizationView() {
               </div>
             </Card>
           ))}
+          </div>
         </div>
       )}
 
@@ -185,7 +222,7 @@ export default function OrganizationView() {
                 <div key={dept.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                      <span className="font-mono font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-100">
                         {dept.code}
                       </span>
                       <h4 className="font-bold text-slate-800">{dept.name}</h4>
@@ -244,8 +281,8 @@ export default function OrganizationView() {
                     {holiday.type}
                   </Badge>
                 </div>
-                <p className="text-indigo-600 font-semibold mt-1 flex items-center gap-1.5">
-                  <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+                <p className="text-teal-600 font-semibold mt-1 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-teal-500" />
                   {holiday.date}
                 </p>
                 <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center gap-1 text-[11px] text-slate-500">

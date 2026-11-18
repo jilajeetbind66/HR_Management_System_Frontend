@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bell,
+  Building2,
+  CheckCircle2,
   ChevronDown,
+  Clock,
   LogOut,
   Search,
   UserRound,
@@ -10,21 +13,10 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { getIndiaDateString } from '../../utils/date';
+import { getRoleMenuItems } from '../../config/roleAccess';
 
-const employeeLinks = [
-  { label: 'Dashboard', module: 'dashboard' },
-  { label: 'My Workspace', module: 'developer_space' },
-  { label: 'Attendance', module: 'attendance' },
-  { label: 'Leave Management', module: 'leaves' },
-  { label: 'Projects', module: 'projects' },
-  { label: 'Performance', module: 'performance' },
-  { label: 'Training', module: 'training' },
-  { label: 'Policies & Notices', module: 'documents' },
-  { label: 'Expenses', module: 'expenses' },
-  { label: 'Help & Support', module: 'helpdesk' },
-  { label: 'Announcements', module: 'announcements' },
-  { label: 'Account & Security', module: 'account' },
-];
+const employeeLinks = getRoleMenuItems('employee');
 
 const getInitials = (user) => {
   const initials = `${user?.first_name?.[0] || ''}${user?.last_name?.[0] || ''}`.trim();
@@ -41,11 +33,21 @@ const formatDate = (date) => {
 
 export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   const { currentUser, logout } = useAuth();
-  const { announcements } = useHRMS();
+  const {
+    announcements,
+    attendance,
+    punchAttendance,
+    notifications,
+    refreshNotifications,
+    markNotificationRead,
+  } = useHRMS();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notificationError, setNotificationError] = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [punchFeedback, setPunchFeedback] = useState(null);
   const matches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
@@ -54,6 +56,16 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       .slice(0, 5);
   }, [query]);
   const recentAnnouncements = announcements.slice(0, 3);
+  const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
+  const today = getIndiaDateString();
+  const todayPunch = attendance.find((record) => (
+    Number(record.employee_id) === Number(currentUser?.employee_id) && record.date === today
+  ));
+  const isPunchComplete = Boolean(todayPunch?.punch_out);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [currentUser?.avatar]);
 
   const navigateTo = (module) => {
     onNavigate(module);
@@ -71,13 +83,35 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     }
   };
 
+  const handlePunch = async () => {
+    if (isPunchComplete || !currentUser?.employee_id) return;
+
+    try {
+      const result = await punchAttendance(
+        currentUser.employee_id,
+        currentUser.branch_name || 'Web Portal',
+      );
+      if (result?.type === 'in') {
+        setPunchFeedback(`Punched in at ${result.punch?.punch_in || 'now'}`);
+      } else if (result?.type === 'out') {
+        setPunchFeedback(`Punched out at ${result.punch?.punch_out || 'now'}`);
+      } else {
+        setPunchFeedback('Attendance is already complete for today.');
+      }
+    } catch (error) {
+      setPunchFeedback(error?.data?.message || error.message || 'Punch action failed.');
+    }
+
+    setTimeout(() => setPunchFeedback(null), 3500);
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-[68px] w-full items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-3 backdrop-blur sm:px-5 lg:px-7">
       <button
         type="button"
         onClick={onMenuToggle}
         aria-label="Open navigation"
-        className="rounded-lg p-2 text-slate-500 transition hover:bg-orange-50 hover:text-orange-600 lg:hidden"
+        className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
       >
         <span className="block h-0.5 w-5 rounded bg-current before:block before:h-0.5 before:w-5 before:-translate-y-1.5 before:rounded before:bg-current after:block after:h-0.5 after:w-5 after:translate-y-1 after:rounded after:bg-current" />
       </button>
@@ -113,7 +147,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             if (event.key === 'Escape') setSearchOpen(false);
             if (event.key === 'Enter' && matches[0]) navigateTo(matches[0].module);
           }}
-          className="h-10 w-full rounded-xl border border-transparent bg-[#f0f2fb] pl-10 pr-9 text-xs text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-orange-200 focus:bg-white focus:ring-2 focus:ring-orange-100"
+          className="h-10 w-full rounded-xl border border-transparent bg-slate-100 pl-10 pr-9 text-xs text-slate-800 outline-none transition placeholder:text-slate-500 focus:border-teal-200 focus:bg-white focus:ring-2 focus:ring-teal-100"
         />
         {searchOpen && query.trim() && (
           <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
@@ -122,7 +156,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                 type="button"
                 key={link.module}
                 onClick={() => navigateTo(link.module)}
-                className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-200"
+                className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-200"
               >
                 {link.label}
                 <span className="text-[10px] text-slate-400">Open</span>
@@ -135,37 +169,108 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <div
+          title={`Branch: ${currentUser?.branch_name || 'Not assigned'}`}
+          className="hidden max-w-44 items-center gap-1.5 truncate rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[10px] font-medium text-slate-600 lg:flex"
+        >
+          <Building2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-teal-600" />
+          <span className="shrink-0 font-semibold">Branch:</span>
+          <span className="truncate">{currentUser?.branch_name || 'Not assigned'}</span>
+        </div>
         <div className="relative">
           <button
             type="button"
-            aria-label={`Company updates${announcements.length ? ` (${announcements.length})` : ''}`}
+            disabled={isPunchComplete || !currentUser?.employee_id}
+            onClick={handlePunch}
+            aria-label={isPunchComplete ? 'Punch completed for today' : todayPunch ? 'Punch out' : 'Punch in'}
+            className={`flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed ${
+              isPunchComplete
+                ? 'bg-slate-100 text-slate-500'
+                : todayPunch
+                  ? 'bg-rose-600 text-white hover:bg-rose-700'
+                  : 'bg-teal-600 text-white hover:bg-teal-700'
+            }`}
+          >
+            {isPunchComplete ? <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> : <Clock aria-hidden="true" className="h-3.5 w-3.5" />}
+            <span className="hidden sm:inline">{isPunchComplete ? 'Completed' : todayPunch ? 'Punch Out' : 'Punch In'}</span>
+          </button>
+          {punchFeedback && (
+            <p role="status" className="absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] text-white shadow-xl">
+              {punchFeedback}
+            </p>
+          )}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            aria-label={`Notifications and company updates${unreadNotifications ? ` (${unreadNotifications} unread)` : ''}`}
             aria-expanded={notificationsOpen}
             onClick={() => {
-              setNotificationsOpen((open) => !open);
+              const nextOpen = !notificationsOpen;
+              setNotificationsOpen(nextOpen);
               setProfileOpen(false);
               setSearchOpen(false);
+              if (nextOpen) {
+                setNotificationError('');
+                refreshNotifications().catch((error) => {
+                  setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
+                });
+              }
             }}
-            className="relative rounded-xl p-2 text-slate-600 transition hover:bg-orange-50 hover:text-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-200"
+            className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           >
             <Bell className="h-5 w-5" />
-            {announcements.length > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-orange-600 px-1 text-[9px] font-bold text-white">
-                {announcements.length > 9 ? '9+' : announcements.length}
+            {(unreadNotifications + announcements.length) > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-bold text-white">
+                {unreadNotifications + announcements.length > 9 ? '9+' : unreadNotifications + announcements.length}
               </span>
             )}
           </button>
           {notificationsOpen && (
             <div className="absolute right-0 top-full z-50 mt-2 w-[min(21rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <h2 className="text-xs font-bold text-slate-900">Company updates</h2>
+                <h2 className="text-xs font-bold text-slate-900">Notifications & updates</h2>
                 <button
                   type="button"
                   onClick={() => navigateTo('announcements')}
-                  className="text-[10px] font-semibold text-orange-700 hover:text-orange-800"
+                  className="text-[10px] font-semibold text-teal-700 hover:text-teal-800"
                 >
                   View all
                 </button>
               </div>
+              {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700">{notificationError}</p>}
+              <section aria-label="Notifications">
+                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Notifications
+                </h3>
+                {notifications.length ? (
+                  <div className="divide-y divide-slate-100">
+                    {notifications.map((notification) => (
+                      <button
+                        type="button"
+                        key={notification.id}
+                        onClick={() => {
+                          if (!notification.read_at) {
+                            markNotificationRead(notification.id).catch((error) => {
+                              setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
+                            });
+                          }
+                        }}
+                        className={`block w-full px-4 py-3 text-left hover:bg-teal-50/60 ${notification.read_at ? '' : 'bg-teal-50/40'}`}
+                      >
+                        <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
+                        <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{notification.message}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : !notificationError ? (
+                  <p role="status" className="px-4 py-3 text-center text-xs text-slate-500">No notifications yet.</p>
+                ) : null}
+              </section>
+              <section aria-label="Company updates" className="border-t border-slate-100">
+                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  Company updates
+                </h3>
               {recentAnnouncements.length ? (
                 <div className="divide-y divide-slate-100">
                   {recentAnnouncements.map((announcement) => (
@@ -173,7 +278,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                       type="button"
                       key={announcement.id}
                       onClick={() => navigateTo('announcements')}
-                      className="block w-full px-4 py-3 text-left hover:bg-orange-50/60"
+                      className="block w-full px-4 py-3 text-left hover:bg-teal-50/60"
                     >
                       <span className="flex items-start justify-between gap-3">
                         <span className="line-clamp-1 text-xs font-semibold text-slate-800">{announcement.title}</span>
@@ -186,6 +291,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               ) : (
                 <p role="status" className="px-4 py-6 text-center text-xs text-slate-500">No company updates yet.</p>
               )}
+              </section>
             </div>
           )}
         </div>
@@ -201,12 +307,17 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               setNotificationsOpen(false);
               setSearchOpen(false);
             }}
-            className="flex items-center gap-2 rounded-xl p-1.5 text-left transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-orange-200"
+            className="flex items-center gap-2 rounded-xl p-1.5 text-left transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-teal-200"
           >
-            {currentUser?.avatar ? (
-              <img src={currentUser.avatar} alt="" className="h-9 w-9 rounded-full border border-slate-200 object-cover" />
+            {currentUser?.avatar && !avatarLoadFailed ? (
+              <img
+                src={currentUser.avatar}
+                alt=""
+                onError={() => setAvatarLoadFailed(true)}
+                className="h-9 w-9 rounded-full border border-slate-200 object-cover"
+              />
             ) : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#101b3d] text-xs font-bold text-white">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0f172a] text-xs font-bold text-white">
                 {getInitials(currentUser)}
               </span>
             )}
@@ -215,7 +326,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                 {currentUser?.name || `${currentUser?.first_name || ''} ${currentUser?.last_name || ''}`.trim()}
               </span>
               <span className="mt-0.5 block max-w-32 truncate text-[10px] font-medium text-slate-500">
-                {currentUser?.designation || 'Employee'}
+                {currentUser?.branch_name || currentUser?.designation || 'Employee'}
               </span>
             </span>
             <ChevronDown className={`hidden h-4 w-4 text-slate-500 transition sm:block ${profileOpen ? 'rotate-180' : ''}`} />
@@ -229,7 +340,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               <button
                 type="button"
                 onClick={() => navigateTo('account')}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-700"
               >
                 <KeyRound className="h-4 w-4" />
                 Account & security
@@ -237,7 +348,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               <button
                 type="button"
                 onClick={() => navigateTo('developer_space')}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-orange-50 hover:text-orange-700"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-xs font-medium text-slate-700 hover:bg-teal-50 hover:text-teal-700"
               >
                 <UserRound className="h-4 w-4" />
                 My workspace

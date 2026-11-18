@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { canReviewLeave } from '../../utils/leaveApproval';
 
 const dateKey = (date) => String(date || '').slice(0, 10);
 
@@ -92,12 +93,7 @@ export default function ManagerDashboard({ onNavigate }) {
   const activeTeamProjects = teamProjects.filter(
     (project) => !['completed', 'cancelled'].includes(String(project.status || '').toLowerCase())
   );
-  const teamLeaveRequests = leaveRequests.filter(
-    (leave) => teamMemberIds.has(Number(leave.employee_id))
-  );
-  const pendingTeamLeaves = teamLeaveRequests.filter(
-    (leave) => String(leave.status || '').toLowerCase() === 'pending'
-  );
+  const pendingTeamLeaves = leaveRequests.filter((leave) => canReviewLeave(leave, currentUser));
   const presentToday = attendance.filter(
     (record) => teamMemberIds.has(Number(record.employee_id))
       && dateKey(record.date) === todayKey
@@ -154,7 +150,7 @@ export default function ManagerDashboard({ onNavigate }) {
 
   return (
     <div className="mx-auto w-full max-w-[1640px] space-y-5">
-      <section className="relative isolate flex min-h-[160px] items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-[#0f9488] via-[#079982] to-[#059669] px-6 py-6 text-white shadow-md sm:px-8">
+      <section className="hrms-dashboard-hero relative isolate flex min-h-[160px] items-center justify-between overflow-hidden rounded-2xl px-6 py-6 text-white shadow-md sm:px-8">
         <div aria-hidden="true" className="absolute -right-10 -top-20 -z-10 h-64 w-64 rounded-full border border-white/10" />
         <div aria-hidden="true" className="absolute -right-2 -bottom-36 -z-10 h-72 w-72 rounded-full bg-white/5" />
         <div className="relative z-10 max-w-2xl">

@@ -29,6 +29,41 @@ import {
   CalendarClock
 } from 'lucide-react';
 
+const PROJECT_PRIORITY_PRESENTATION = {
+  low: { label: 'Low Priority', variant: 'neutral' },
+  medium: { label: 'Medium Priority', variant: 'neutral' },
+  high: { label: 'High Priority', variant: 'warning' },
+  urgent: { label: 'Urgent Priority', variant: 'danger' },
+};
+const PROJECT_TYPES = ['Feature', 'Bug Fix', 'Integration', 'Report', 'Migration', 'Support'];
+
+const nextDate = (date) => {
+  if (!date) return '';
+  const [year, month, day] = date.slice(0, 10).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+};
+
+const extensionStatusClass = {
+  pending: 'bg-amber-100 text-amber-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  rejected: 'bg-rose-100 text-rose-800',
+};
+
+const formatRoleLabel = (role) => role
+  ? role.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
+  : '';
+
+const validateProjectDates = ({ start_date, planned_end_date }, showRequiredErrors = false) => {
+  const errors = {};
+  if (showRequiredErrors && !start_date) errors.start_date = 'Start Date is required.';
+  if (showRequiredErrors && !planned_end_date) {
+    errors.planned_end_date = 'Planned Baseline End Date is required.';
+  } else if (start_date && planned_end_date && planned_end_date < start_date) {
+    errors.planned_end_date = 'Planned Baseline End Date must be on or after Start Date.';
+  }
+  return errors;
+};
+
 export default function ProjectsView() {
   const { currentUser, hasPermission } = useAuth();
   const {
@@ -48,6 +83,7 @@ export default function ProjectsView() {
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [projectTypeFilter, setProjectTypeFilter] = useState('all');
   const [activeTab, setActiveTab] = useState('list'); // 'list' | 'extensions' | 'policy'
 
   // Modals
@@ -61,10 +97,12 @@ export default function ProjectsView() {
   const [showExtensionModal, setShowExtensionModal] = useState(false);
   const [requestedDate, setRequestedDate] = useState('');
   const [extensionReason, setExtensionReason] = useState('');
+  const [extensionRequestError, setExtensionRequestError] = useState('');
 
   const [showReviewExtModal, setShowReviewExtModal] = useState(false);
   const [selectedExtension, setSelectedExtension] = useState(null);
   const [extDecisionNote, setExtDecisionNote] = useState('');
+  const [extensionReviewError, setExtensionReviewError] = useState('');
 
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [submissionDeliverable, setSubmissionDeliverable] = useState('');
@@ -85,6 +123,7 @@ export default function ProjectsView() {
 
   const [submittingProject, setSubmittingProject] = useState(false);
   const [projectFormError, setProjectFormError] = useState(null);
+  const [projectFieldErrors, setProjectFieldErrors] = useState({});
   const [projectSuccessToast, setProjectSuccessToast] = useState(null);
 
   // Create Project Form
@@ -92,8 +131,9 @@ export default function ProjectsView() {
     name: '',
     description: '',
     deliverable: '',
-    assigned_employee_id: employees.find(e => e.role === 'employee')?.id || employees[0]?.id || 1,
-    priority: 'High',
+    project_type: '',
+    assigned_employee_id: '',
+    priority: 'Medium',
     start_date: new Date().toISOString().substring(0, 10),
     planned_end_date: ''
   };
@@ -101,6 +141,23 @@ export default function ProjectsView() {
   const [newProject, setNewProject] = useState(initialProjectState);
 
   const canManageProjects = hasPermission('projects.manage');
+  const canCreateProjects = hasPermission('projects.create');
+  const activeEmployees = employees.filter(
+    (employee) => employee.status?.toLowerCase() === 'active' && !employee.deleted_at
+  );
+  const canUpdateProject = (project) => Boolean(project?.assignment_id) && (
+    currentUser?.role === 'super_admin'
+    || (currentUser?.employee_id
+      && Number(project.assigned_employee_id) === Number(currentUser.employee_id))
+  );
+  const canReviewProject = (project) => Boolean(project?.assignment_id) && (
+    ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role)
+    || (
+      currentUser?.role === 'manager'
+      && Number(project.assigned_employee_reporting_manager_id) === Number(currentUser.employee_id)
+    )
+  );
+  const canRecordPenaltyReview = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
 
   useEffect(() => {
     if (!selectedProject?.assignment_id) {
@@ -130,27 +187,44 @@ export default function ProjectsView() {
                           p.project_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.assigned_employee_name || '')?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesType = projectTypeFilter === 'all' || p.project_type === projectTypeFilter;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
   // Calculate high-level stats
   const totalProjects = projects.length;
   const inProgressCount = projects.filter(p => p.status === 'in_progress').length;
   const underReviewCount = projects.filter(p => p.status === 'under_review').length;
-  const overdueCount = projects.filter(p => p.status === 'overdue').length;
+  const overdueCount = projects.filter(p => p.is_overdue || p.status === 'overdue').length;
   const completedCount = projects.filter(p => p.status === 'completed').length;
 
-  // Pending extensions across all projects
-  const allPendingExtensions = projects.flatMap(p => 
+  const allExtensionRequests = projects.flatMap(p =>
     (p.extensions || [])
-      .filter(e => e.status === 'pending')
-      .map(e => ({ ...e, projectId: p.id, projectCode: p.project_code, projectName: p.name }))
+      .map(e => ({
+        ...e,
+        projectId: p.id,
+        projectCode: p.project_code,
+        projectName: p.name,
+        canReview: canReviewProject(p),
+      }))
   );
+  const allPendingExtensions = allExtensionRequests.filter(extension => extension.status === 'pending');
+  const extensionStatusCounts = allExtensionRequests.reduce((counts, extension) => {
+    counts[extension.status] = (counts[extension.status] || 0) + 1;
+    return counts;
+  }, {});
 
   // Form Handlers
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!newProject.name || !newProject.planned_end_date) return;
+    const dateErrors = validateProjectDates(newProject, true);
+    setProjectFieldErrors(dateErrors);
+    if (Object.keys(dateErrors).length > 0) return;
+
+    if (!newProject.name || !newProject.assigned_employee_id || !newProject.project_type || !newProject.planned_end_date) {
+      setProjectFormError('Select an active developer and project type, then complete the required project fields.');
+      return;
+    }
     setProjectFormError(null);
     setSubmittingProject(true);
 
@@ -158,7 +232,7 @@ export default function ProjectsView() {
       const saved = await createProject(
         {
           ...newProject,
-          assigned_employee_id: Number(newProject.assigned_employee_id) || employees[0]?.id || 1
+          assigned_employee_id: Number(newProject.assigned_employee_id)
         },
         `${currentUser.first_name} ${currentUser.last_name} (${currentUser.role})`
       );
@@ -167,8 +241,15 @@ export default function ProjectsView() {
       setTimeout(() => setProjectSuccessToast(null), 4000);
       setShowCreateModal(false);
       setNewProject(initialProjectState);
+      setProjectFieldErrors({});
     } catch (err) {
       console.error("Project create error:", err);
+      const backendErrors = err?.data?.errors || {};
+      setProjectFieldErrors({
+        ...validateProjectDates(newProject, true),
+        ...(backendErrors.start_date ? { start_date: backendErrors.start_date[0] } : {}),
+        ...(backendErrors.planned_end_date ? { planned_end_date: backendErrors.planned_end_date[0] } : {}),
+      });
       const msg = err?.data?.message || err.message || "Failed to save project to database. Ensure Laravel server is running.";
       setProjectFormError(msg);
     } finally {
@@ -192,26 +273,35 @@ export default function ProjectsView() {
   const handleExtensionSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject || !requestedDate || !extensionReason) return;
-    setProjectFormError(null);
+    setExtensionRequestError('');
     try {
       await requestExtension(selectedProject.id, requestedDate, extensionReason);
       setShowExtensionModal(false);
       setRequestedDate('');
       setExtensionReason('');
+      setExtensionRequestError('');
     } catch (error) {
-      setProjectFormError(error?.data?.message || error.message || 'Unable to save the extension request.');
+      const validationMessage = Object.values(error?.data?.errors || {}).flat()[0];
+      setExtensionRequestError(validationMessage || error?.data?.message || error.message || 'Unable to save the extension request.');
     }
   };
 
   const handleReviewExtension = async (decision) => {
     if (!selectedProject || !selectedExtension) return;
+    if (decision === 'rejected' && !extDecisionNote.trim()) {
+      setExtensionReviewError('Decision remarks are required when rejecting an extension request.');
+      return;
+    }
+    setExtensionReviewError('');
     setProjectFormError(null);
     try {
       await reviewExtension(selectedProject.id, selectedExtension.id, decision, extDecisionNote);
       setShowReviewExtModal(false);
       setExtDecisionNote('');
+      setExtensionReviewError('');
     } catch (error) {
-      setProjectFormError(error?.data?.message || error.message || 'Unable to review the extension request.');
+      const validationMessage = Object.values(error?.data?.errors || {}).flat()[0];
+      setExtensionReviewError(validationMessage || error?.data?.message || error.message || 'Unable to review the extension request.');
     }
   };
 
@@ -278,7 +368,7 @@ export default function ProjectsView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+            <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
               Workforce Operations
             </span>
             <span className="text-xs text-slate-500 font-medium">Delivery & Deadline Management</span>
@@ -290,12 +380,16 @@ export default function ProjectsView() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          {canManageProjects && (
+          {canCreateProjects && (
             <Button
               variant="primary"
               size="md"
               icon={Plus}
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => {
+                setProjectFormError(null);
+                setProjectFieldErrors({});
+                setShowCreateModal(true);
+              }}
             >
               Assign New Project
             </Button>
@@ -323,13 +417,13 @@ export default function ProjectsView() {
         <StatCard title="Completed" value={completedCount} color="emerald" />
       </div>
 
-      {/* Sub-Tabs: List View vs Pending Extensions vs Policy Safeguards */}
+      {/* Sub-Tabs: List View vs Extension History vs Policy Safeguards */}
       <div className="border-b border-slate-200 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('list')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition ${
-              activeTab === 'list' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'list' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             All Assigned Projects ({projects.length})
@@ -337,7 +431,7 @@ export default function ProjectsView() {
           <button
             onClick={() => setActiveTab('extensions')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'extensions' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'extensions' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             Extension Requests
@@ -350,7 +444,7 @@ export default function ProjectsView() {
           <button
             onClick={() => setActiveTab('policy')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'policy' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              activeTab === 'policy' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
@@ -371,11 +465,11 @@ export default function ProjectsView() {
                 placeholder="Search by project name, PRJ code, or developer..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-slate-500 font-medium">Status:</span>
               <select
                 value={statusFilter}
@@ -387,6 +481,18 @@ export default function ProjectsView() {
                 <option value="under_review">Under Review</option>
                 <option value="overdue">Overdue</option>
                 <option value="completed">Completed</option>
+              </select>
+              <span className="text-xs text-slate-500 font-medium">Type:</span>
+              <select
+                aria-label="Filter by project type"
+                value={projectTypeFilter}
+                onChange={(e) => setProjectTypeFilter(e.target.value)}
+                className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none cursor-pointer"
+              >
+                <option value="all">All Types</option>
+                {PROJECT_TYPES.map((projectType) => (
+                  <option key={projectType} value={projectType}>{projectType}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -400,12 +506,19 @@ export default function ProjectsView() {
                   : 'No projects match your current search and status filters.'}
               </div>
             ) : filteredProjects.map((project) => {
-              const isOverdue = project.status === 'overdue';
-              const isUnderReview = project.status === 'under_review';
+              const isOverdue = Boolean(project.is_overdue || project.status === 'overdue');
+              const isUnderReview = project.status === 'under_review' || project.assignment_status === 'under_review';
               const isCompleted = project.status === 'completed';
+              const isAssignedDeveloper = canUpdateProject(project);
+              const priorityPresentation = PROJECT_PRIORITY_PRESENTATION[String(project.priority || '').toLowerCase()]
+                || { label: `${project.priority || 'Unknown'} Priority`, variant: 'neutral' };
 
               const hasPendingExtension = project.extensions?.some(e => e.status === 'pending');
               const activeExtension = project.extensions?.find(e => e.status === 'pending');
+              const projectExtensionCounts = (project.extensions || []).reduce((counts, extension) => {
+                counts[extension.status] = (counts[extension.status] || 0) + 1;
+                return counts;
+              }, {});
 
               return (
                 <div
@@ -418,19 +531,16 @@ export default function ProjectsView() {
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-slate-100">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                        <span className="font-mono text-xs font-bold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded">
                           {project.project_code}
                         </span>
                         <h3 className="text-base font-bold text-slate-900">{project.name}</h3>
-                        <Badge
-                          variant={
-                            project.priority === 'Urgent' ? 'danger' :
-                            project.priority === 'High' ? 'warning' : 'neutral'
-                          }
-                          size="sm"
-                        >
-                          {project.priority} Priority
+                        <Badge variant={priorityPresentation.variant} size="sm">
+                          {priorityPresentation.label}
                         </Badge>
+                        {project.project_type && (
+                          <Badge variant="neutral" size="sm">{project.project_type}</Badge>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">{project.description}</p>
                     </div>
@@ -461,11 +571,17 @@ export default function ProjectsView() {
                   {/* Deliverable Box */}
                   <div className="mt-3 p-3 rounded-lg bg-slate-50/90 border border-slate-200/80 text-xs">
                     <span className="font-semibold text-slate-800">Target Deliverable: </span>
-                    <span className="text-slate-600">{project.deliverable}</span>
+                    <span className="whitespace-pre-line text-slate-600">{project.deliverable}</span>
                     {project.submission_note && (
                       <div className="mt-2 pt-2 border-t border-slate-200/60 text-slate-700">
-                        <span className="font-semibold text-indigo-700">Developer Submission Note: </span>
-                        <span>"{project.submission_note}"</span>
+                        <span className="font-semibold text-teal-700">Developer Submission Note: </span>
+                        <span className="whitespace-pre-line">"{project.submission_note}"</span>
+                      </div>
+                    )}
+                    {project.review_note && (
+                      <div className="mt-2 pt-2 border-t border-slate-200/60 text-slate-700">
+                        <span className="font-semibold text-emerald-700">Review Notes{project.accepted_by ? ` (${project.accepted_by})` : ''}: </span>
+                        <span className="whitespace-pre-line">"{project.review_note}"</span>
                       </div>
                     )}
                   </div>
@@ -476,17 +592,70 @@ export default function ProjectsView() {
                       <span className="flex items-center gap-1.5">
                         Progress Update (v{project.version || 1})
                       </span>
-                      <span className="font-bold text-indigo-600">{project.progress_percent}% Complete</span>
+                      <span className="font-bold text-teal-600">{project.progress_percent}% Complete</span>
                     </div>
                     <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${
-                          isCompleted ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-indigo-600'
+                          isCompleted ? 'bg-emerald-500' : isOverdue ? 'bg-rose-500' : 'bg-teal-600'
                         }`}
                         style={{ width: `${project.progress_percent}%` }}
                       />
                     </div>
                   </div>
+                  {project.updates?.length > 0 && (
+                    <details className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <summary className="cursor-pointer font-semibold text-slate-700">
+                        Progress history ({project.updates.length})
+                      </summary>
+                      <ol className="mt-2 space-y-2">
+                        {[...project.updates].reverse().map((update) => (
+                          <li key={update.id} className="border-t border-slate-100 pt-2">
+                            <p className="font-medium text-slate-800">
+                              {update.progress_percent}% — {update.note}
+                            </p>
+                            <p className="mt-1 text-slate-500">
+                              Updated by <strong className="text-slate-700">{update.updated_by}</strong>
+                              {update.created_at && ` · ${new Date(update.created_at).toLocaleString()}`}
+                            </p>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+                  {project.extensions?.length > 0 && (
+                    <details className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs">
+                      <summary className="cursor-pointer font-semibold text-slate-700">
+                        Extension history ({project.extensions.length})
+                      </summary>
+                      <ol className="mt-2 space-y-2">
+                        {project.extensions.map((extension) => (
+                          <li key={extension.id} className="border-t border-slate-100 pt-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${extensionStatusClass[extension.status] || 'bg-slate-100 text-slate-700'}`}>
+                                {extension.status}
+                              </span>
+                              <span className="text-slate-600">
+                                {extension.old_due_date} → {extension.requested_due_date}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-slate-600">{extension.reason}</p>
+                            {extension.decision_note && (
+                              <p className="mt-1 text-slate-600">
+                                Decision remarks: {extension.decision_note}
+                              </p>
+                            )}
+                            {extension.decided_by && (
+                              <p className="mt-1 text-slate-500">
+                                Decided by <strong className="text-slate-700">{extension.decided_by}</strong>
+                                {extension.decided_at && ` · ${new Date(extension.decided_at).toLocaleString()}`}
+                              </p>
+                            )}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
 
                   {/* Metadata Grid (Section 9 Specs) */}
                   <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-slate-50 text-xs border border-slate-100">
@@ -504,7 +673,10 @@ export default function ProjectsView() {
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Start Date</span>
                       <span className="font-semibold text-slate-800 block mt-1">{project.start_date}</span>
-                      <span className="text-[10px] text-slate-400">Assigned by {project.assigned_by}</span>
+                      <span className="text-[10px] text-slate-400">
+                        Assigned by {project.assigned_by || 'Unknown'}
+                        {project.assigned_by_role && ` (${formatRoleLabel(project.assigned_by_role)})`}
+                      </span>
                     </div>
 
                     <div>
@@ -515,7 +687,7 @@ export default function ProjectsView() {
 
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Active Deadline</span>
-                      <span className={`font-bold block mt-1 ${isOverdue ? "text-rose-600" : "text-indigo-600"}`}>
+                      <span className={`font-bold block mt-1 ${isOverdue ? "text-rose-600" : "text-teal-600"}`}>
                         {project.active_due_date}
                       </span>
                       {project.actual_completed_at && (
@@ -532,15 +704,23 @@ export default function ProjectsView() {
                           <CalendarClock className="w-4 h-4 text-amber-600" />
                           Extension Requested to {activeExtension.requested_due_date}
                         </span>
+                        <p className="text-[11px] text-slate-600 mt-1">
+                          Requested by <strong>{activeExtension.requested_by}</strong>
+                          {activeExtension.on_behalf_of && (
+                            <> · Submitted on behalf by <strong>{activeExtension.on_behalf_of}</strong></>
+                          )}
+                        </p>
                         <p className="text-[11px] text-amber-800 mt-0.5">"{activeExtension.reason}"</p>
                       </div>
-                      {canManageProjects && (
+                      {canReviewProject(project) && (
                         <Button
                           size="sm"
                           variant="secondary"
                           onClick={() => {
                             setSelectedProject(project);
                             setSelectedExtension(activeExtension);
+                            setExtDecisionNote('');
+                            setExtensionReviewError('');
                             setShowReviewExtModal(true);
                           }}
                         >
@@ -558,14 +738,14 @@ export default function ProjectsView() {
                           <AlertTriangle className="w-4 h-4 text-rose-600" />
                           Assessed Penalty Record (Non-Monetary Baseline)
                         </span>
-                        {canManageProjects && project.penalties[0].status !== 'waived' && (
+                        {canRecordPenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && (
                           <button
                             onClick={() => {
                               setSelectedProject(project);
                               setSelectedPenalty(project.penalties[0]);
                               setShowWaiveModal(true);
                             }}
-                            className="text-xs text-indigo-700 font-bold hover:underline"
+                            className="text-xs text-teal-700 font-bold hover:underline"
                           >
                             Waive Penalty
                           </button>
@@ -584,12 +764,14 @@ export default function ProjectsView() {
                       <History className="w-3.5 h-3.5 text-slate-400" />
                       <span>{project.updates?.length || 0} Progress Log(s)</span>
                       <span>•</span>
-                      <span>{project.extensions?.length || 0} Extension(s)</span>
+                      <span>
+                        Extensions: {projectExtensionCounts.pending || 0} pending · {projectExtensionCounts.approved || 0} approved · {projectExtensionCounts.rejected || 0} rejected
+                      </span>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       {/* Developer Buttons */}
-                      {!isCompleted && (
+                      {isAssignedDeveloper && !isCompleted && (
                         <>
                           <Button
                             size="sm"
@@ -608,8 +790,12 @@ export default function ProjectsView() {
                             size="sm"
                             variant="secondary"
                             icon={Calendar}
+                            disabled={hasPendingExtension}
                             onClick={() => {
                               setSelectedProject(project);
+                              setRequestedDate(nextDate(project.active_due_date || project.planned_end_date));
+                              setExtensionReason('');
+                              setExtensionRequestError('');
                               setShowExtensionModal(true);
                             }}
                           >
@@ -631,7 +817,7 @@ export default function ProjectsView() {
                       )}
 
                       {/* HR / Reviewer Buttons */}
-                      {canManageProjects && isUnderReview && (
+                      {canReviewProject(project) && isUnderReview && (
                         <Button
                           size="sm"
                           variant="success"
@@ -646,7 +832,7 @@ export default function ProjectsView() {
                       )}
 
                       {/* HR Non-Monetary Penalty Assessment */}
-                      {canManageProjects && isOverdue && (!project.penalties || project.penalties.length === 0) && (
+                      {canRecordPenaltyReview && canReviewProject(project) && isOverdue && (!project.penalties || project.penalties.length === 0) && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -670,51 +856,74 @@ export default function ProjectsView() {
 
       {/* TAB 2: EXTENSIONS REVIEW LIST */}
       {activeTab === 'extensions' && (
-        <Card title="Pending Deadline Extension Requests" subtitle="Formal HR & Manager review workflow">
-          {allPendingExtensions.length > 0 ? (
+        <Card
+          title="Deadline Extension History"
+          subtitle={`${allPendingExtensions.length} pending · ${extensionStatusCounts.approved || 0} approved · ${extensionStatusCounts.rejected || 0} rejected`}
+        >
+          {allExtensionRequests.length > 0 ? (
             <div className="space-y-4">
-              {allPendingExtensions.map((ext) => (
-                <div key={ext.id} className="p-4 rounded-xl border border-amber-200 bg-amber-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
+              {allExtensionRequests.map((ext) => (
+                <div key={ext.id} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                      <span className="font-mono font-bold text-teal-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                         {ext.projectCode}
                       </span>
                       <h4 className="font-bold text-slate-900 text-sm">{ext.projectName}</h4>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${extensionStatusClass[ext.status] || 'bg-slate-100 text-slate-700'}`}>
+                        {ext.status}
+                      </span>
                     </div>
                     <p className="text-slate-600 mt-1">
-                      Requested by <strong className="text-slate-800">{ext.requested_by}</strong> on {ext.requested_at}
+                      Requested by <strong className="text-slate-800">{ext.requested_by}</strong>
+                      {ext.created_at && ` on ${new Date(ext.created_at).toLocaleString()}`}
+                      {ext.on_behalf_of && (
+                        <> · Submitted on behalf by <strong className="text-slate-800">{ext.on_behalf_of}</strong></>
+                      )}
                     </p>
                     <p className="text-slate-700 mt-2 p-2.5 rounded-lg bg-white border border-slate-200/80 italic">
                       "{ext.reason}"
                     </p>
                     <div className="flex items-center gap-4 mt-2 text-[11px] text-slate-500">
-                      <span>Original/Active Due: <strong className="text-slate-800">{ext.old_due_date}</strong></span>
-                      <span>Proposed New Due: <strong className="text-indigo-600">{ext.requested_due_date}</strong></span>
+                      <span>Active deadline at request: <strong className="text-slate-800">{ext.old_due_date}</strong></span>
+                      <span>Proposed New Due: <strong className="text-teal-600">{ext.requested_due_date}</strong></span>
                     </div>
+                    {ext.decision_note && (
+                      <p className="mt-2 text-slate-600">Decision remarks: {ext.decision_note}</p>
+                    )}
+                    {ext.decided_by && (
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Decided by <strong className="text-slate-700">{ext.decided_by}</strong>
+                        {ext.decided_at && ` · ${new Date(ext.decided_at).toLocaleString()}`}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex sm:flex-col gap-2 justify-end">
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => {
-                        const targetProj = projects.find(p => p.id === ext.projectId);
-                        setSelectedProject(targetProj);
-                        setSelectedExtension(ext);
-                        setShowReviewExtModal(true);
-                      }}
-                    >
-                      Approve / Reject
-                    </Button>
-                  </div>
+                  {ext.status === 'pending' && ext.canReview && (
+                    <div className="flex sm:flex-col gap-2 justify-end">
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => {
+                          const targetProj = projects.find(p => p.id === ext.projectId);
+                          setSelectedProject(targetProj);
+                          setSelectedExtension(ext);
+                          setExtDecisionNote('');
+                          setExtensionReviewError('');
+                          setShowReviewExtModal(true);
+                        }}
+                      >
+                        Approve / Reject
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
             <div className="text-center py-12 text-slate-400 text-xs">
               <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2 opacity-80" />
-              No pending extension requests at this moment.
+              No extension requests have been submitted.
             </div>
           )}
         </Card>
@@ -730,7 +939,7 @@ export default function ProjectsView() {
                 <div>
                   <h4 className="font-bold text-emerald-900 text-sm">Non-Monetary Default Safeguard Active</h4>
                   <p className="text-emerald-800 text-xs mt-1">
-                    In compliance with Indian employment laws and Section 9 of the HRMS Architecture proposal, automated salary deductions for project delays are <strong>strictly disabled</strong>. Default penalties are non-monetary (formal escalation email, manager notice, and performance cycle review remark).
+                    Automated salary deductions for project delays are <strong>strictly disabled</strong>. Only HR or super-admin can record a non-monetary notice after reviewing the documented reason; every record is attributed to the reviewer and audit-logged. Managers cannot apply a penalty independently.
                   </p>
                 </div>
               </div>
@@ -744,7 +953,7 @@ export default function ProjectsView() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
                   <span className="font-bold text-slate-800 text-sm block">Grace Period</span>
-                  <p className="text-2xl font-black text-indigo-600 mt-1">
+                  <p className="text-2xl font-black text-teal-600 mt-1">
                     {penaltyPolicy ? `${penaltyPolicy.grace_days} Days` : 'Not Configured'}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-1">
@@ -757,7 +966,7 @@ export default function ProjectsView() {
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
                   <span className="font-bold text-slate-800 text-sm block">Monetary Deductions</span>
                   <p className="text-2xl font-black text-rose-600 mt-1">DISABLED</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Requires explicit management sign-off and legal payroll review.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">Any monetary change is disabled here; this workflow records only HR-reviewed non-monetary notices.</p>
                 </div>
 
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50">
@@ -798,7 +1007,7 @@ export default function ProjectsView() {
               placeholder="e.g. UPI QR Payment Processing API"
               value={newProject.name}
               onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -810,7 +1019,7 @@ export default function ProjectsView() {
               placeholder="Detailed description of features, technical stack..."
               value={newProject.description}
               onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
@@ -822,24 +1031,29 @@ export default function ProjectsView() {
               placeholder="Exact deliverables required for HR / Manager sign-off..."
               value={newProject.deliverable}
               onChange={(e) => setNewProject({ ...newProject, deliverable: e.target.value })}
-              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full p-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Assign Developer:</label>
               <select
+                required
                 value={newProject.assigned_employee_id}
                 onChange={(e) => setNewProject({ ...newProject, assigned_employee_id: e.target.value })}
                 className="w-full p-2 rounded-lg border border-slate-200 bg-white"
               >
-                {employees.map(emp => (
+                <option value="">Select developer</option>
+                {activeEmployees.map(emp => (
                   <option key={emp.id} value={emp.id}>
                     {emp.first_name} {emp.last_name} ({emp.employee_code}) - {emp.designation}
                   </option>
                 ))}
               </select>
+              {activeEmployees.length === 0 && (
+                <p role="status" className="mt-1 text-xs text-amber-700">No active employees are available for assignment.</p>
+              )}
             </div>
 
             <div>
@@ -849,10 +1063,25 @@ export default function ProjectsView() {
                 onChange={(e) => setNewProject({ ...newProject, priority: e.target.value })}
                 className="w-full p-2 rounded-lg border border-slate-200 bg-white"
               >
-                <option value="Urgent">Urgent</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
                 <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">Project Type:</label>
+              <select
+                required
+                value={newProject.project_type}
+                onChange={(e) => setNewProject({ ...newProject, project_type: e.target.value })}
+                className="w-full p-2 rounded-lg border border-slate-200 bg-white"
+              >
+                <option value="">Select project type</option>
+                {PROJECT_TYPES.map((projectType) => (
+                  <option key={projectType} value={projectType}>{projectType}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -861,30 +1090,63 @@ export default function ProjectsView() {
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Start Date:</label>
               <input
+                aria-describedby={projectFieldErrors.start_date ? 'project-start-date-error' : undefined}
+                aria-invalid={Boolean(projectFieldErrors.start_date)}
                 type="date"
-                required
                 value={newProject.start_date}
-                onChange={(e) => setNewProject({ ...newProject, start_date: e.target.value })}
-                className="w-full p-2 rounded-lg border border-slate-200"
+                onBlur={() => setProjectFieldErrors(validateProjectDates(newProject, true))}
+                onChange={(e) => {
+                  const updatedProject = { ...newProject, start_date: e.target.value };
+                  setNewProject(updatedProject);
+                  setProjectFieldErrors(validateProjectDates(updatedProject));
+                }}
+                className={`w-full p-2 rounded-lg border ${projectFieldErrors.start_date ? 'border-rose-500' : 'border-slate-200'}`}
               />
+              {projectFieldErrors.start_date && (
+                <p id="project-start-date-error" role="alert" className="mt-1 text-xs text-rose-700">
+                  {projectFieldErrors.start_date}
+                </p>
+              )}
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Planned Baseline End Date:</label>
               <input
+                aria-describedby={projectFieldErrors.planned_end_date ? 'project-end-date-error' : undefined}
+                aria-invalid={Boolean(projectFieldErrors.planned_end_date)}
                 type="date"
-                required
+                min={newProject.start_date || undefined}
                 value={newProject.planned_end_date}
-                onChange={(e) => setNewProject({ ...newProject, planned_end_date: e.target.value })}
-                className="w-full p-2 rounded-lg border border-slate-200"
+                onBlur={() => setProjectFieldErrors(validateProjectDates(newProject, true))}
+                onChange={(e) => {
+                  const updatedProject = { ...newProject, planned_end_date: e.target.value };
+                  setNewProject(updatedProject);
+                  setProjectFieldErrors(validateProjectDates(updatedProject));
+                }}
+                className={`w-full p-2 rounded-lg border ${projectFieldErrors.planned_end_date ? 'border-rose-500' : 'border-slate-200'}`}
               />
+              {projectFieldErrors.planned_end_date && (
+                <p id="project-end-date-error" role="alert" className="mt-1 text-xs text-rose-700">
+                  {projectFieldErrors.planned_end_date}
+                </p>
+              )}
               <span className="text-[10px] text-slate-400 mt-0.5 block">This initial due date is immutable in history.</span>
             </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <Button variant="secondary" disabled={submittingProject} onClick={() => { setShowCreateModal(false); setProjectFormError(null); }}>Cancel</Button>
-            <Button type="submit" variant="primary" disabled={submittingProject}>
+            <Button
+              variant="secondary"
+              disabled={submittingProject}
+              onClick={() => {
+                setShowCreateModal(false);
+                setProjectFormError(null);
+                setProjectFieldErrors({});
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" variant="primary" disabled={submittingProject || activeEmployees.length === 0}>
               {submittingProject ? 'Saving to Database...' : 'Create & Assign Project'}
             </Button>
           </div>
@@ -910,7 +1172,7 @@ export default function ProjectsView() {
           <div>
             <div className="flex justify-between font-semibold text-slate-700 mb-1">
               <span>Progress Percentage:</span>
-              <span className="text-indigo-600 font-bold text-sm">{progressVal}%</span>
+              <span className="text-teal-600 font-bold text-sm">{progressVal}%</span>
             </div>
             <input
               type="range"
@@ -919,7 +1181,7 @@ export default function ProjectsView() {
               step="5"
               value={progressVal}
               onChange={(e) => setProgressVal(e.target.value)}
-              className="w-full accent-indigo-600 cursor-pointer"
+              className="w-full accent-teal-600 cursor-pointer"
             />
           </div>
 
@@ -945,7 +1207,10 @@ export default function ProjectsView() {
       {/* MODAL 3: Request Extension */}
       <Modal
         isOpen={showExtensionModal}
-        onClose={() => setShowExtensionModal(false)}
+        onClose={() => {
+          setShowExtensionModal(false);
+          setExtensionRequestError('');
+        }}
         title="Request Deadline Extension"
         subtitle={selectedProject ? `Active Due Date: ${selectedProject.active_due_date}` : ""}
       >
@@ -955,11 +1220,18 @@ export default function ProjectsView() {
             <input
               type="date"
               required
+              min={nextDate(selectedProject?.active_due_date || selectedProject?.planned_end_date)}
               value={requestedDate}
               onChange={(e) => setRequestedDate(e.target.value)}
               className="w-full p-2 rounded-lg border border-slate-200"
             />
           </div>
+          {currentUser?.role === 'super_admin'
+            && Number(selectedProject?.assigned_employee_id) !== Number(currentUser.employee_id) && (
+              <p role="status" className="rounded-lg bg-teal-50 px-3 py-2 text-xs text-teal-800">
+                This request will be recorded for {selectedProject?.assigned_employee_name}, submitted on behalf by {currentUser.name}.
+              </p>
+            )}
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Reason for Extension Request:</label>
@@ -972,6 +1244,7 @@ export default function ProjectsView() {
               className="w-full p-2.5 rounded-lg border border-slate-200"
             />
           </div>
+          {extensionRequestError && <p role="alert" className="text-rose-700">{extensionRequestError}</p>}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="secondary" onClick={() => setShowExtensionModal(false)}>Cancel</Button>
@@ -983,7 +1256,10 @@ export default function ProjectsView() {
       {/* MODAL 4: Review Extension Request (HR / Manager) */}
       <Modal
         isOpen={showReviewExtModal}
-        onClose={() => setShowReviewExtModal(false)}
+        onClose={() => {
+          setShowReviewExtModal(false);
+          setExtensionReviewError('');
+        }}
         title="Review Extension Request"
         subtitle={selectedProject ? `${selectedProject.project_code} - ${selectedProject.name}` : ""}
       >
@@ -991,22 +1267,29 @@ export default function ProjectsView() {
           {selectedExtension && (
             <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
               <p><strong>Requested By:</strong> {selectedExtension.requested_by}</p>
+              {selectedExtension.on_behalf_of && (
+                <p><strong>Submitted on behalf by:</strong> {selectedExtension.on_behalf_of}</p>
+              )}
               <p><strong>Current Active Due Date:</strong> {selectedExtension.old_due_date}</p>
-              <p><strong>Proposed New Due Date:</strong> <span className="font-bold text-indigo-600">{selectedExtension.requested_due_date}</span></p>
+              <p><strong>Proposed New Due Date:</strong> <span className="font-bold text-teal-600">{selectedExtension.requested_due_date}</span></p>
               <p><strong>Reason:</strong> "{selectedExtension.reason}"</p>
             </div>
           )}
 
           <div>
-            <label className="block font-semibold text-slate-700 mb-1">Decision Remarks / Notes:</label>
+            <label className="block font-semibold text-slate-700 mb-1">Decision Remarks / Notes (required for rejection):</label>
             <textarea
               rows="3"
               value={extDecisionNote}
-              onChange={(e) => setExtDecisionNote(e.target.value)}
+              onChange={(e) => {
+                setExtDecisionNote(e.target.value);
+                setExtensionReviewError('');
+              }}
               placeholder="Add feedback for the developer regarding this decision..."
               className="w-full p-2.5 rounded-lg border border-slate-200"
             />
           </div>
+          {extensionReviewError && <p role="alert" className="text-rose-700">{extensionReviewError}</p>}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="danger" onClick={() => handleReviewExtension('rejected')}>
@@ -1054,7 +1337,7 @@ export default function ProjectsView() {
                   type="button"
                   key={file.id}
                   onClick={() => openProjectFile(file.id)}
-                  className="block text-left font-semibold text-indigo-600 hover:underline"
+                  className="block text-left font-semibold text-teal-600 hover:underline"
                 >
                   {file.original_filename} · Download securely
                 </button>
@@ -1091,11 +1374,18 @@ export default function ProjectsView() {
         <div className="space-y-4 text-xs">
           <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
             <p><strong>Assigned Developer:</strong> {selectedProject?.assigned_employee_name}</p>
-            <p className="mt-1"><strong>Submission Note:</strong> "{selectedProject?.submission_note}"</p>
+            <p className="mt-1">
+              <strong>Target Deliverable:</strong>
+              <span className="mt-1 block whitespace-pre-line">{selectedProject?.deliverable || 'No target deliverable specified.'}</span>
+            </p>
+            <p className="mt-1">
+              <strong>Submission Note:</strong>
+              <span className="mt-1 block whitespace-pre-line">"{selectedProject?.submission_note}"</span>
+            </p>
             {selectedProject?.deliverable_link && (
               <p className="mt-1">
                 <strong>Link: </strong>
-                <a href={selectedProject.deliverable_link} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                <a href={selectedProject.deliverable_link} target="_blank" rel="noreferrer" className="text-teal-600 underline">
                   {selectedProject.deliverable_link}
                 </a>
               </p>

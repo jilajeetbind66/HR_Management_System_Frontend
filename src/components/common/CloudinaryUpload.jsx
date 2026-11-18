@@ -44,7 +44,7 @@ export default function CloudinaryUpload({
         accept={accept}
         disabled={uploading}
         onChange={handleChange}
-        className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-60"
+        className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-teal-700 hover:file:bg-teal-100 disabled:opacity-60"
       />
       {uploading && <p className="text-xs text-slate-500">Uploading to Cloudinary...</p>}
       {message && <p role="status" className="text-xs text-emerald-700">{message}</p>}

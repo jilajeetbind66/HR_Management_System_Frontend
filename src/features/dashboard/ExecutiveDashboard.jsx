@@ -6,6 +6,7 @@ import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import { getIndiaDateString } from '../../utils/date';
+import { canReviewLeave } from '../../utils/leaveApproval';
 import {
   Users,
   FolderGit2,
@@ -28,7 +29,7 @@ export default function ExecutiveDashboard({ onNavigate }) {
   const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'under_review' || p.status === 'overdue');
   const overdueProjects = projects.filter(p => p.status === 'overdue');
   const completedProjects = projects.filter(p => p.status === 'completed');
-  const pendingLeaves = leaveRequests.filter(l => l.status === 'pending');
+  const pendingLeaves = leaveRequests.filter((leave) => canReviewLeave(leave, currentUser));
 
   const today = getIndiaDateString();
   const presentToday = attendance.filter(a => a.date === today && a.status === 'Present').length;
@@ -39,7 +40,7 @@ export default function ExecutiveDashboard({ onNavigate }) {
   return (
     <div className="space-y-5">
       {/* Top Banner / Welcome */}
-      <div className="relative isolate flex min-h-[160px] items-center justify-between overflow-hidden rounded-2xl bg-gradient-to-r from-[#0f9488] via-[#079982] to-[#059669] px-6 py-6 text-white shadow-md sm:px-8">
+      <div className="hrms-dashboard-hero relative isolate flex min-h-[160px] items-center justify-between overflow-hidden rounded-2xl px-6 py-6 text-white shadow-md sm:px-8">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -54,13 +55,13 @@ export default function ExecutiveDashboard({ onNavigate }) {
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <Button
               variant="teal"
               size="sm"
               icon={FolderGit2}
               onClick={() => onNavigate('projects')}
-              className="border border-white/25"
+              className="min-w-[8rem] flex-1 whitespace-normal border border-white/25 text-center leading-tight"
             >
               Active Projects ({activeProjects.length})
             </Button>
@@ -69,6 +70,7 @@ export default function ExecutiveDashboard({ onNavigate }) {
               size="sm"
               icon={Users}
               onClick={() => onNavigate('employees')}
+              className="min-w-[8rem] flex-1 whitespace-normal text-center leading-tight"
             >
               Employee Directory
             </Button>

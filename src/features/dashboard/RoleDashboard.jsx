@@ -6,6 +6,7 @@ import Button from '../../components/common/Button';
 import EmployeeDashboard from './EmployeeDashboard';
 import ManagerDashboard from './ManagerDashboard';
 import { canAccessModule, getPanelName } from '../../config/roleAccess';
+import { canReviewLeave } from '../../utils/leaveApproval';
 import {
   ArrowRight,
   Banknote,
@@ -81,7 +82,7 @@ export default function RoleDashboard({ onNavigate }) {
   const panel = panelCopy[role] || panelCopy.employee;
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
   const myAttendance = attendance.filter(record => Number(record.employee_id) === Number(currentUser.employee_id));
-  const pendingLeaves = leaveRequests.filter(leave => leave.status === 'pending');
+  const pendingLeaves = leaveRequests.filter(leave => canReviewLeave(leave, currentUser));
   const employeeCount = employees.filter(employee => employee.status === 'active').length;
   const today = new Date().toISOString().slice(0, 10);
   const presentToday = attendance.filter(record => record.date === today && record.status === 'Present').length;
@@ -308,8 +309,8 @@ export default function RoleDashboard({ onNavigate }) {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 text-white shadow-xl">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-indigo-300">
+      <section className="hrms-dashboard-hero rounded-2xl p-6 text-white shadow-xl">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-teal-50">
           {getPanelName(role)} workspace
         </p>
         <h1 className="mt-2 text-2xl font-bold">{panel.title}</h1>

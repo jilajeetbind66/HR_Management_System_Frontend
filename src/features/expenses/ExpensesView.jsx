@@ -236,7 +236,7 @@ export default function ExpensesView() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+          <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
             Finance &amp; Claims
           </span>
           <span className="text-xs text-slate-500 font-medium">Reimbursements and employee loan requests</span>
@@ -267,7 +267,7 @@ export default function ExpensesView() {
           aria-selected={activeTab === 'expenses'}
           onClick={() => setActiveTab('expenses')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'expenses' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'expenses' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Receipt className="w-4 h-4" aria-hidden="true" /> Expense claims
@@ -278,7 +278,7 @@ export default function ExpensesView() {
           aria-selected={activeTab === 'loans'}
           onClick={() => setActiveTab('loans')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'loans' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'loans' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Banknote className="w-4 h-4" aria-hidden="true" /> Loan requests
@@ -339,7 +339,7 @@ export default function ExpensesView() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
                 >
                   {saving ? 'Submitting…' : 'Submit claim'}
                 </button>
@@ -391,7 +391,7 @@ export default function ExpensesView() {
                                 <button
                                   type="button"
                                   onClick={() => openReceipt(receipt)}
-                                  className="font-semibold text-indigo-600 hover:underline"
+                                  className="font-semibold text-teal-600 hover:underline"
                                 >
                                   Download securely
                                 </button>
@@ -476,7 +476,7 @@ export default function ExpensesView() {
                     <button
                       type="button"
                       onClick={() => openReceipt(receipt)}
-                      className="font-semibold text-indigo-600 hover:underline"
+                      className="font-semibold text-teal-600 hover:underline"
                     >
                       Download securely
                     </button>
@@ -520,7 +520,7 @@ export default function ExpensesView() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
                 >
                   {saving ? 'Submitting…' : 'Submit loan request'}
                 </button>

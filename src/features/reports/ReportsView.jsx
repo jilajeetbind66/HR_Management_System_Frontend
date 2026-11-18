@@ -123,6 +123,7 @@ export default function ReportsView() {
   const workforce = reports?.workforce;
   const projects = reports?.projects;
   const payroll = reports?.payroll;
+  const training = reports?.training;
   const exports = reports?.exports || {};
   const lockedRuns = payroll?.locked_runs || [];
 
@@ -131,7 +132,7 @@ export default function ReportsView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-indigo-600">
+            <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-teal-600">
               Intelligence & Analytics
             </span>
             <span className="text-xs font-medium text-slate-500">Database-backed reports</span>
@@ -152,12 +153,43 @@ export default function ReportsView() {
             {exporting === 'employee_master' ? 'Exporting…' : 'Export Employee Master'}
           </Button>
         )}
+        {exports.training_compliance && (
+          <Button
+            variant="secondary"
+            icon={Download}
+            disabled={loading || exporting !== ''}
+            onClick={() => downloadReport('training_compliance')}
+          >
+            {exporting === 'training_compliance' ? 'Exporting…' : 'Export Training Compliance'}
+          </Button>
+        )}
       </div>
 
       {loading && (
         <p role="status" className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
           Loading reports…
         </p>
+      )}
+      {training && (
+        <Card title="Mandatory Training Compliance by Branch" subtitle="Completed mandatory assignments divided by active mandatory assignments; overdue excludes completed work.">
+          {training.branch_compliance.length === 0 ? (
+            <p className="text-sm text-slate-600">No mandatory training assignments are available for this reporting scope.</p>
+          ) : (
+            <div className="space-y-3">
+              {training.branch_compliance.map((branch) => (
+                <div key={branch.branch_id} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_auto]">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{branch.branch_name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {branch.completed_count}/{branch.assigned_count} completed · {branch.pending_review_count} awaiting review · {branch.overdue_count} overdue
+                    </p>
+                  </div>
+                  <strong className="text-lg text-teal-700">{branch.compliance_percent}%</strong>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
       {error && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
@@ -227,7 +259,7 @@ export default function ReportsView() {
                           <span>{branch.active_employee_count} staff ({branch.share_percent}%)</span>
                         </div>
                         <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-indigo-600" style={{ width: `${branch.share_percent}%` }} />
+                          <div className="h-full rounded-full bg-teal-600" style={{ width: `${branch.share_percent}%` }} />
                         </div>
                       </div>
                     ))}
@@ -274,7 +306,7 @@ export default function ReportsView() {
                     id="report-payroll-run"
                     value={selectedRunId}
                     onChange={(event) => setSelectedRunId(event.target.value)}
-                    className="mb-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200 sm:max-w-md"
+                    className="mb-4 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-200 sm:max-w-md"
                   >
                     {lockedRuns.map((run) => (
                       <option key={run.id} value={run.id}>
@@ -312,7 +344,7 @@ export default function ReportsView() {
         </>
       )}
 
-      {!loading && !error && !workforce && !projects && !payroll && (
+      {!loading && !error && !workforce && !projects && !payroll && !training && (
         <Card title="Reports unavailable" subtitle="No report data is assigned to this role.">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BarChart3 className="h-4 w-4" />

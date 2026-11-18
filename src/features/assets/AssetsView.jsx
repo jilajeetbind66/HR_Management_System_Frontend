@@ -100,7 +100,7 @@ export default function AssetsView() {
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-indigo-600">
+            <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-teal-600">
               IT Infrastructure
             </span>
             <span className="text-xs font-medium text-slate-500">Hardware assets and device allocations</span>
@@ -221,7 +221,7 @@ export default function AssetsView() {
                   return (
                     <tr key={asset.id} className="align-top hover:bg-slate-50">
                       <td className="px-5 py-3">
-                        <span className="mr-2 rounded border border-indigo-100 bg-indigo-50 px-1.5 py-0.5 font-mono font-bold text-indigo-600">
+                        <span className="mr-2 rounded border border-teal-100 bg-teal-50 px-1.5 py-0.5 font-mono font-bold text-teal-600">
                           {asset.asset_code}
                         </span>
                         <span className="font-semibold text-slate-900">{asset.name}</span>

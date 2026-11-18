@@ -2,10 +2,137 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --hrms-color-brand: #0f172a;
+  --hrms-color-accent: #0f9488;
+  --hrms-color-accent-hover: #0f766e;
+  --hrms-color-canvas: #f1f5f9;
+  --hrms-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
 @layer base {
   body {
-    @apply bg-slate-50 text-slate-900 font-sans antialiased selection:bg-indigo-500 selection:text-white;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    @apply bg-slate-100 text-slate-900 antialiased selection:bg-teal-600 selection:text-white;
+  }
+}
+
+body {
+  font-family: var(--hrms-font-family);
+}
+
+@layer components {
+  .hrms-app-shell {
+    background-color: var(--hrms-color-canvas);
+  }
+
+  .hrms-sidebar {
+    background-color: var(--hrms-color-brand);
+    color: #e2e8f0;
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .hrms-sidebar__brand,
+  .hrms-sidebar__footer {
+    border-color: rgb(255 255 255 / 10%);
+  }
+
+  .hrms-sidebar__link {
+    color: #e2e8f0;
+  }
+
+  .hrms-sidebar__link:hover {
+    background-color: rgb(255 255 255 / 8%);
+    color: #fff;
+  }
+
+  .hrms-sidebar__link--active,
+  .hrms-sidebar__link--active:hover {
+    background-color: var(--hrms-color-accent);
+    color: #fff;
+  }
+
+  .hrms-sidebar__link--highlight {
+    border: 1px solid rgb(255 255 255 / 10%);
+    background-color: rgb(255 255 255 / 5%);
+  }
+
+  .hrms-sidebar__badge {
+    background-color: rgb(255 255 255 / 10%);
+    color: #e2e8f0;
+  }
+
+  .hrms-sidebar--hr {
+    background-color: #e8e9e1;
+    color: #050505;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__brand,
+  .hrms-sidebar--hr .hrms-sidebar__footer {
+    border-color: #171717;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__link {
+    color: #080808;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__link:hover {
+    background-color: #fff;
+    color: #080808;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__link--active,
+  .hrms-sidebar--hr .hrms-sidebar__link--active:hover {
+    background-color: #fff;
+    color: #080808;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__link:focus-visible {
+    outline: 2px solid #009b58;
+    outline-offset: 1px;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__icon--hr {
+    color: #00a65a;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__badge {
+    background-color: #d7d9d0;
+    color: #006a3f;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__status {
+    color: #00995a;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__status .font-mono {
+    color: #00864d;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__logout {
+    min-height: 42px;
+    margin-top: 8px;
+    border-top: 1px solid #171717;
+    background-color: #daddd3;
+    color: #b42318;
+  }
+
+  .hrms-sidebar--hr .hrms-sidebar__logout:hover {
+    background-color: #b91c1c;
+    color: #fff;
+  }
+
+  .hrms-button-primary {
+    background-color: var(--hrms-color-accent);
+    color: #fff;
+  }
+
+  .hrms-button-primary:hover {
+    background-color: var(--hrms-color-accent-hover);
+  }
+
+  .hrms-dashboard-hero {
+    background-image: linear-gradient(105deg, #0f766e 0%, #0f9488 52%, #059669 100%);
   }
 }
 
@@ -17,10 +144,10 @@
   border: 1px solid transparent;
   background-image: linear-gradient(
     90deg,
-    #0d9488 0%,
-    #0d9488 50%,
-    #22c55e 50%,
-    #15803d 100%
+    #0f766e 0%,
+    #0f766e 50%,
+    #0f9488 50%,
+    #059669 100%
   );
   background-position: 100% 0;
   background-size: 200% 100%;
@@ -29,7 +156,7 @@
 
 .hrms-login-submit:hover {
   background-position: 0 0;
-  border-color: #0d9488;
+  border-color: #0f9488;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -138,46 +265,4 @@
   background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(226, 232, 240, 0.8);
-}
-
-.hr-workspace [class~="bg-indigo-50"] {
-  background-color: #ecfdf5;
-}
-
-.hr-workspace [class~="bg-indigo-100"] {
-  background-color: #d1fae5;
-}
-
-.hr-workspace [class~="bg-indigo-600"] {
-  background-color: #059669;
-}
-
-.hr-workspace [class~="bg-indigo-700"],
-.hr-workspace [class~="hover:bg-indigo-700"]:hover {
-  background-color: #047857;
-}
-
-.hr-workspace [class~="text-indigo-400"],
-.hr-workspace [class~="text-indigo-500"],
-.hr-workspace [class~="text-indigo-600"],
-.hr-workspace [class~="text-indigo-700"],
-.hr-workspace [class~="text-indigo-800"] {
-  color: #047857;
-}
-
-.hr-workspace [class~="border-indigo-100"] {
-  border-color: #d1fae5;
-}
-
-.hr-workspace [class~="border-indigo-200"] {
-  border-color: #a7f3d0;
-}
-
-.hr-workspace [class~="focus:ring-indigo-500"]:focus {
-  --tw-ring-color: #10b981;
-}
-
-.hr-workspace [class~="shadow-indigo-600/30"] {
-  --tw-shadow-color: rgb(5 150 105 / 0.3);
-  --tw-shadow: var(--tw-shadow-colored);
 }

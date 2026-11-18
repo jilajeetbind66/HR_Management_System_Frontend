@@ -267,7 +267,7 @@ export default function PerformanceView() {
     <div className="space-y-6">
       <div>
         <div className="flex items-center gap-2">
-          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-indigo-600">
+          <span className="rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-teal-600">
             Talent &amp; Development
           </span>
           <span className="text-xs font-medium text-slate-500">Quarterly objectives and reviews</span>
@@ -576,7 +576,7 @@ export default function PerformanceView() {
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${statusStyle(objective.status)}`}>
                           {objective.status}
                         </span>
-                        <span className="text-xs font-semibold text-indigo-700">{Number(objective.weight_percent)}% weight</span>
+                        <span className="text-xs font-semibold text-teal-700">{Number(objective.weight_percent)}% weight</span>
                       </div>
                       <p className="mt-1 text-xs text-slate-500">
                         {objective.first_name} {objective.last_name} · {objective.employee_code}
@@ -641,7 +641,7 @@ export default function PerformanceView() {
                                   ...previous,
                                   [keyResult.id]: event.target.value,
                                 }))}
-                                className="w-full accent-indigo-600"
+                                className="w-full accent-teal-600"
                               />
                               <span className="w-12 text-right text-xs text-slate-600">{progress}%</span>
                               {String(progress) !== String(keyResult.progress_percent) && (
@@ -716,7 +716,7 @@ export default function PerformanceView() {
 
                     <div className="rounded-lg border border-slate-100 p-3">
                       <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
-                        <ClipboardList className="h-3.5 w-3.5 text-indigo-500" /> Manager-rating
+                        <ClipboardList className="h-3.5 w-3.5 text-teal-500" /> Manager-rating
                       </p>
                       {objective.manager_rating == null ? (
                         <p className="mt-1 text-xs text-slate-500">Not submitted</p>
@@ -772,7 +772,7 @@ export default function PerformanceView() {
                   </div>
 
                   {canReviewThisObjective && objective.status === 'submitted' && selectedCycle.status === 'open' && (
-                    <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+                    <div className="mt-4 rounded-lg border border-teal-100 bg-teal-50/50 p-3">
                       <label className="block text-xs font-semibold text-slate-700">
                         Manager feedback
                         <textarea

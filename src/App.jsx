@@ -9,6 +9,7 @@ import LoginPage from './features/auth/LoginPage';
 import ExecutiveDashboard from './features/dashboard/ExecutiveDashboard';
 import DeveloperDashboard from './features/dashboard/DeveloperDashboard';
 import ProjectsView from './features/projects/ProjectsView';
+import MyProjectsView from './features/projects/MyProjectsView';
 import OrganizationView from './features/organization/OrganizationView';
 import DocumentsView from './features/documents/DocumentsView';
 import AttendanceView from './features/attendance/AttendanceView';
@@ -26,6 +27,7 @@ import ReportsView from './features/reports/ReportsView';
 import RoleDashboard from './features/dashboard/RoleDashboard';
 import { canAccessModule, hasRolePermission } from './config/roleAccess';
 import EmailChangeVerificationPage from './features/account/EmailChangeVerificationPage';
+import EmployeeAccountSetupPage from './features/account/EmployeeAccountSetupPage';
 
 const EmployeesView = lazy(() => import('./features/employees/EmployeesView'));
 const PlatformView = lazy(() => import('./features/platform/PlatformView'));
@@ -35,6 +37,7 @@ const AccountSettingsView = lazy(() => import('./features/account/AccountSetting
 const TAB_ROUTES = {
   dashboard: '/dashboard',
   developer_space: '/developer-space',
+  my_projects: '/my-projects',
   projects: '/projects',
   employees: '/employees',
   organization: '/organization',
@@ -70,6 +73,8 @@ function MainApp() {
   const { pathname } = useLocation();
   const currentPath = normalizePathname(pathname);
   const isEmailChangeVerification = currentPath === '/verify-email-change';
+  const isEmployeeAccountSetup = currentPath === '/setup-password';
+  const isPublicAccountAction = isEmailChangeVerification || isEmployeeAccountSetup;
   const activeTab = currentPath === '/employees/create'
     ? 'employees'
     : ROUTE_TABS[currentPath] || 'dashboard';
@@ -78,7 +83,7 @@ function MainApp() {
     : canAccessModule(currentUser?.role, activeTab);
 
   useEffect(() => {
-    if (isEmailChangeVerification) return;
+    if (isPublicAccountAction) return;
     if (isLoading) return;
 
     if (!isAuthenticated) {
@@ -98,7 +103,7 @@ function MainApp() {
     ) {
       navigate(TAB_ROUTES.dashboard, { replace: true });
     }
-  }, [activeTab, canAccessCurrentPath, currentPath, isAuthenticated, isEmailChangeVerification, isLoading, navigate]);
+  }, [activeTab, canAccessCurrentPath, currentPath, isAuthenticated, isPublicAccountAction, isLoading, navigate]);
 
   const handleTabSelect = (tab) => {
     const route = TAB_ROUTES[tab];
@@ -109,6 +114,10 @@ function MainApp() {
 
   if (isEmailChangeVerification) {
     return <EmailChangeVerificationPage />;
+  }
+
+  if (isEmployeeAccountSetup) {
+    return <EmployeeAccountSetupPage />;
   }
 
   if (isLoading) {
@@ -127,6 +136,8 @@ function MainApp() {
           : <RoleDashboard onNavigate={handleTabSelect} />;
       case 'developer_space':
         return <DeveloperDashboard onNavigate={handleTabSelect} />;
+      case 'my_projects':
+        return <MyProjectsView />;
       case 'projects':
         return <ProjectsView />;
       case 'employees':

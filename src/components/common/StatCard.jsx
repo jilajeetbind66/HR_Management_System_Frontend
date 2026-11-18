@@ -18,9 +18,9 @@ export default function StatCard({
       border: 'border-teal-100'
     },
     indigo: {
-      bg: 'bg-indigo-50/80',
-      text: 'text-indigo-600',
-      border: 'border-indigo-100'
+      bg: 'bg-teal-50/80',
+      text: 'text-teal-600',
+      border: 'border-teal-100'
     },
     emerald: {
       bg: 'bg-emerald-50/80',

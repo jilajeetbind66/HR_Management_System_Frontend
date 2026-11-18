@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import EmployeeNavbar from './EmployeeNavbar';
 import Sidebar from './Sidebar';
@@ -7,8 +8,10 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function AppLayout({ activeTab, onTabSelect, children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { backendStatus, backendError, syncWithBackend } = useHRMS();
+  const { backendStatus, backendError, syncWithBackend, refreshAttendance } = useHRMS();
   const { currentUser } = useAuth();
+  const { pathname } = useLocation();
+  const [attendanceRefreshError, setAttendanceRefreshError] = useState(null);
   const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser?.role);
   const isManagerWorkspace = currentUser?.role === 'manager';
   const isAdminWorkspace = currentUser?.role === 'super_admin';
@@ -20,10 +23,25 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
       ? 'max-w-none p-4 sm:p-5 lg:p-6'
       : 'max-w-7xl p-4 sm:p-6 lg:p-8';
 
+  useEffect(() => {
+    let active = true;
+    refreshAttendance()
+      .then(() => {
+        if (active) setAttendanceRefreshError(null);
+      })
+      .catch((error) => {
+        if (active) {
+          setAttendanceRefreshError(error?.data?.message || error.message || 'Attendance status could not be refreshed.');
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [pathname, refreshAttendance]);
+
   return (
-    <div className={`${isHrWorkspace ? 'hr-workspace ' : ''}${isManagerWorkspace ? 'manager-workspace ' : ''}${isAdminWorkspace ? 'admin-workspace ' : ''}${isEmployeeWorkspace ? 'employee-workspace ' : ''}flex h-screen overflow-hidden font-sans antialiased text-slate-800 ${
-      isHrWorkspace ? 'bg-[#f4f7f6]' : isNavyWorkspace ? 'bg-[#f1f5f9]' : isEmployeeWorkspace ? 'bg-[#f5f6f8]' : 'bg-slate-50'
-    }`}>
+    <div className={`${isHrWorkspace ? 'hr-workspace ' : ''}${isManagerWorkspace ? 'manager-workspace ' : ''}${isAdminWorkspace ? 'admin-workspace ' : ''}${isEmployeeWorkspace ? 'employee-workspace ' : ''}hrms-app-shell flex h-screen overflow-hidden antialiased text-slate-800`}>
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -40,10 +58,18 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
             onNavigate={onTabSelect}
           />
         ) : (
-          <Navbar onMenuToggle={() => setSidebarOpen(!sidebarOpen)} />
+          <Navbar
+            onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
+            onNavigate={onTabSelect}
+          />
         )}
 
         <main className={`flex-1 w-full mx-auto ${mainPadding}`}>
+          {attendanceRefreshError && (
+            <p role="alert" className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Attendance status could not be refreshed: {attendanceRefreshError}
+            </p>
+          )}
           {backendStatus === 'checking' ? (
             <p role="status" className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600">
               Loading HRMS records from the server...

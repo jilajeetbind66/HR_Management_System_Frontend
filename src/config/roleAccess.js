@@ -1,6 +1,7 @@
 const allModules = [
   'dashboard',
   'developer_space',
+  'my_projects',
   'projects',
   'employees',
   'organization',
@@ -24,24 +25,24 @@ const allModules = [
 
 const modulesByRole = {
   employee: [
-    'dashboard', 'developer_space', 'projects', 'documents', 'attendance',
+    'dashboard', 'developer_space', 'my_projects', 'documents', 'attendance',
     'leaves', 'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'account',
   ],
   manager: [
-    'dashboard', 'projects', 'employees', 'documents', 'attendance', 'leaves',
+    'dashboard', 'developer_space', 'projects', 'employees', 'documents', 'attendance', 'leaves',
     'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
   ],
   hr_admin: [
-    'dashboard', 'employees', 'organization', 'documents', 'attendance',
-    'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'helpdesk', 'announcements', 'account',
+    'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
+    'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   hr_executive: [
-    'dashboard', 'employees', 'organization', 'documents', 'attendance',
-    'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'helpdesk', 'announcements', 'account',
+    'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
+    'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
-  recruiter: ['dashboard', 'payslips', 'recruitment', 'helpdesk', 'account'],
-  payroll_admin: ['dashboard', 'payroll', 'payslips', 'reports', 'account'],
-  auditor: ['dashboard', 'employees', 'payroll', 'payslips', 'reports', 'platform', 'account'],
+  recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'account'],
+  payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'reports', 'account'],
+  auditor: ['dashboard', 'developer_space', 'employees', 'payroll', 'payslips', 'reports', 'platform', 'account'],
   super_admin: allModules,
 };
 
@@ -56,14 +57,40 @@ const roleLabels = {
   super_admin: 'Admin Dashboard',
 };
 
+const moduleLabels = {
+  developer_space: 'My Workspace',
+  my_projects: 'My Projects',
+  projects: 'Projects & Deadlines',
+  employees: 'Employees Directory',
+  organization: 'Organization & Branches',
+  documents: 'Documents & Policies',
+  attendance: 'Attendance & Punches',
+  leaves: 'Leave Management',
+  payroll: 'Payroll & Statutory Tax',
+  payslips: 'My Payslips',
+  expenses: 'Expenses & Advances',
+  recruitment: 'Recruitment & ATS',
+  lifecycle: 'Lifecycle & Exit',
+  assets: 'Asset Register',
+  performance: 'Performance & Goals',
+  training: 'Training & LMS',
+  helpdesk: 'Helpdesk & SLA',
+  announcements: 'Announcements',
+  reports: 'Analytics & Reports',
+  platform: 'Platform & Audit Logs',
+  account: 'Account & Security',
+};
+
 const permissions = {
   'projects.manage': ['manager', 'super_admin'],
+  'projects.create': ['manager', 'hr_admin', 'hr_executive', 'super_admin'],
   'projects.view_own': ['employee', 'manager', 'super_admin'],
   'projects.progress.update': ['employee', 'manager', 'super_admin'],
   'projects.extension.request': ['employee', 'manager', 'super_admin'],
   'projects.submit': ['employee', 'manager', 'super_admin'],
-  'payroll.view': ['payroll_admin', 'auditor', 'super_admin'],
+  'payroll.view': ['hr_admin', 'payroll_admin', 'auditor', 'super_admin'],
   'payroll.manage': ['payroll_admin', 'super_admin'],
+  'payroll.components.manage': ['hr_admin', 'super_admin'],
   'payslips.view_own': ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'payroll_admin', 'auditor', 'super_admin'],
   'org.view': ['hr_admin', 'hr_executive', 'auditor', 'super_admin'],
   'org.manage': ['hr_admin', 'super_admin'],
@@ -82,6 +109,19 @@ export function canAccessModule(role, module) {
 
 export function getDashboardLabel(role) {
   return roleLabels[role] || 'Dashboard';
+}
+
+export function getModuleLabel(role, module) {
+  return module === 'dashboard'
+    ? getDashboardLabel(role)
+    : moduleLabels[module] || module;
+}
+
+export function getRoleMenuItems(role) {
+  return (modulesByRole[role] || []).map((module) => ({
+    module,
+    label: getModuleLabel(role, module),
+  }));
 }
 
 export function getPanelName(role) {

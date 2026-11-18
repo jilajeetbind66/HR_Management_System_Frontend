@@ -181,7 +181,7 @@ export default function RecruitmentView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200 uppercase tracking-wide">
+            <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
               Talent Acquisition
             </span>
             <span className="text-xs text-slate-500 font-medium">ATS pipeline and onboarding conversion</span>
@@ -225,7 +225,7 @@ export default function RecruitmentView() {
         <button
           onClick={() => setActiveTab('kanban')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'kanban' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'kanban' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Users className="w-4 h-4" /> Candidate Pipeline Kanban
@@ -234,7 +234,7 @@ export default function RecruitmentView() {
         <button
           onClick={() => setActiveTab('jobs')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'jobs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            activeTab === 'jobs' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
           <Briefcase className="w-4 h-4" /> Job Requisitions ({openJobs.length} open)
@@ -292,7 +292,7 @@ export default function RecruitmentView() {
                                 const nextStageIndex = stages.indexOf(stage) + 1;
                                 if (nextStageIndex < stages.length) handleStageMove(cand.id, stages[nextStageIndex]);
                               }}
-                              className="text-indigo-600 font-semibold hover:underline text-[11px] inline-flex items-center gap-1"
+                              className="text-teal-600 font-semibold hover:underline text-[11px] inline-flex items-center gap-1"
                             >
                               Advance Stage <ArrowRight className="w-3 h-3" />
                             </button>
@@ -300,7 +300,7 @@ export default function RecruitmentView() {
                           {['Interview', 'Offered'].includes(stage) && canManageRecruitment && (
                             <button
                               onClick={() => openEvaluation(cand)}
-                              className="text-indigo-600 font-semibold hover:underline text-[11px]"
+                              className="text-teal-600 font-semibold hover:underline text-[11px]"
                             >
                               {Number(cand.rating) > 0 ? 'Update Evaluation' : 'Evaluate'}
                             </button>
@@ -333,7 +333,7 @@ export default function RecruitmentView() {
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Vacancies</span>
-                  <span className="font-bold text-indigo-600">{job.vacancies} Positions</span>
+                  <span className="font-bold text-teal-600">{job.vacancies} Positions</span>
                 </div>
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-500">Experience Needed</span>
