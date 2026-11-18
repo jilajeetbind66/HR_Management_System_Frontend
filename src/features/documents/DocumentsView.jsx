@@ -164,7 +164,9 @@ export default function DocumentsView() {
       else failures.push(errorText(letterResult.reason));
       if (documentResult.status === 'fulfilled') setEmployeeDocs(documentResult.value?.data || []);
       else failures.push(errorText(documentResult.reason));
-      setFeedback(failures.length ? { type: 'error', text: failures.join(' ') } : null);
+      if (failures.length) {
+        setFeedback({ type: 'error', text: failures.join(' ') });
+      }
       setLoading(false);
     });
 
@@ -643,7 +645,8 @@ export default function DocumentsView() {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={busyAction === `document-${document.id}`}
+                                  disabled={busyAction === `document-${document.id}` || !(reviewNotes[document.id] || '').trim()}
+                                  title={!(reviewNotes[document.id] || '').trim() ? 'Enter a review note before rejecting' : undefined}
                                   onClick={() => reviewDocument(document, 'rejected')}
                                   className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 font-semibold text-white disabled:opacity-60"
                                 >

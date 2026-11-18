@@ -44,6 +44,7 @@ export default function PayrollView() {
     payrollRuns,
     runPayroll,
     refreshPayrollRuns,
+    refreshBranches,
     branches
   } = useHRMS();
 
@@ -150,7 +151,7 @@ export default function PayrollView() {
   }, [activeTab, canViewComponents, componentRefresh]);
 
   useEffect(() => {
-    if (activeTab !== 'statutory') return undefined;
+    if (activeTab !== 'statutory' || !canViewComponents) return undefined;
     let active = true;
     setStatutoryLoading(true);
     setStatutoryError('');
@@ -173,7 +174,7 @@ export default function PayrollView() {
     return () => {
       active = false;
     };
-  }, [activeTab, componentRefresh]);
+  }, [activeTab, canViewComponents, componentRefresh]);
 
   useEffect(() => {
     const employee = taxDeclarations.find(item => String(item.employee_id) === String(selectedTaxEmployeeId));
@@ -525,14 +526,16 @@ export default function PayrollView() {
           <Receipt className="w-4 h-4" /> CTC Structure & Component Master
         </button>}
 
-        <button
-          onClick={() => setActiveTab('statutory')}
-          className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'statutory' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <ShieldCheck className="w-4 h-4" /> Indian Statutory Config (EPFO / ESIC / PT)
-        </button>
+        {canViewComponents && (
+          <button
+            onClick={() => setActiveTab('statutory')}
+            className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+              activeTab === 'statutory' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" /> Indian Statutory Config (EPFO / ESIC / PT)
+          </button>
+        )}
       </div>
 
       {/* TAB 1: PAYROLL RUNS */}
@@ -937,6 +940,38 @@ export default function PayrollView() {
                       </Button>
                     </form>
                   )}
+
+                  {canManageComponents && branches.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 mt-4">
+                      <h4 className="font-semibold text-slate-800 mb-1">Branch Professional Tax Opt-In</h4>
+                      <p className="text-[11px] text-slate-500 mb-2">Enable or disable PT deduction per regional branch location:</p>
+                      <div className="space-y-1.5">
+                        {branches.map((b) => (
+                          <div key={b.id} className="flex items-center justify-between py-1 border-b border-slate-200/70 last:border-b-0">
+                            <div>
+                              <span className="font-semibold text-slate-800">{b.name}</span>
+                              <span className="text-slate-500 text-[11px]"> · {b.city}, {b.state}</span>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={b.pt_applicable ? 'secondary' : 'primary'}
+                              onClick={async () => {
+                                try {
+                                  await api.updateBranchProfessionalTax(b.id, !b.pt_applicable);
+                                  await refreshBranches?.();
+                                } catch (err) {
+                                  setStatutoryError(statutoryErrorMessage(err));
+                                }
+                              }}
+                            >
+                              {b.pt_applicable ? 'PT Enabled' : 'PT Disabled'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
 
@@ -1028,7 +1063,7 @@ export default function PayrollView() {
                           <div className="grid gap-3 sm:grid-cols-2">
                             <label className="font-semibold text-slate-700">
                               Financial year
-                              <input required pattern="\\d{4}-\\d{4}" value={declarationForm.financial_year}
+                              <input required pattern="\d{4}-\d{4}" value={declarationForm.financial_year}
                                 onChange={event => setDeclarationForm(form => ({ ...form, financial_year: event.target.value }))}
                                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
                             </label>
@@ -1109,6 +1144,21 @@ export default function PayrollView() {
         subtitle="Architecture Section 7.2: Unique period_year, period_month, scope_key"
       >
         <form onSubmit={handleStartPayroll} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
+          {salaryDataIssues.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
+              <p className="font-semibold">Employees with incomplete salary details ({salaryDataIssues.length}):</p>
+              <ul className="mt-1 list-disc pl-4 space-y-0.5">
+                {salaryDataIssues.map((emp) => (
+                  <li key={emp.id || emp.employee_code}>{emp.name || emp.employee_code} ({emp.employee_code})</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Period Month:</label>

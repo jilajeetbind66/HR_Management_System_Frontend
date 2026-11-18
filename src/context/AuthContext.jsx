@@ -94,6 +94,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const refreshCurrentUser = async () => {
+    const response = await api.currentUser();
+    const user = response?.data;
+    if (user) {
+      setCurrentUser(user);
+      setCachedUser(user);
+    }
+    return user;
+  };
+
   const logout = async () => {
     try {
       if (isAuthenticated) await api.logout();
@@ -104,6 +114,7 @@ export function AuthProvider({ children }) {
       setCachedUser(null);
       setCurrentUser(null);
       setIsAuthenticated(false);
+      setActiveBranch('All Branches');
     }
   };
 
@@ -121,6 +132,7 @@ export function AuthProvider({ children }) {
       setActiveBranch,
       login,
       changePassword,
+      refreshCurrentUser,
       logout,
       hasPermission,
     }}>

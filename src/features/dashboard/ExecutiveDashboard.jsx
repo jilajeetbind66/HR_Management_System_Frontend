@@ -24,18 +24,42 @@ export default function ExecutiveDashboard({ onNavigate }) {
   const { currentUser, activeBranch } = useAuth();
   const { employees, projects, attendance, leaveRequests, payrollRuns, branches } = useHRMS();
 
-  // Metrics
-  const activeEmployees = employees.filter(e => e.status === 'active');
-  const activeProjects = projects.filter(p => p.status === 'in_progress' || p.status === 'under_review' || p.status === 'overdue');
-  const overdueProjects = projects.filter(p => p.status === 'overdue');
-  const completedProjects = projects.filter(p => p.status === 'completed');
-  const pendingLeaves = leaveRequests.filter((leave) => canReviewLeave(leave, currentUser));
+  // Branch-scoped metrics
+  const selectedBranchObj = activeBranch && activeBranch !== 'All Branches'
+    ? branches.find((b) => b.name === activeBranch)
+    : null;
+  const scopedEmployees = selectedBranchObj
+    ? employees.filter((e) => Number(e.branch_id) === Number(selectedBranchObj.id))
+    : employees;
+  const scopedEmployeeIds = new Set(scopedEmployees.map((e) => Number(e.id)));
+  const scopedProjects = selectedBranchObj
+    ? projects.filter((p) => scopedEmployeeIds.has(Number(p.assigned_employee_id)))
+    : projects;
+  const scopedAttendance = selectedBranchObj
+    ? attendance.filter((a) => scopedEmployeeIds.has(Number(a.employee_id)))
+    : attendance;
+
+  const activeEmployees = scopedEmployees.filter(e => e.status === 'active');
+  const activeProjects = scopedProjects.filter(p => p.status === 'in_progress' || p.status === 'under_review' || p.status === 'overdue');
+  const overdueProjects = scopedProjects.filter(p => p.status === 'overdue');
+  const completedProjects = scopedProjects.filter(p => p.status === 'completed');
+  const pendingLeaves = leaveRequests.filter((leave) => (
+    canReviewLeave(leave, currentUser)
+    && (!selectedBranchObj || scopedEmployeeIds.has(Number(leave.employee_id)))
+  ));
 
   const today = getIndiaDateString();
-  const presentToday = attendance.filter(a => a.date === today && a.status === 'Present').length;
-  const attendanceRate = Math.round((presentToday / Math.max(employees.length, 1)) * 100);
+  const currentMonthPrefix = today.slice(0, 7);
+  const joinedThisMonth = activeEmployees.filter((e) => String(e.date_of_joining || '').startsWith(currentMonthPrefix)).length;
+  const presentToday = scopedAttendance.filter(a => a.date === today && ['Present', 'Short Hours', 'Half Day', 'Late'].includes(a.status)).length;
+  const attendanceRate = activeEmployees.length > 0
+    ? Math.round((presentToday / activeEmployees.length) * 100)
+    : 0;
 
-  const lastPayroll = payrollRuns.find(p => p.status === 'locked') || payrollRuns[0] || null;
+  const lastPayroll = payrollRuns.find(p => ['published', 'locked'].includes(p.status)) || payrollRuns[0] || null;
+  const lastPayrollBadge = lastPayroll
+    ? `${lastPayroll.status.charAt(0).toUpperCase()}${lastPayroll.status.slice(1)}`
+    : 'No Data';
 
   return (
     <div className="space-y-5">
@@ -114,8 +138,8 @@ export default function ExecutiveDashboard({ onNavigate }) {
         <StatCard
           title="Active Workforce"
           value={activeEmployees.length}
-          subvalue="1,000 capacity baseline"
-          trend="+4 this month"
+          subvalue={`${scopedEmployees.length} total in ${selectedBranchObj ? selectedBranchObj.name : 'all branches'}`}
+          trend={joinedThisMonth > 0 ? `+${joinedThisMonth} joined this month` : `${branches.length} branches active`}
           icon={Users}
           color="teal"
           badge="Permanent"
@@ -137,8 +161,8 @@ export default function ExecutiveDashboard({ onNavigate }) {
         <StatCard
           title="Today's Attendance"
           value={`${presentToday} Present`}
-          subvalue="Web punch active"
-          trend="85% on time"
+          subvalue={`Out of ${activeEmployees.length} active staff`}
+          trend={`${attendanceRate}% checked in`}
           icon={Clock}
           color="rose"
           badge="Live"
@@ -149,10 +173,10 @@ export default function ExecutiveDashboard({ onNavigate }) {
           title="Latest Net Payroll"
           value={lastPayroll ? `₹${(Number(lastPayroll.net_payout_inr || 0) / 100000).toFixed(2)} Lakh` : 'Not run yet'}
           subvalue={lastPayroll?.month_name || 'No payroll runs'}
-          trend={lastPayroll ? '100% PF/ESI Compliant' : 'Add employee records, then run payroll'}
+          trend={lastPayroll ? `${lastPayroll.total_employees || 0} employees in run` : 'Add employee records, then run payroll'}
           icon={Banknote}
-          color={lastPayroll ? 'teal' : 'amber'}
-          badge={lastPayroll ? 'Locked' : 'No Data'}
+          color={lastPayroll && ['published', 'locked'].includes(lastPayroll.status) ? 'teal' : 'amber'}
+          badge={lastPayrollBadge}
           className="!min-h-[178px] !rounded-2xl"
         />
       </div>
@@ -172,10 +196,21 @@ export default function ExecutiveDashboard({ onNavigate }) {
             }
           >
             <div className="space-y-4">
-              {projects.map(project => {
+              {scopedProjects.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-slate-500">
+                  No project assignments found{selectedBranchObj ? ` for ${selectedBranchObj.name}` : ''}.
+                </div>
+              ) : scopedProjects.map(project => {
                 const isOverdue = project.status === 'overdue';
                 const isComplete = project.status === 'completed';
                 const isReview = project.status === 'under_review';
+                const assigneeInitials = String(project.assigned_employee_name || 'E')
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0])
+                  .join('')
+                  .toUpperCase();
 
                 return (
                   <div key={project.id} className="p-4 rounded-2xl border border-slate-200/80 hover:border-slate-300 transition bg-slate-50/40">
@@ -221,7 +256,13 @@ export default function ExecutiveDashboard({ onNavigate }) {
                     {/* Footer: Assigned developer & Dates */}
                     <div className="mt-3 pt-3 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                       <div className="flex items-center gap-2">
-                        <img src={project.assigned_employee_avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        {project.assigned_employee_avatar ? (
+                          <img src={project.assigned_employee_avatar} alt="" className="w-5 h-5 rounded-full object-cover" />
+                        ) : (
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-700">
+                            {assigneeInitials}
+                          </span>
+                        )}
                         <span className="font-medium text-slate-700">{project.assigned_employee_name}</span>
                         <span className="text-[11px] text-slate-400">({project.assigned_employee_code})</span>
                       </div>

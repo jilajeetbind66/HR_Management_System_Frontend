@@ -65,7 +65,12 @@ export default function LeavesView() {
     (request) => Number(request.employee_id) === Number(currentUser.employee_id)
   );
   const pendingApprovals = leaveRequests.filter((request) => canReviewLeave(request, currentUser));
-  const displayedLeaves = (activeTab === 'approvals' ? pendingApprovals : myLeaves).filter((request) => (
+  const baseLeaves = activeTab === 'approvals'
+    ? pendingApprovals
+    : activeTab === 'all'
+      ? leaveRequests
+      : myLeaves;
+  const displayedLeaves = baseLeaves.filter((request) => (
     (!statusFilter || request.status === statusFilter)
     && (!employeeFilter || String(request.employee_id) === employeeFilter)
     && (!dateFromFilter || request.to_date >= dateFromFilter)
@@ -187,6 +192,8 @@ export default function LeavesView() {
         <Button
           variant="primary"
           icon={CalendarPlus}
+          disabled={!currentUser?.employee_id}
+          title={!currentUser?.employee_id ? 'Account is not linked to an employee record' : undefined}
           onClick={() => setShowApplyModal(true)}
         >
           Apply for Leave
@@ -248,6 +255,17 @@ export default function LeavesView() {
           </button>
         )}
 
+        {canApprove && (
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+              activeTab === 'all' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <CheckCircle2 className="w-4 h-4" /> All / Team Leaves ({leaveRequests.length})
+          </button>
+        )}
+
         <button
           onClick={() => setActiveTab('policy')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
@@ -259,7 +277,7 @@ export default function LeavesView() {
       </div>
 
       {/* TAB 1: REQUESTS */}
-      {(activeTab === 'my' || activeTab === 'approvals') && (
+      {(activeTab === 'my' || activeTab === 'approvals' || activeTab === 'all') && (
         <>
         {reviewError && (
           <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
@@ -281,7 +299,7 @@ export default function LeavesView() {
               <option value="cancelled">Cancelled</option>
             </select>
           </label>
-          {canApprove && (
+          {canApprove && activeTab !== 'my' && (
             <label className="text-xs font-medium text-slate-600">
               Employee
               <select
@@ -423,8 +441,10 @@ export default function LeavesView() {
                           ) : (
                             <span className="text-[11px] text-slate-400">Awaiting {req.approval_stage}</span>
                           )
+                        ) : req.status === 'cancelled' ? (
+                          <span className="text-[11px] text-slate-400">Cancelled by employee</span>
                         ) : (
-                          <span className="text-[11px] text-slate-400">Reviewed by {req.reviewed_by}</span>
+                          <span className="text-[11px] text-slate-400">Reviewed by {req.reviewed_by || 'Approver'}</span>
                         )}
                       </td>
                     )}

@@ -227,7 +227,9 @@ export default function LifecycleView() {
                   className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
                 >
                   <option value="">Select an employee</option>
-                  {employees.map((employee) => (
+                  {employees
+                    .filter((employee) => ['active', 'on_notice'].includes(employee.status))
+                    .map((employee) => (
                     <option key={employee.id} value={employee.id}>
                       {employee.employee_code} — {employeeName(employee)}
                     </option>
@@ -260,7 +262,9 @@ export default function LifecycleView() {
                     effective_date: event.target.value,
                     target_completion_date: activeTab === 'offboarding'
                       ? event.target.value
-                      : previous.target_completion_date,
+                      : (previous.target_completion_date && previous.target_completion_date < event.target.value
+                        ? event.target.value
+                        : previous.target_completion_date),
                   }))}
                   className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
                 />
@@ -334,7 +338,7 @@ export default function LifecycleView() {
                 : null;
 
               return (
-                <details key={lifecycleCase.id} className="rounded-lg border border-slate-200 bg-white" open={false}>
+                <details key={lifecycleCase.id} className="rounded-lg border border-slate-200 bg-white">
                   <summary className="cursor-pointer list-none p-4 hover:bg-slate-50">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>

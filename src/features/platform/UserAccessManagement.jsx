@@ -176,7 +176,10 @@ export default function UserAccessManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredUsers.map((user) => (
+                {filteredUsers.map((user) => {
+                  const isArchived = Boolean(user.employee_deleted_at) || ['inactive', 'terminated'].includes(user.employee_status);
+                  const isSetupPending = !isArchived && Boolean(user.must_change_password);
+                  return (
                   <tr key={user.id} className="hover:bg-slate-50/70">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
@@ -192,14 +195,25 @@ export default function UserAccessManagement() {
                     <td className="px-4 py-3 capitalize text-slate-600">{user.role?.replace(/_/g, ' ') || 'User'}</td>
                     <td className="px-4 py-3 font-mono text-slate-500">{user.employee_code || '-'}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">
-                        Active
-                      </span>
+                      {isArchived ? (
+                        <span className="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                          Archived / Disabled
+                        </span>
+                      ) : isSetupPending ? (
+                        <span className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
+                          Setup Pending
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                          Active
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="inline-flex flex-wrap justify-end gap-2">
                         <button
                           type="button"
+                          disabled={isArchived}
                           onClick={() => {
                             setSelectedEmailUser(user);
                             setEmail('');
@@ -207,20 +221,21 @@ export default function UserAccessManagement() {
                             setEmailCurrentPassword('');
                             setEmailFormError('');
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <Mail className="h-3.5 w-3.5" />
                           Change email
                         </button>
                         <button
                           type="button"
+                          disabled={isArchived}
                           onClick={() => {
                             setSelectedUser(user);
                             setPassword('');
                             setPasswordConfirmation('');
                             setFormError('');
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 font-semibold text-slate-700 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-45"
                         >
                           <KeyRound className="h-3.5 w-3.5" />
                           Reset password
@@ -228,7 +243,8 @@ export default function UserAccessManagement() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

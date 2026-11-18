@@ -30,6 +30,7 @@ export default function AttendanceView() {
     regularizationRequests,
     submitRegularization,
     reviewRegularization,
+    refreshAttendance,
     employees
   } = useHRMS();
 
@@ -39,6 +40,7 @@ export default function AttendanceView() {
   const [regIn, setRegIn] = useState('09:15 AM');
   const [regOut, setRegOut] = useState('06:30 PM');
   const [regReason, setRegReason] = useState('');
+  const [regModalError, setRegModalError] = useState('');
   const [importFiles, setImportFiles] = useState([]);
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
@@ -72,12 +74,16 @@ export default function AttendanceView() {
   }, [canViewCsvImports, importRefresh]);
 
   const today = getIndiaDateString();
-  const myPunch = attendance.find(a => Number(a.employee_id) === Number(currentUser.employee_id) && a.date === today);
-  const isPunchComplete = Boolean(myPunch?.punch_out);
+  const hasEmployeeProfile = Boolean(currentUser?.employee_id);
+  const myPunch = hasEmployeeProfile
+    ? attendance.find(a => Number(a.employee_id) === Number(currentUser.employee_id) && a.date === today)
+    : null;
+  const hasPunchedIn = Boolean(myPunch?.punch_in);
+  const isPunchComplete = Boolean(myPunch?.punch_in && myPunch?.punch_out);
   const currentEmployeeName = [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.name;
 
   const handlePunchClick = async () => {
-    if (isPunchComplete) return;
+    if (!hasEmployeeProfile || isPunchComplete) return;
 
     try {
       const res = await punchAttendance(currentUser.employee_id, currentUser.branch_name || 'Web Portal');
@@ -98,6 +104,7 @@ export default function AttendanceView() {
     e.preventDefault();
     if (!regDate || !regReason) return;
     setWorkflowError('');
+    setRegModalError('');
     try {
       await submitRegularization({
         date: regDate,
@@ -108,7 +115,9 @@ export default function AttendanceView() {
       setShowRegModal(false);
       setRegReason('');
     } catch (error) {
-      setWorkflowError(error?.data?.message || error.message || 'Unable to save the regularization request.');
+      const msg = error?.data?.message || error.message || 'Unable to save the regularization request.';
+      setRegModalError(msg);
+      setWorkflowError(msg);
     }
   };
 
@@ -154,6 +163,9 @@ export default function AttendanceView() {
       setImportSuccess(
         `Import complete: ${response.data.imported_count} attendance day(s) saved; ${response.data.existing_count} existing day(s) skipped.`
       );
+      if (refreshAttendance) {
+        await refreshAttendance();
+      }
     } catch (error) {
       if (error?.data?.data) updateImportSummary(file.id, error.data.data);
       setImportError(error?.data?.message || error.message || 'Unable to process the attendance file.');
@@ -195,18 +207,24 @@ export default function AttendanceView() {
         <div className="flex items-center gap-2.5">
           <Button
             variant="secondary"
-            onClick={() => setShowRegModal(true)}
+            disabled={!hasEmployeeProfile}
+            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
+            onClick={() => {
+              setRegModalError('');
+              setShowRegModal(true);
+            }}
           >
             Request Regularization
           </Button>
 
           <Button
-            variant={isPunchComplete ? "secondary" : myPunch ? "danger" : "primary"}
+            variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
             icon={Clock}
-            disabled={isPunchComplete}
+            disabled={!hasEmployeeProfile || isPunchComplete}
+            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
             onClick={handlePunchClick}
           >
-            {isPunchComplete ? "Punch Completed" : myPunch ? "Punch Out" : "Punch In"}
+            {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
           </Button>
         </div>
       </div>
@@ -286,7 +304,7 @@ export default function AttendanceView() {
                     ? `${emp.first_name} ${emp.last_name}`
                     : isCurrentEmployee
                       ? currentEmployeeName
-                      : `EMP-${att.employee_id}`;
+                      : [att.first_name, att.last_name].filter(Boolean).join(' ') || (att.employee_code ? `${att.employee_code}` : `EMP-${att.employee_id}`);
                   const employeeInfo = emp?.designation || (isCurrentEmployee ? currentUser.employee_code : '');
 
                   return (
@@ -341,7 +359,7 @@ export default function AttendanceView() {
                   </p>
                 </div>
 
-                {canApprove && req.status === 'pending' && (
+                {canApprove && req.status === 'pending' && Number(req.employee_id) !== Number(currentUser?.employee_id) && (
                   <div className="flex items-center gap-2">
                     <Button size="sm" variant="danger" onClick={() => handleReviewRegularization(req.id, 'rejected')}>
                       Reject
@@ -497,6 +515,11 @@ export default function AttendanceView() {
         subtitle="Submit missed punch justification for manager review"
       >
         <form onSubmit={handleRegSubmit} className="space-y-4 text-xs">
+          {regModalError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {regModalError}
+            </p>
+          )}
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Date to Regularize:</label>
             <input

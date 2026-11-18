@@ -77,6 +77,7 @@ export default function HelpdeskView() {
     setDetailsOpen(true);
     setDetailsLoading(true);
     setDetailsError('');
+    setReply('');
     setSelectedTicket(null);
     try {
       const response = await api.getTicket(ticketId);
@@ -139,9 +140,11 @@ export default function HelpdeskView() {
 
   const canManageTicket = role === 'super_admin'
     || (role === 'hr_admin' && selectedTicket?.category === 'HR Query');
+  const currentUserId = Number(currentUser?.user_id ?? currentUser?.id);
   const canCloseOwnTicket = selectedTicket
-    && Number(selectedTicket.created_by_user_id) === Number(currentUser?.id)
-    && selectedTicket.status === 'Resolved';
+    && Number(selectedTicket.created_by_user_id) === currentUserId
+    && selectedTicket.status === 'Resolved'
+    && !canManageTicket;
 
   return (
     <div className="space-y-6">

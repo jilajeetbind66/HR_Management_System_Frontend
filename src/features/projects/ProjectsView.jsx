@@ -802,17 +802,19 @@ export default function ProjectsView() {
                             Request Extension
                           </Button>
 
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={Send}
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setShowSubmitModal(true);
-                            }}
-                          >
-                            Submit Completion
-                          </Button>
+                          {!isUnderReview && (
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              icon={Send}
+                              onClick={() => {
+                                setSelectedProject(project);
+                                setShowSubmitModal(true);
+                              }}
+                            >
+                              Submit Completion
+                            </Button>
+                          )}
                         </>
                       )}
 
@@ -1389,6 +1391,24 @@ export default function ProjectsView() {
                   {selectedProject.deliverable_link}
                 </a>
               </p>
+            )}
+            {deliverableUploads.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-200">
+                <strong>Attached Deliverable Files ({deliverableUploads.length}):</strong>
+                <ul className="mt-1 space-y-1">
+                  {deliverableUploads.map((file) => (
+                    <li key={file.id}>
+                      <button
+                        type="button"
+                        onClick={() => openPrivateDeliverable(file)}
+                        className="text-teal-600 underline hover:text-teal-800"
+                      >
+                        {file.original_filename} ({Math.round(file.file_size / 1024)} KB)
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 

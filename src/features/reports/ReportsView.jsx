@@ -47,7 +47,8 @@ export default function ReportsView() {
   const [selectedRunId, setSelectedRunId] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState('');
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [exportError, setExportError] = useState('');
   const [exportNotice, setExportNotice] = useState('');
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export default function ReportsView() {
         }
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message || 'Unable to load reports.');
+        if (active) setLoadError(requestError.message || 'Unable to load reports.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -75,20 +76,20 @@ export default function ReportsView() {
   }, []);
 
   const downloadReport = async (report) => {
-    setError('');
+    setExportError('');
     setExportNotice('');
     setExporting(report);
 
     try {
       const response = await api.getReportExport(
         report,
-        report === 'employee_master' ? undefined : selectedRunId
+        ['employee_master', 'training_compliance'].includes(report) ? undefined : selectedRunId
       );
       const result = response?.data;
       const rows = result?.rows;
 
       if (!Array.isArray(rows) || rows.length === 0) {
-        setError('No matching database records are available for this export.');
+        setExportError('No matching database records are available for this export.');
         return;
       }
 
@@ -114,7 +115,7 @@ export default function ReportsView() {
         `${rows.length} database record(s) exported.${missingCount ? ` ${missingCount} record(s) have a missing identifier.` : ''}`
       );
     } catch (requestError) {
-      setError(requestError.message || 'Unable to export this report.');
+      setExportError(requestError.message || 'Unable to export this report.');
     } finally {
       setExporting('');
     }
@@ -191,9 +192,9 @@ export default function ReportsView() {
           )}
         </Card>
       )}
-      {error && (
+      {(loadError || exportError) && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
-          {error}
+          {loadError || exportError}
         </div>
       )}
       {exportNotice && (
@@ -203,7 +204,7 @@ export default function ReportsView() {
         </div>
       )}
 
-      {!loading && !error && (
+      {!loading && !loadError && (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {workforce && (

@@ -46,12 +46,16 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
 
   // Check today's punch for current user
   const today = getIndiaDateString();
-  const todayPunch = attendance.find(a => Number(a.employee_id) === Number(currentUser.employee_id) && a.date === today);
-  const isPunchComplete = Boolean(todayPunch?.punch_out);
+  const hasEmployeeProfile = Boolean(currentUser?.employee_id);
+  const todayPunch = hasEmployeeProfile
+    ? attendance.find(a => Number(a.employee_id) === Number(currentUser.employee_id) && a.date === today)
+    : null;
+  const hasPunchedIn = Boolean(todayPunch?.punch_in);
+  const isPunchComplete = Boolean(todayPunch?.punch_in && todayPunch?.punch_out);
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
 
   const handlePunch = async () => {
-    if (isPunchComplete) return;
+    if (!hasEmployeeProfile || isPunchComplete) return;
 
     try {
       const res = await punchAttendance(currentUser.employee_id, `${currentUser.branch_name || 'Web Portal'}`);
@@ -129,15 +133,16 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             size="sm"
             variant={isPunchComplete
               ? 'secondary'
-              : todayPunch
+              : hasPunchedIn
               ? 'danger'
               : 'orange'}
-            disabled={isPunchComplete}
+            disabled={!hasEmployeeProfile || isPunchComplete}
+            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
             onClick={handlePunch}
             icon={Clock}
             className="shadow-sm font-medium"
           >
-            {isPunchComplete ? "Punch Completed" : todayPunch ? "Punch Out" : "Punch In"}
+            {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
           </Button>
 
           {punchFeedback && (
@@ -234,7 +239,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
               {currentUser?.first_name} {currentUser?.last_name}
             </p>
             <p className="text-[10px] text-slate-400 font-medium">
-              {currentUser?.employee_code} • {currentUser?.branch_name?.split(' ')[0]}
+              {[currentUser?.employee_code, currentUser?.branch_name?.split(' ')[0]].filter(Boolean).join(' • ') || currentUser?.email}
             </p>
           </div>
 

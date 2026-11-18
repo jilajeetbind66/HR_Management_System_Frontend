@@ -449,6 +449,29 @@ export default function ExpensesView() {
                             </div>
                           </div>
                         )}
+                        {claim.status === 'submitted' && Number(claim.employee_id) === employeeId && (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={async () => {
+                              if (!window.confirm(`Cancel claim for ${claim.title}?`)) return;
+                              setFeedback(null);
+                              try {
+                                const response = await api.cancelExpenseClaim(claim.id);
+                                setData((prev) => ({
+                                  ...prev,
+                                  claims: prev.claims.map((c) => (c.id === claim.id ? response.data : c)),
+                                }));
+                                setFeedback({ type: 'success', text: 'Expense claim cancelled.' });
+                              } catch (err) {
+                                setFeedback({ type: 'error', text: errorText(err) });
+                              }
+                            }}
+                            className="mt-3 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel claim
+                          </button>
+                        )}
                         {isSuperAdmin && claim.status === 'approved' && (
                           <button
                             type="button"
@@ -591,6 +614,32 @@ export default function ExpensesView() {
                               Reject request
                             </button>
                           </div>
+                        </div>
+                      )}
+
+                      {loan.status === 'submitted' && Number(loan.employee_id) === employeeId && (
+                        <div className="mt-3">
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={async () => {
+                              if (!window.confirm('Cancel this loan request?')) return;
+                              setFeedback(null);
+                              try {
+                                const response = await api.cancelLoanRequest(loan.id);
+                                setData((prev) => ({
+                                  ...prev,
+                                  loans: prev.loans.map((l) => (l.id === loan.id ? response.data : l)),
+                                }));
+                                setFeedback({ type: 'success', text: 'Loan request cancelled.' });
+                              } catch (err) {
+                                setFeedback({ type: 'error', text: errorText(err) });
+                              }
+                            }}
+                            className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel request
+                          </button>
                         </div>
                       )}
 

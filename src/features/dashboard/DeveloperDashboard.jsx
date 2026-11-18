@@ -185,11 +185,17 @@ export default function DeveloperDashboard({ onNavigate }) {
       {/* Developer Hero */}
       <div className="hrms-dashboard-hero rounded-2xl p-6 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <img
-            src={workspaceUser.avatar}
-            alt=""
-            className="w-16 h-16 rounded-2xl object-cover border-2 border-teal-400 shadow-lg"
-          />
+          {workspaceUser.avatar ? (
+            <img
+              src={workspaceUser.avatar}
+              alt=""
+              className="w-16 h-16 rounded-2xl object-cover border-2 border-teal-400 shadow-lg"
+            />
+          ) : (
+            <div className="flex w-16 h-16 items-center justify-center rounded-2xl bg-slate-900 border-2 border-teal-400 text-lg font-bold text-white shadow-lg">
+              {`${workspaceUser.first_name?.[0] || ''}${workspaceUser.last_name?.[0] || ''}`.toUpperCase() || 'EMP'}
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-teal-50">My Workspace</span>
@@ -349,6 +355,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                             size="sm"
                             variant="secondary"
                             icon={Calendar}
+                            disabled={hasPendingExtension}
                             onClick={() => {
                               setSelectedProject(project);
                               setShowExtensionModal(true);
@@ -357,17 +364,19 @@ export default function DeveloperDashboard({ onNavigate }) {
                             Request Extension
                           </Button>
 
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={Send}
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setShowSubmitModal(true);
-                            }}
-                          >
-                            Submit Completion
-                          </Button>
+                          {!isUnderReview && (
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              icon={Send}
+                              onClick={() => {
+                                setSelectedProject(project);
+                                setShowSubmitModal(true);
+                              }}
+                            >
+                              Submit Completion
+                            </Button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -406,12 +415,12 @@ export default function DeveloperDashboard({ onNavigate }) {
               </div>
 
               <Button
-                variant={isPunchComplete ? "secondary" : myPunch ? "danger" : "primary"}
+                variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
                 className="w-full"
-                disabled={isPunchComplete}
+                disabled={!isViewingOwnWorkspace || !workspaceEmployeeId || isPunchComplete}
                 onClick={handleDeveloperPunch}
               >
-                {isPunchComplete ? "Punch Completed" : myPunch ? "Punch Out Now" : "Punch In Now"}
+                {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out Now" : "Punch In Now"}
               </Button>
             </div>
           </Card>
@@ -431,8 +440,9 @@ export default function DeveloperDashboard({ onNavigate }) {
                 </button>
                 <button
                   type="button"
+                  disabled={!isViewingOwnWorkspace || !workspaceEmployeeId}
                   onClick={() => setShowLeaveModal(true)}
-                  className="text-xs text-teal-600 font-semibold hover:underline"
+                  className="text-xs text-teal-600 font-semibold hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   + Apply
                 </button>
@@ -464,19 +474,19 @@ export default function DeveloperDashboard({ onNavigate }) {
             <div className="space-y-2 text-xs">
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">PAN Number</span>
-                <span className="font-mono font-semibold text-slate-800">{workspaceUser.pan}</span>
+                <span className="font-mono font-semibold text-slate-800">{workspaceUser.pan || '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">EPF UAN</span>
-                <span className="font-mono font-semibold text-slate-800">{workspaceUser.uan}</span>
+                <span className="font-mono font-semibold text-slate-800">{workspaceUser.uan || '—'}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Tax Regime</span>
-                <span className="font-semibold text-teal-600">{workspaceUser.tax_regime} Regime</span>
+                <span className="font-semibold text-teal-600">{workspaceUser.tax_regime ? `${workspaceUser.tax_regime} Regime` : '—'}</span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-500">Salary Bank</span>
-                <span className="font-semibold text-slate-800">{workspaceUser.bank_name}</span>
+                <span className="font-semibold text-slate-800">{workspaceUser.bank_name || '—'}</span>
               </div>
             </div>
           </Card>
@@ -491,6 +501,11 @@ export default function DeveloperDashboard({ onNavigate }) {
         subtitle={selectedProject ? `${selectedProject.project_code} - ${selectedProject.name}` : ""}
       >
         <form onSubmit={handleUpdateProgressSubmit} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <div>
             <div className="flex justify-between font-semibold text-slate-700 mb-1">
               <span>Progress Percentage:</span>
@@ -564,6 +579,11 @@ export default function DeveloperDashboard({ onNavigate }) {
         subtitle={selectedProject ? `Current Active Deadline: ${selectedProject.active_due_date}` : ""}
       >
         <form onSubmit={handleExtensionSubmit} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900">
             <p className="font-semibold">Company Delivery Policy:</p>
             <p className="text-[11px] mt-0.5">
@@ -609,6 +629,11 @@ export default function DeveloperDashboard({ onNavigate }) {
         subtitle={selectedProject ? `${selectedProject.project_code} - ${selectedProject.name}` : ""}
       >
         <form onSubmit={handleSubmitCompletion} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Deliverable Link / Git Repository PR:</label>
             <input
@@ -647,6 +672,11 @@ export default function DeveloperDashboard({ onNavigate }) {
         subtitle="Accrued Leave Policy"
       >
         <form onSubmit={handleApplyLeaveSubmit} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Leave Type:</label>
             <select

@@ -282,12 +282,7 @@ export default function TrainingView() {
         material_url: courseDraft.material_url.trim() || null,
         description: courseDraft.description.trim() || null,
       });
-      setTraining((previous) => ({
-        ...previous,
-        courses: previous.courses.map((item) => Number(item.id) === Number(course.id)
-          ? { ...item, ...response.data.course }
-          : item),
-      }));
+      await refreshTraining();
       setEditingCourseId(null);
       setCourseDraft(null);
       setFeedback({ type: 'success', text: 'Course details updated.' });
@@ -304,12 +299,7 @@ export default function TrainingView() {
       const response = await api.updateTrainingCourse(course.id, {
         status: course.status === 'archived' ? 'active' : 'archived',
       });
-      setTraining((previous) => ({
-        ...previous,
-        courses: previous.courses.map((item) => Number(item.id) === Number(course.id)
-          ? { ...item, ...response.data.course }
-          : item),
-      }));
+      await refreshTraining();
       setFeedback({ type: 'success', text: course.status === 'archived' ? 'Course reactivated.' : 'Course archived.' });
     } catch (error) {
       setFeedback({ type: 'error', text: errorText(error) });
@@ -789,21 +779,36 @@ export default function TrainingView() {
                         </select>
                       </div>
                       <button type="button" className="text-xs font-semibold text-teal-700 underline"
-                        onClick={() => toggleVisibleEmployees(courseAssignmentEmployeeIds, setCourseAssignmentEmployeeIds)}>
-                        Select all filtered employees
+                        onClick={() => {
+                          const unassigned = visibleEmployees.filter(
+                            (emp) => !enrollments.some((e) => Number(e.employee_id) === Number(emp.id))
+                          );
+                          const unassignedIds = unassigned.map((e) => Number(e.id));
+                          const allSelected = unassignedIds.every((id) => courseAssignmentEmployeeIds.includes(id));
+                          setCourseAssignmentEmployeeIds(allSelected ? [] : unassignedIds);
+                        }}>
+                        Select all unassigned filtered employees
                       </button>
                       <div className="grid max-h-40 gap-2 overflow-auto sm:grid-cols-2 lg:grid-cols-3">
-                        {visibleEmployees.map((employee) => (
-                          <label key={employee.id} className="flex items-center gap-2 text-xs text-slate-700">
-                            <input type="checkbox" checked={courseAssignmentEmployeeIds.includes(Number(employee.id))}
+                        {visibleEmployees.map((employee) => {
+                          const alreadyAssigned = enrollments.some((e) => Number(e.employee_id) === Number(employee.id));
+                          return (
+                          <label key={employee.id} className={`flex items-center gap-2 text-xs ${alreadyAssigned ? 'text-slate-400 opacity-60' : 'text-slate-700'}`}>
+                            <input
+                              type="checkbox"
+                              disabled={alreadyAssigned}
+                              checked={alreadyAssigned || courseAssignmentEmployeeIds.includes(Number(employee.id))}
                               onChange={() => setCourseAssignmentEmployeeIds((previous) => (
                                 previous.includes(Number(employee.id))
                                   ? previous.filter((id) => id !== Number(employee.id))
                                   : [...previous, Number(employee.id)]
-                              ))} />
+                              ))}
+                            />
                             {employee.employee_code} — {employee.first_name} {employee.last_name}
+                            {alreadyAssigned && ' (Enrolled)'}
                           </label>
-                        ))}
+                          );
+                        })}
                       </div>
                       <button type="submit" disabled={courseAssignmentEmployeeIds.length === 0}
                         className="rounded-lg bg-teal-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50">

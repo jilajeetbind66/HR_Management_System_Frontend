@@ -15,17 +15,19 @@ const initialForm = {
 
 export default function EmployeeStaffingRequests() {
   const { currentUser } = useAuth();
-  const { employees } = useHRMS();
+  const { employees, refreshEmployees } = useHRMS();
   const isManager = currentUser?.role === 'manager';
   const isHr = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
   const [requests, setRequests] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [employeeSelections, setEmployeeSelections] = useState({});
+  const [reviewNotes, setReviewNotes] = useState({});
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
 
   const loadRequests = async () => {
+    if (!isManager && !isHr) return;
     try {
       const response = await api.getEmployeeStaffingRequests();
       setRequests(Array.isArray(response?.data) ? response.data : []);
@@ -35,8 +37,10 @@ export default function EmployeeStaffingRequests() {
   };
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    if (isManager || isHr) {
+      loadRequests();
+    }
+  }, [isManager, isHr]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitRequest = async (event) => {
     event.preventDefault();
@@ -67,12 +71,16 @@ export default function EmployeeStaffingRequests() {
     try {
       await api.reviewEmployeeStaffingRequest(request.id, {
         decision,
+        review_note: (reviewNotes[request.id] || '').trim() || null,
         assigned_employee_id: decision === 'approved' && request.request_type === 'team_member'
           ? Number(employeeSelections[request.id])
           : null,
       });
       setStatus(`Request #${request.id} ${decision}.`);
       await loadRequests();
+      if (decision === 'approved' && request.request_type === 'team_member') {
+        await refreshEmployees?.();
+      }
     } catch (reviewError) {
       setError(reviewError?.data?.message || reviewError.message || 'Could not review the staffing request.');
     } finally {
@@ -183,7 +191,7 @@ export default function EmployeeStaffingRequests() {
                     {request.review_note && <span className="mt-1 block text-slate-500">{request.review_note}</span>}
                   </td>
                   {isHr && (
-                    <td className="min-w-52 py-3">
+                    <td className="min-w-56 py-3">
                       {request.status === 'pending' ? (
                         <div className="space-y-2">
                           {request.request_type === 'team_member' && (
@@ -194,13 +202,22 @@ export default function EmployeeStaffingRequests() {
                               aria-label={`Employee to assign for request ${request.id}`}
                             >
                               <option value="">Select active employee</option>
-                              {employees.filter((employee) => employee.status === 'active').map((employee) => (
+                              {employees
+                                .filter((employee) => employee.status === 'active' && Number(employee.id) !== Number(request.manager_employee_id))
+                                .map((employee) => (
                                 <option key={employee.id} value={employee.id}>
                                   {employee.employee_code} — {employee.first_name} {employee.last_name}
                                 </option>
                               ))}
                             </select>
                           )}
+                          <input
+                            type="text"
+                            placeholder="Review note (optional)"
+                            value={reviewNotes[request.id] || ''}
+                            onChange={(e) => setReviewNotes({ ...reviewNotes, [request.id]: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
+                          />
                           <div className="flex gap-2">
                             <Button size="sm" disabled={busy || (request.request_type === 'team_member' && !employeeSelections[request.id])} onClick={() => reviewRequest(request, 'approved')}>Approve</Button>
                             <Button size="sm" variant="secondary" disabled={busy} onClick={() => reviewRequest(request, 'rejected')}>Reject</Button>

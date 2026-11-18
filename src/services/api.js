@@ -190,10 +190,55 @@ export const api = {
 
   // M02 Organization
   getCompany: () => request('/organization/company'),
+  updateCompany: (company) => request('/organization/company', {
+    method: 'PUT',
+    body: JSON.stringify(company),
+  }),
   getBranches: () => request('/organization/branches'),
+  createBranch: (branch) => request('/organization/branches', {
+    method: 'POST',
+    body: JSON.stringify(branch),
+  }),
+  updateBranch: (branchId, branch) => request(`/organization/branches/${branchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(branch),
+  }),
   getDepartments: () => request('/organization/departments'),
+  createDepartment: (dept) => request('/organization/departments', {
+    method: 'POST',
+    body: JSON.stringify(dept),
+  }),
+  updateDepartment: (deptId, dept) => request(`/organization/departments/${deptId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(dept),
+  }),
+  deleteDepartment: (deptId) => request(`/organization/departments/${deptId}`, {
+    method: 'DELETE',
+  }),
   getDesignations: () => request('/organization/designations'),
+  createDesignation: (desig) => request('/organization/designations', {
+    method: 'POST',
+    body: JSON.stringify(desig),
+  }),
+  updateDesignation: (desigId, desig) => request(`/organization/designations/${desigId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(desig),
+  }),
+  deleteDesignation: (desigId) => request(`/organization/designations/${desigId}`, {
+    method: 'DELETE',
+  }),
   getHolidays: () => request('/organization/holidays'),
+  createHoliday: (holiday) => request('/organization/holidays', {
+    method: 'POST',
+    body: JSON.stringify(holiday),
+  }),
+  updateHoliday: (holidayId, holiday) => request(`/organization/holidays/${holidayId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(holiday),
+  }),
+  deleteHoliday: (holidayId) => request(`/organization/holidays/${holidayId}`, {
+    method: 'DELETE',
+  }),
 
   // M03 Employees Directory
   getEmployees: () => request('/employees'),
@@ -232,6 +277,10 @@ export const api = {
   updateEmployeeCompensation: (employeeId, compensation) => request(`/employees/${employeeId}/compensation`, {
     method: 'PATCH',
     body: JSON.stringify(compensation),
+  }),
+  updateEmployeeStatutory: (employeeId, statutory) => request(`/employees/${employeeId}/statutory`, {
+    method: 'PATCH',
+    body: JSON.stringify(statutory),
   }),
   updateEmployeeLeadAccess: (employeeId, hasLeadAccess) => request(`/employees/${employeeId}/lead-access`, {
     method: 'PATCH',
@@ -506,6 +555,7 @@ export const api = {
     body: JSON.stringify({ decision, decision_note: decisionNote }),
   }),
   markExpenseClaimPaid: (claimId) => request(`/expense-claims/${claimId}/pay`, { method: 'POST' }),
+  cancelExpenseClaim: (claimId) => request(`/expense-claims/${claimId}/cancel`, { method: 'POST' }),
   createLoanRequest: (loanRequest) => request('/loan-requests', {
     method: 'POST',
     body: JSON.stringify(loanRequest),
@@ -514,6 +564,7 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ decision, decision_note: decisionNote }),
   }),
+  cancelLoanRequest: (loanId) => request(`/loan-requests/${loanId}/cancel`, { method: 'POST' }),
   getPolicies: () => request('/documents/policies'),
   createPolicy: (policy) => request('/documents/policies', {
     method: 'POST',
@@ -560,8 +611,16 @@ export const api = {
   }),
 
   // M00 Platform & Audit Logs
-  getAuditLogs: () => request('/platform/audit-logs'),
+  getAuditLogs: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.module) query.set('module', params.module);
+    if (params.limit) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return request(`/platform/audit-logs${qs ? `?${qs}` : ''}`);
+  },
   getSchedulerRuns: () => request('/platform/scheduler-runs'),
+  getSequences: () => request('/platform/sequences'),
   getAdminUsers: () => request('/admin/users'),
   resetUserPassword: (userId, password, passwordConfirmation) => request(`/admin/users/${userId}/password`, {
     method: 'PATCH',
