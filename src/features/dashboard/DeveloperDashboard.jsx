@@ -60,6 +60,7 @@ export default function DeveloperDashboard({ onNavigate }) {
   const today = getIndiaDateString();
   const myPunch = attendance.find(a => Number(a.employee_id) === workspaceEmployeeId && a.date === today);
   const isPunchComplete = Boolean(myPunch?.punch_out);
+  const hasPunchedIn = Boolean(myPunch && !myPunch?.punch_out);
 
   // Balances
   const myBalance = { cl: 0, sl: 0, pl: 0, comp_off: 0, ...leaveBalances[workspaceEmployeeId] };
@@ -262,6 +263,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   const isOverdue = project.status === 'overdue';
                   const isComplete = project.status === 'completed';
                   const isUnderReview = project.status === 'under_review';
+                  const hasPendingExtension = (project.extensions || []).some(ext => ext.status === 'pending');
 
                   return (
                     <div key={project.id} className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm space-y-4">
