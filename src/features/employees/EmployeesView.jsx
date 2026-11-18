@@ -33,6 +33,7 @@ import {
   XCircle,
   UserRound,
   TrendingUp,
+  Pencil,
 } from 'lucide-react';
 
 export default function EmployeesView() {

@@ -1401,7 +1401,7 @@ export default function ProjectsView() {
                     <li key={file.id}>
                       <button
                         type="button"
-                        onClick={() => openPrivateDeliverable(file)}
+                        onClick={() => openProjectFile(file.id)}
                         className="text-teal-600 underline hover:text-teal-800"
                       >
                         {file.original_filename} ({Math.round(file.file_size / 1024)} KB)
