@@ -37,7 +37,7 @@ import {
 export default function EmployeesView() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, activeBranch, setActiveBranch } = useAuth();
   const {
     employees,
     branches,
@@ -54,7 +54,9 @@ export default function EmployeesView() {
   } = useHRMS();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [selectedBranch, setSelectedBranch] = useState(
+    activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all'
+  );
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -187,6 +189,21 @@ export default function EmployeesView() {
   }, [searchTerm, selectedBranch, selectedDept, selectedStatus]);
 
   useEffect(() => {
+    if (activeBranch && activeBranch !== 'All Branches') {
+      setSelectedBranch(activeBranch);
+    } else if (activeBranch === 'All Branches') {
+      setSelectedBranch('all');
+    }
+  }, [activeBranch]);
+
+  const handleBranchFilterChange = (value) => {
+    setSelectedBranch(value);
+    if (setActiveBranch) {
+      setActiveBranch(value === 'all' ? 'All Branches' : value);
+    }
+  };
+
+  useEffect(() => {
     const params = new URLSearchParams(search);
     const employeeId = Number(params.get('employee_id'));
     if (!employeeId || params.get('profile_tab') !== 'salary') return;
@@ -205,7 +222,10 @@ export default function EmployeesView() {
     const nameMatch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       emp.employee_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       (currentUser?.role !== 'manager' && emp.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const branchMatch = selectedBranch === 'all' || emp.branch_name === selectedBranch;
+    const branchMatch = selectedBranch === 'all'
+      || emp.branch_name === selectedBranch
+      || String(emp.branch_id) === String(selectedBranch)
+      || (selectedBranch && emp.branch_name && emp.branch_name.toLowerCase().includes(selectedBranch.toLowerCase()));
     const deptMatch = selectedDept === 'all' || emp.department === selectedDept;
     const statusMatch = selectedStatus === 'all' || emp.status === selectedStatus;
     return nameMatch && branchMatch && deptMatch && statusMatch;
@@ -617,7 +637,7 @@ export default function EmployeesView() {
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <select
             value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
+            onChange={(e) => handleBranchFilterChange(e.target.value)}
             className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
           >
             <option value="all">All Branches</option>

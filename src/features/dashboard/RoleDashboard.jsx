@@ -66,7 +66,7 @@ const panelCopy = {
 };
 
 export default function RoleDashboard({ onNavigate }) {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     employees,
     projects,
@@ -85,11 +85,18 @@ export default function RoleDashboard({ onNavigate }) {
     return <ManagerDashboard onNavigate={onNavigate} />;
   }
 
+  const selectedBranchObj = activeBranch && activeBranch !== 'All Branches'
+    ? branches.find((b) => b.name === activeBranch)
+    : null;
+  const scopedEmployees = selectedBranchObj
+    ? employees.filter((e) => Number(e.branch_id) === Number(selectedBranchObj.id) || e.branch_name === selectedBranchObj.name)
+    : employees;
+
   const panel = panelCopy[role] || panelCopy.employee;
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
   const myAttendance = attendance.filter(record => Number(record.employee_id) === Number(currentUser.employee_id));
   const pendingLeaves = leaveRequests.filter(leave => canReviewLeave(leave, currentUser));
-  const employeeCount = employees.filter(employee => employee.status === 'active').length;
+  const employeeCount = scopedEmployees.filter(employee => employee.status === 'active').length;
   const today = new Date().toISOString().slice(0, 10);
   const presentToday = attendance.filter(record => record.date === today && record.status === 'Present').length;
   const isHrRole = ['hr_admin', 'hr_executive', 'recruiter'].includes(role);
