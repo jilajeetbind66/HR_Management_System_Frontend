@@ -12,6 +12,7 @@ import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import PhoneInput from '../../components/common/PhoneInput';
 import EmployeeCsvImport from './EmployeeCsvImport';
 import EmployeeStaffingRequests from './EmployeeStaffingRequests';
+import { initialBranches } from '../../data/mockData';
 import { getAssignableUserRoles, roleLoginCategory, userRoleLabels } from '../../config/userRoles';
 import {
   Users,
@@ -54,6 +55,7 @@ export default function EmployeesView() {
   } = useHRMS();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const [selectedBranch, setSelectedBranch] = useState(
     activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all'
   );
@@ -641,7 +643,7 @@ export default function EmployeesView() {
             className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
           >
             <option value="all">All Branches</option>
-            {branches.map(b => (
+            {availableBranches.map(b => (
               <option key={b.id} value={b.name}>{b.name}</option>
             ))}
           </select>

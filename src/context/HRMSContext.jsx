@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useLocation } from 'react-router-dom';
 import api from '../services/api';
 import { useAuth } from './AuthContext';
+import { initialBranches } from '../data/mockData';
 
 const HRMSContext = createContext(null);
 
@@ -68,7 +69,7 @@ export function HRMSProvider({ children }) {
   const { currentUser, isAuthenticated } = useAuth();
   const { pathname } = useLocation();
   const [company, setCompany] = useState(null);
-  const [branches, setBranches] = useState([]);
+  const [branches, setBranches] = useState(initialBranches);
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   const [holidays, setHolidays] = useState([]);
@@ -212,7 +213,8 @@ export function HRMSProvider({ children }) {
     const requestedResources = new Set([
       ...(targetTab === 'dashboard' ? DASHBOARD_DATA_BY_ROLE[role] || [] : []),
       ...moduleResources,
-      ...(role === 'super_admin' ? ['branches', 'employees'] : []),
+      ...(canViewOrganization ? ['branches'] : []),
+      ...(role === 'super_admin' ? ['employees'] : []),
       ...(canViewProjects ? ['projects'] : []),
       ...(canReviewLeaves ? ['leaves'] : []),
       'notifications',

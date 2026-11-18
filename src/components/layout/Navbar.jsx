@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { initialBranches } from '../../data/mockData';
 import {
   Bell,
   Clock,
@@ -32,6 +33,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [notificationError, setNotificationError] = useState('');
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser.role);
   const isManagerWorkspace = currentUser.role === 'manager';
   const isAdminWorkspace = currentUser.role === 'super_admin';
@@ -93,7 +95,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
           >
             <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
-            {branches.map(b => (
+            {availableBranches.map(b => (
               <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
             ))}
           </select>
