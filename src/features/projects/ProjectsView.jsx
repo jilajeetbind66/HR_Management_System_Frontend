@@ -145,10 +145,9 @@ export default function ProjectsView() {
   const activeEmployees = employees.filter(
     (employee) => employee.status?.toLowerCase() === 'active' && !employee.deleted_at
   );
-  const canUpdateProject = (project) => Boolean(project?.assignment_id) && (
-    currentUser?.role === 'super_admin'
-    || (currentUser?.employee_id
-      && Number(project.assigned_employee_id) === Number(currentUser.employee_id))
+  const canUpdateProject = (project) => Boolean(project?.assignment_id) && Boolean(
+    currentUser?.employee_id
+    && Number(project.assigned_employee_id) === Number(currentUser.employee_id)
   );
   const canReviewProject = (project) => Boolean(project?.assignment_id) && (
     ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role)
@@ -819,6 +818,24 @@ export default function ProjectsView() {
                       )}
 
                       {/* HR / Reviewer Buttons */}
+                      {hasPendingExtension && canReviewProject(project) && (
+                        <Button
+                          size="sm"
+                          variant="warning"
+                          icon={Calendar}
+                          onClick={() => {
+                            const ext = activeExtension || (project.extensions || []).find(e => e.status === 'pending');
+                            setSelectedProject(project);
+                            setSelectedExtension(ext);
+                            setExtDecisionNote('');
+                            setExtensionReviewError('');
+                            setShowReviewExtModal(true);
+                          }}
+                        >
+                          Review Extension
+                        </Button>
+                      )}
+
                       {canReviewProject(project) && isUnderReview && (
                         <Button
                           size="sm"
