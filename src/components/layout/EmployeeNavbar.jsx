@@ -106,13 +106,14 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-[68px] w-full items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-3 backdrop-blur sm:px-5 lg:px-7">
-      <button
-        type="button"
-        onClick={onMenuToggle}
-        aria-label="Open navigation"
-        className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
-      >
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      <div className="flex h-[68px] w-full items-center justify-between gap-3 px-3 sm:px-5 lg:px-7">
+        <button
+          type="button"
+          onClick={onMenuToggle}
+          aria-label="Open navigation"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
+        >
         <span className="block h-0.5 w-5 rounded bg-current before:block before:h-0.5 before:w-5 before:-translate-y-1.5 before:rounded before:bg-current after:block after:h-0.5 after:w-5 after:translate-y-1 after:rounded after:bg-current" />
       </button>
 
@@ -364,6 +365,19 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             </div>
           )}
         </div>
+      </div>
+      </div>
+
+      {/* Mobile Branch Strip for Employee */}
+      <div className="flex lg:hidden items-center justify-between border-t border-slate-200/80 bg-slate-50/95 px-3 py-1.5 text-xs text-slate-600">
+        <div className="flex items-center gap-1.5 font-medium">
+          <Building2 aria-hidden="true" className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+          <span className="font-semibold text-slate-500">Branch:</span>
+          <span className="font-bold text-slate-800">{currentUser?.branch_name || 'Not assigned'}</span>
+        </div>
+        <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200">
+          Assigned Location
+        </span>
       </div>
     </header>
   );

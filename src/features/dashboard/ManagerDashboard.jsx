@@ -92,14 +92,22 @@ function PanelHeader({ icon: Icon, title, action, onAction }) {
 }
 
 export default function ManagerDashboard({ onNavigate }) {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const { employees, projects, attendance, leaveRequests, announcements } = useHRMS();
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const firstName = currentUser.first_name || currentUser.name?.split(' ')[0] || 'Manager';
-  const teamMembers = employees.filter(
-    (employee) => String(employee.status || '').toLowerCase() === 'active'
-  );
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
+
+  const teamMembers = employees.filter((employee) => {
+    if (String(employee.status || '').toLowerCase() !== 'active') return false;
+    if (!isBranchScoped) return true;
+    return (
+      employee.branch_name === activeBranch
+      || (activeBranch.includes('Prayagraj') && employee.branch_name?.includes('Prayagraj'))
+      || (activeBranch.includes('Kaushambi') && employee.branch_name?.includes('Kaushambi'))
+    );
+  });
   const teamMemberIds = new Set(teamMembers.map((employee) => Number(employee.id)));
   const teamProjects = projects.filter(
     (project) => teamMemberIds.has(Number(project.assigned_employee_id))
@@ -107,7 +115,10 @@ export default function ManagerDashboard({ onNavigate }) {
   const activeTeamProjects = teamProjects.filter(
     (project) => !['completed', 'cancelled'].includes(String(project.status || '').toLowerCase())
   );
-  const pendingTeamLeaves = leaveRequests.filter((leave) => canReviewLeave(leave, currentUser));
+  const pendingTeamLeaves = leaveRequests.filter((leave) => (
+    canReviewLeave(leave, currentUser)
+    && (!isBranchScoped || teamMemberIds.has(Number(leave.employee_id)))
+  ));
   const presentToday = attendance.filter(
     (record) => teamMemberIds.has(Number(record.employee_id))
       && dateKey(record.date) === todayKey
@@ -134,8 +145,8 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Team Members',
       value: teamMembers.length,
-      note: 'Active direct reports',
-      badge: 'Team',
+      note: isBranchScoped ? `${activeBranch} active staff` : 'Active direct reports',
+      badge: isBranchScoped ? activeBranch.replace(' Branch', '') : 'Team',
       icon: UsersRound,
       tone: 'teal',
       module: 'employees',
@@ -143,7 +154,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Team Projects',
       value: activeTeamProjects.length,
-      note: 'Assigned active projects',
+      note: isBranchScoped ? `${activeBranch} projects` : 'Assigned active projects',
       badge: 'Projects',
       icon: FolderKanban,
       tone: 'blue',
@@ -152,7 +163,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Pending Leave Requests',
       value: pendingTeamLeaves.length,
-      note: 'Awaiting your review',
+      note: isBranchScoped ? `${activeBranch} requests` : 'Awaiting your review',
       badge: 'Review',
       icon: FileText,
       tone: 'amber',
@@ -161,7 +172,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Present Today',
       value: presentToday,
-      note: 'Team attendance records',
+      note: isBranchScoped ? `${activeBranch} attendance` : 'Team attendance records',
       badge: 'Today',
       icon: Clock3,
       tone: 'rose',
@@ -175,7 +186,15 @@ export default function ManagerDashboard({ onNavigate }) {
         <div aria-hidden="true" className="absolute -right-10 -top-20 -z-10 h-64 w-64 rounded-full border border-white/10" />
         <div aria-hidden="true" className="absolute -right-2 -bottom-36 -z-10 h-72 w-72 rounded-full bg-white/5" />
         <div className="relative z-10 max-w-2xl">
-          <p className="text-xs font-medium text-teal-50">Manager workspace</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium text-teal-50">Manager workspace</p>
+            {isBranchScoped && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur">
+                <Building2 className="h-3 w-3" />
+                {activeBranch}
+              </span>
+            )}
+          </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-[30px]">
             Welcome, {firstName}! <span aria-hidden="true">👋</span>
           </h1>

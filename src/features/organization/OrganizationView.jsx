@@ -27,7 +27,7 @@ function extractError(error, fallback) {
 }
 
 export default function OrganizationView() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     company,
     branches,
@@ -43,6 +43,15 @@ export default function OrganizationView() {
   const [selectedHolidayBranch, setSelectedHolidayBranch] = useState('all');
   const [updatingPtBranchId, setUpdatingPtBranchId] = useState(null);
   const [feedback, setFeedback] = useState(null);
+
+  React.useEffect(() => {
+    if (!activeBranch || activeBranch === 'All Branches') {
+      setSelectedHolidayBranch('all');
+    } else {
+      const match = branches.find(b => b.name === activeBranch || activeBranch.includes(b.city) || activeBranch.includes(b.name));
+      if (match) setSelectedHolidayBranch(String(match.id));
+    }
+  }, [activeBranch, branches]);
 
   // Modals state (Super Admin CRUD)
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
@@ -485,61 +494,79 @@ export default function OrganizationView() {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {branches.map((branch) => (
-              <Card
-                key={branch.id}
-                title={branch.name}
-                subtitle={`Branch Code: ${branch.code}`}
-                action={
-                  isSuperAdmin && (
-                    <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openBranchModal(branch)}>
-                      Edit
-                    </Button>
-                  )
-                }
-              >
-                <div className="space-y-3 text-xs">
-                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500">City / State</span>
-                    <span className="font-semibold text-slate-800">{branch.city}, {branch.state}</span>
-                  </div>
+            {branches.map((branch) => {
+              const isActive = Boolean(
+                activeBranch &&
+                activeBranch !== 'All Branches' &&
+                (branch.name === activeBranch || activeBranch.includes(branch.city) || activeBranch.includes(branch.name))
+              );
 
-                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500">Active Staff Count</span>
-                    <span className="font-bold text-teal-600">{branch.employees_count} Employees</span>
-                  </div>
+              return (
+                <div key={branch.id} className={isActive ? 'ring-2 ring-teal-500 rounded-2xl' : ''}>
+                  <Card
+                    title={
+                      <div className="flex items-center gap-2">
+                        <span>{branch.name}</span>
+                        {isActive && (
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                            Active Branch
+                          </span>
+                        )}
+                      </div>
+                    }
+                    subtitle={`Branch Code: ${branch.code}`}
+                    action={
+                      isSuperAdmin && (
+                        <Button size="sm" variant="ghost" icon={Pencil} onClick={() => openBranchModal(branch)}>
+                          Edit
+                        </Button>
+                      )
+                    }
+                  >
+                    <div className="space-y-3 text-xs">
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">City / State</span>
+                        <span className="font-semibold text-slate-800">{branch.city}, {branch.state}</span>
+                      </div>
 
-                  <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                    <span className="text-slate-500">Professional Tax (PT)</span>
-                    {branch.pt_applicable ? (
-                      <Badge variant="primary" size="sm">Enabled · {branch.state} rule required</Badge>
-                    ) : (
-                      <Badge variant="neutral" size="sm">Disabled for this branch</Badge>
-                    )}
-                  </div>
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Active Staff Count</span>
+                        <span className="font-bold text-teal-600">{branch.employees_count} Employees</span>
+                      </div>
 
-                  {['super_admin', 'hr_admin'].includes(currentUser?.role) && (
-                    <Button
-                      size="sm"
-                      variant={branch.pt_applicable ? 'secondary' : 'primary'}
-                      disabled={updatingPtBranchId === branch.id}
-                      onClick={() => toggleBranchPt(branch)}
-                    >
-                      {updatingPtBranchId === branch.id
-                        ? 'Saving…'
-                        : branch.pt_applicable ? 'Disable PT for branch' : 'Enable PT for branch'}
-                    </Button>
-                  )}
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">Professional Tax (PT)</span>
+                        {branch.pt_applicable ? (
+                          <Badge variant="primary" size="sm">Enabled · {branch.state} rule required</Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Disabled for this branch</Badge>
+                        )}
+                      </div>
 
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-slate-500">Status</span>
-                    <Badge variant={branch.is_active === false ? 'warning' : 'success'} size="sm">
-                      {branch.is_active === false ? 'Inactive' : 'Operational'}
-                    </Badge>
-                  </div>
+                      {['super_admin', 'hr_admin'].includes(currentUser?.role) && (
+                        <Button
+                          size="sm"
+                          variant={branch.pt_applicable ? 'secondary' : 'primary'}
+                          disabled={updatingPtBranchId === branch.id}
+                          onClick={() => toggleBranchPt(branch)}
+                        >
+                          {updatingPtBranchId === branch.id
+                            ? 'Saving…'
+                            : branch.pt_applicable ? 'Disable PT for branch' : 'Enable PT for branch'}
+                        </Button>
+                      )}
+
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-slate-500">Status</span>
+                        <Badge variant={branch.is_active === false ? 'warning' : 'success'} size="sm">
+                          {branch.is_active === false ? 'Inactive' : 'Operational'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </Card>
                 </div>
-              </Card>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

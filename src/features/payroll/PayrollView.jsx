@@ -13,7 +13,8 @@ import {
   Lock,
   ShieldCheck,
   Plus,
-  Receipt
+  Receipt,
+  Building2
 } from 'lucide-react';
 
 const PAYROLL_MONTHS = [
@@ -39,7 +40,7 @@ const needsOverrideReason = (amount, computedAmount) => (
 );
 
 export default function PayrollView() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     payrollRuns,
     runPayroll,
@@ -48,6 +49,7 @@ export default function PayrollView() {
     branches
   } = useHRMS();
 
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
   const [activeTab, setActiveTab] = useState(currentUser.role === 'hr_admin' ? 'structures' : 'runs');
   const [selectedRun, setSelectedRun] = useState(null);
   const [runPayslips, setRunPayslips] = useState([]);
@@ -507,7 +509,7 @@ export default function PayrollView() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
+      <div className="border-b border-slate-200 flex flex-wrap items-center gap-4 text-xs">
         {canViewPayrollRuns && <button
           onClick={() => setActiveTab('runs')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
@@ -535,6 +537,13 @@ export default function PayrollView() {
           >
             <ShieldCheck className="w-4 h-4" /> Indian Statutory Config (EPFO / ESIC / PT)
           </button>
+        )}
+
+        {isBranchScoped && (
+          <div className="ml-auto pb-2 flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Branch: {activeBranch}</span>
+          </div>
         )}
       </div>
 
