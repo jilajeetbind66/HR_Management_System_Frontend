@@ -277,9 +277,13 @@ export default function ProjectsView() {
   const handleUpdateProgressSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject) return;
+    if (Number(progressVal) < Number(selectedProject.progress_percent || 0)) {
+      setProjectFormError(`Progress cannot be reduced from ${selectedProject.progress_percent}% to ${progressVal}%. Milestone progress can only advance forward.`);
+      return;
+    }
     setProjectFormError(null);
     try {
-      await updateProjectProgress(selectedProject.id, progressVal, progressNote);
+      await updateProjectProgress(selectedProject.id, Number(progressVal), progressNote);
       setShowProgressModal(false);
       setProgressNote('');
     } catch (error) {
@@ -1208,11 +1212,20 @@ export default function ProjectsView() {
       {/* MODAL 2: Update Progress */}
       <Modal
         isOpen={showProgressModal}
-        onClose={() => setShowProgressModal(false)}
+        onClose={() => {
+          setShowProgressModal(false);
+          setProjectFormError(null);
+        }}
         title="Update Project Progress"
         subtitle={selectedProject ? `${selectedProject.project_code} - ${selectedProject.name}` : ""}
       >
         <form onSubmit={handleUpdateProgressSubmit} className="space-y-4 text-xs">
+          {projectFormError && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+              {projectFormError}
+            </div>
+          )}
+
           <div>
             <div className="flex justify-between font-semibold text-slate-700 mb-1">
               <span>Progress Percentage:</span>
@@ -1220,13 +1233,17 @@ export default function ProjectsView() {
             </div>
             <input
               type="range"
-              min="0"
+              min={selectedProject ? (selectedProject.progress_percent || 0) : 0}
               max="100"
               step="5"
               value={progressVal}
-              onChange={(e) => setProgressVal(e.target.value)}
+              onChange={(e) => setProgressVal(Number(e.target.value))}
               className="w-full accent-teal-600 cursor-pointer"
             />
+            <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+              <span>Current Baseline: {selectedProject?.progress_percent || 0}%</span>
+              <span>Target Deliverable: 100%</span>
+            </div>
           </div>
 
           <div>
