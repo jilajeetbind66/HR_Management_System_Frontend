@@ -36,6 +36,7 @@ function SidebarShell({
   onLogout,
   showLogout = true,
   isHrWorkspace = false,
+  isSuperAdmin = false,
   ariaLabel,
   navClassName = '',
   activeBranch,
@@ -74,8 +75,8 @@ function SidebarShell({
           )}
         </div>
 
-        {/* Mobile Drawer Branch Selector */}
-        {availableBranches && availableBranches.length > 0 && (
+        {/* Mobile Drawer Branch Selector (Super Admin Only) */}
+        {isSuperAdmin && availableBranches && availableBranches.length > 0 && (
           <div className="lg:hidden mx-3 my-2.5 rounded-xl border border-white/15 bg-white/10 p-2.5">
             <div className="flex items-center gap-1.5 mb-1.5 text-teal-200 text-[11px] font-semibold">
               <Building2 className="h-3.5 w-3.5 text-teal-300" />
@@ -171,6 +172,7 @@ function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjec
       isOpen={isOpen}
       onClose={onClose}
       onLogout={handleLogout}
+      isSuperAdmin={false}
       activeBranch={activeBranch}
       setActiveBranch={setActiveBranch}
       availableBranches={availableBranches}
@@ -367,6 +369,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       onLogout={handleLogout}
+      isSuperAdmin={currentUser?.role === 'super_admin'}
       activeBranch={activeBranch}
       setActiveBranch={setActiveBranch}
       availableBranches={availableBranches}

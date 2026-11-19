@@ -43,7 +43,7 @@ const DASHBOARD_DATA_BY_ROLE = {
   hr_executive: ['employees', 'projects', 'attendance', 'leaves', 'branches', 'announcements'],
   recruiter: ['announcements'],
   payroll_admin: ['payrollRuns'],
-  auditor: ['auditLogs', 'payrollRuns', 'branches'],
+  auditor: ['auditLogs', 'payrollRuns', 'branches', 'employees'],
 };
 
 const MODULE_DATA = {

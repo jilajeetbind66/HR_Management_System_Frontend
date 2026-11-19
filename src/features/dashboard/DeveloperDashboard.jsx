@@ -207,12 +207,13 @@ export default function DeveloperDashboard({ onNavigate }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2.5">
           <Button
             variant="secondary"
             size="sm"
             icon={CalendarCheck}
             onClick={openMyLeave}
+            className="w-full justify-center sm:w-auto"
           >
             My Leave
           </Button>
@@ -223,6 +224,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             disabled={!isViewingOwnWorkspace}
             title={!isViewingOwnWorkspace ? 'Payslips are available only for your signed-in account.' : undefined}
             onClick={() => onNavigate('payslips')}
+            className="w-full justify-center sm:w-auto"
           >
             My Payslips
           </Button>
@@ -232,6 +234,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             icon={CalendarPlus}
             disabled={!isViewingOwnWorkspace}
             onClick={() => setShowLeaveModal(true)}
+            className="w-full justify-center sm:w-auto"
           >
             Apply Leave
           </Button>
@@ -242,7 +245,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             disabled={!isViewingOwnWorkspace || isPunchComplete}
             title={!isViewingOwnWorkspace ? 'Punch actions are available only for your signed-in account.' : undefined}
             onClick={handleDeveloperPunch}
-            className={isPunchComplete ? '' : 'bg-teal-600 hover:bg-teal-500 shadow'}
+            className={`w-full justify-center sm:w-auto ${isPunchComplete ? '' : 'bg-teal-600 hover:bg-teal-500 shadow'}`}
           >
             {isPunchComplete ? "Punch Completed" : myPunch ? "Punch Out" : "Punch In"}
           </Button>

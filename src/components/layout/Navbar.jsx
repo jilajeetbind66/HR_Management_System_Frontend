@@ -86,21 +86,23 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             <SlidersHorizontal className="h-5 w-5" />
           </button>
 
-          {/* Desktop Branch Selector */}
-          <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
-            <Building2 className="h-3.5 w-3.5 text-teal-600" />
-            <span className="font-semibold text-slate-500">Branch:</span>
-            <select
-              value={activeBranch}
-              onChange={(e) => setActiveBranch(e.target.value)}
-              className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
-            >
-              <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
-              {availableBranches.map(b => (
-                <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
-              ))}
-            </select>
-          </div>
+          {/* Desktop Branch Selector (Super Admin Only) */}
+          {currentUser?.role === 'super_admin' && (
+            <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
+              <Building2 className="h-3.5 w-3.5 text-teal-600" />
+              <span className="font-semibold text-slate-500">Branch:</span>
+              <select
+                value={activeBranch}
+                onChange={(e) => setActiveBranch(e.target.value)}
+                className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
+              >
+                <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+                {availableBranches.map(b => (
+                  <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
+                ))}
+              </select>
+            </div>
+          )}
           {isAdminWorkspace && (
             <label className="flex min-w-0 max-w-[128px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 sm:max-w-none sm:px-2.5">
               <span className="hidden md:inline font-semibold">Workspace</span>
@@ -257,23 +259,25 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
       </div>
       </div>
 
-      {/* Dedicated Mobile Branch Strip (Always visible on mobile screens) */}
-      <div className="flex sm:hidden items-center justify-between border-t border-slate-200/80 bg-slate-50/95 px-3 py-1.5 text-xs">
-        <div className="flex items-center gap-1.5 font-semibold text-slate-700">
-          <Building2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
-          <span>Branch:</span>
+      {/* Dedicated Mobile Branch Strip (Super Admin Only) */}
+      {currentUser?.role === 'super_admin' && (
+        <div className="flex sm:hidden items-center justify-between border-t border-slate-200/80 bg-slate-50/95 px-3 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+            <Building2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+            <span>Branch:</span>
+          </div>
+          <select
+            value={activeBranch}
+            onChange={(e) => setActiveBranch(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-xs focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 max-w-[210px] truncate cursor-pointer"
+          >
+            <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+            {availableBranches.map((b) => (
+              <option key={b.id} value={b.name}>{b.name}</option>
+            ))}
+          </select>
         </div>
-        <select
-          value={activeBranch}
-          onChange={(e) => setActiveBranch(e.target.value)}
-          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-xs focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 max-w-[210px] truncate cursor-pointer"
-        >
-          <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
-          {availableBranches.map((b) => (
-            <option key={b.id} value={b.name}>{b.name}</option>
-          ))}
-        </select>
-      </div>
+      )}
     </header>
   );
 }

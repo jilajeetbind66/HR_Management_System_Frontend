@@ -97,7 +97,7 @@ export default function RoleDashboard({ onNavigate }) {
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
   const myAttendance = attendance.filter(record => Number(record.employee_id) === Number(currentUser.employee_id));
   const pendingLeaves = leaveRequests.filter(leave => canReviewLeave(leave, currentUser));
-  const employeeCount = scopedEmployees.filter(employee => employee.status === 'active').length;
+  const employeeCount = scopedEmployees.filter(employee => String(employee.status || '').toLowerCase() === 'active').length || scopedEmployees.length;
   const today = new Date().toISOString().slice(0, 10);
   const scopedAttendance = selectedBranchObj
     ? attendance.filter(record => scopedEmployeeIds.has(Number(record.employee_id)))
@@ -149,9 +149,26 @@ export default function RoleDashboard({ onNavigate }) {
     ]
     : role === 'auditor'
     ? [
-      { title: 'Audit Trail Records', value: scopedAuditLogs.length, icon: ShieldCheck, color: 'indigo' },
-      { title: 'Payroll Cycles', value: payrollRuns.length, icon: Banknote, color: 'blue' },
-      { title: 'Total Employees', value: employeeCount, icon: Users, color: 'emerald' },
+      {
+        title: selectedBranchObj ? `Total Employees (${selectedBranchObj.name.replace(' Branch', '')})` : 'Total Employees',
+        value: employeeCount,
+        icon: Users,
+        color: 'emerald',
+        badge: selectedBranchObj ? selectedBranchObj.city || selectedBranchObj.name : 'All Staff',
+      },
+      {
+        title: 'Audit Trail Records',
+        value: scopedAuditLogs.length,
+        icon: ShieldCheck,
+        color: 'indigo',
+        badge: selectedBranchObj ? selectedBranchObj.name.replace(' Branch', '') : undefined,
+      },
+      {
+        title: 'Payroll Cycles',
+        value: payrollRuns.length,
+        icon: Banknote,
+        color: 'blue',
+      },
     ]
     : [
       { title: 'Audit Events', value: auditLogs.length, icon: ShieldCheck, color: 'indigo' },
@@ -350,7 +367,7 @@ export default function RoleDashboard({ onNavigate }) {
         </div>
       </section>
 
-      <section aria-label={`${getPanelName(role)} overview`} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section aria-label={`${getPanelName(role)} overview`} className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {statCards.map(card => (
           <StatCard key={card.title} {...card} />
         ))}

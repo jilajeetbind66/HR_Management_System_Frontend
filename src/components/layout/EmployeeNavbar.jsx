@@ -367,18 +367,6 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
         </div>
       </div>
       </div>
-
-      {/* Mobile Branch Strip for Employee */}
-      <div className="flex lg:hidden items-center justify-between border-t border-slate-200/80 bg-slate-50/95 px-3 py-1.5 text-xs text-slate-600">
-        <div className="flex items-center gap-1.5 font-medium">
-          <Building2 aria-hidden="true" className="h-3.5 w-3.5 text-teal-600 shrink-0" />
-          <span className="font-semibold text-slate-500">Branch:</span>
-          <span className="font-bold text-slate-800">{currentUser?.branch_name || 'Not assigned'}</span>
-        </div>
-        <span className="text-[10px] text-teal-700 bg-teal-50 px-2 py-0.5 rounded font-medium border border-teal-200">
-          Assigned Location
-        </span>
-      </div>
     </header>
   );
 }
