@@ -150,6 +150,9 @@ export const api = {
   markNotificationRead: (notificationId) => request(`/notifications/${notificationId}/read`, {
     method: 'POST',
   }),
+  markAllNotificationsRead: () => request('/notifications/read-all', {
+    method: 'POST',
+  }),
   changePassword: (currentPassword, password, passwordConfirmation) => request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({

@@ -94,9 +94,13 @@ export default function DeveloperDashboard({ onNavigate }) {
   const handleUpdateProgressSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject) return;
+    if (Number(progressVal) < Number(selectedProject.progress_percent || 0)) {
+      setWorkflowError(`Progress cannot be reduced from ${selectedProject.progress_percent}% to ${progressVal}%. Milestone progress can only advance forward.`);
+      return;
+    }
     setWorkflowError('');
     try {
-      await updateProjectProgress(selectedProject.id, progressVal, progressNote);
+      await updateProjectProgress(selectedProject.id, Number(progressVal), progressNote);
       setShowProgressModal(false);
       setProgressNote('');
     } catch (error) {
@@ -340,47 +344,66 @@ export default function DeveloperDashboard({ onNavigate }) {
                         </div>
                       </div>
 
+                      {/* Review Feedback Note */}
+                      {project.review_note && (
+                        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                          <strong className="font-semibold">
+                            {project.returned_by
+                              ? `Revision Instructions${project.returned_by ? ` (${project.returned_by})` : ''}`
+                              : `Reviewer Feedback${project.accepted_by ? ` (${project.accepted_by})` : ''}`}:{' '}
+                          </strong>
+                          {project.review_note}
+                        </div>
+                      )}
+
                       {/* Developer Actions (Buttons) */}
                       {!isComplete && canUpdateMyProjects && (
                         <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={Sliders}
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setProgressVal(project.progress_percent);
-                              setShowProgressModal(true);
-                            }}
-                          >
-                            Update Progress
-                          </Button>
+                          {isUnderReview ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
+                              <Clock className="w-3.5 h-3.5" />
+                              Deliverable Submitted — Awaiting Review
+                            </span>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={Sliders}
+                                onClick={() => {
+                                  setSelectedProject(project);
+                                  setProgressVal(project.progress_percent);
+                                  setShowProgressModal(true);
+                                }}
+                              >
+                                Update Progress
+                              </Button>
 
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={Calendar}
-                            disabled={hasPendingExtension}
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setShowExtensionModal(true);
-                            }}
-                          >
-                            Request Extension
-                          </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={Calendar}
+                                disabled={hasPendingExtension}
+                                onClick={() => {
+                                  setSelectedProject(project);
+                                  setShowExtensionModal(true);
+                                }}
+                              >
+                                Request Extension
+                              </Button>
 
-                          {!isUnderReview && (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              icon={Send}
-                              onClick={() => {
-                                setSelectedProject(project);
-                                setShowSubmitModal(true);
-                              }}
-                            >
-                              Submit Completion
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                icon={Send}
+                                onClick={() => {
+                                  setSelectedProject(project);
+                                  setShowSubmitModal(true);
+                                }}
+                              >
+                                Submit Completion
+                              </Button>
+                            </>
                           )}
                         </div>
                       )}
@@ -518,13 +541,17 @@ export default function DeveloperDashboard({ onNavigate }) {
             </div>
             <input
               type="range"
-              min="0"
+              min={selectedProject ? (selectedProject.progress_percent || 0) : 0}
               max="100"
               step="5"
               value={progressVal}
-              onChange={(e) => setProgressVal(e.target.value)}
+              onChange={(e) => setProgressVal(Number(e.target.value))}
               className="w-full accent-teal-600 cursor-pointer"
             />
+            <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+              <span>Current Baseline: {selectedProject?.progress_percent || 0}%</span>
+              <span>Target Deliverable: 100%</span>
+            </div>
           </div>
 
           <div>
