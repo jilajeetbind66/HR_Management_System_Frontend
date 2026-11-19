@@ -24,6 +24,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     notifications,
     refreshNotifications,
     markNotificationRead,
+    markAllNotificationsRead,
     selectedPersonaId,
     setSelectedPersonaId,
   } = useHRMS();
@@ -32,6 +33,30 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [notificationError, setNotificationError] = useState('');
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read_at) {
+      try {
+        await markNotificationRead(notification.id);
+      } catch (error) {
+        setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
+      }
+    }
+    setShowNotifications(false);
+    if (typeof onNavigate === 'function') {
+      const eventKey = notification.event_key || '';
+      if (eventKey.startsWith('project.')) {
+        onNavigate('projects');
+      } else if (eventKey.startsWith('leave.')) {
+        onNavigate('leaves');
+      } else if (eventKey.startsWith('attendance.')) {
+        onNavigate('attendance');
+      } else if (eventKey.startsWith('payroll.')) {
+        onNavigate('payslips');
+      }
+    }
+  };
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser.role);
   const isManagerWorkspace = currentUser.role === 'manager';
   const isAdminWorkspace = currentUser.role === 'super_admin';
@@ -189,23 +214,34 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
           {showNotifications && (
             <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto rounded-xl bg-white p-3 shadow-2xl border border-slate-200 z-50">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
-                <Badge variant="neutral" size="sm">{unreadNotifications} New</Badge>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
+                  <Badge variant="neutral" size="sm">{unreadNotifications} New</Badge>
+                </div>
+                {unreadNotifications > 0 && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await markAllNotificationsRead();
+                      } catch (err) {
+                        setNotificationError(err?.data?.message || err.message || 'Unable to mark all as read.');
+                      }
+                    }}
+                    className="text-[10px] font-semibold text-teal-600 hover:text-teal-800 hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                )}
               </div>
               {notificationError && <p role="alert" className="py-2 text-xs text-rose-700">{notificationError}</p>}
               {notifications.length ? notifications.map((notification) => (
                 <button
                   type="button"
                   key={notification.id}
-                  onClick={async () => {
-                    if (notification.read_at) return;
-                    try {
-                      await markNotificationRead(notification.id);
-                    } catch (error) {
-                      setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
-                    }
-                  }}
-                  className={`block w-full rounded-lg px-2.5 py-2 text-left ${notification.read_at ? 'bg-white' : 'bg-teal-50/70'} hover:bg-slate-50`}
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`block w-full rounded-lg px-2.5 py-2 text-left transition ${notification.read_at ? 'bg-white' : 'bg-teal-50/70 border-l-2 border-teal-500'} hover:bg-slate-50`}
                 >
                   <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
                   <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">{notification.message}</span>

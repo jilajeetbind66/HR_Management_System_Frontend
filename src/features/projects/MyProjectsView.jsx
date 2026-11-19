@@ -145,7 +145,11 @@ export default function MyProjectsView() {
               )}
               {project.review_note && (
                 <p className="mt-3 whitespace-pre-line rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-                  <strong>HR review notes{project.accepted_by || project.returned_by ? ` (${project.accepted_by || project.returned_by})` : ''}: </strong>
+                  <strong>
+                    {project.returned_by
+                      ? `Revision Instructions${project.returned_by ? ` (${project.returned_by})` : ''}`
+                      : `Reviewer Feedback${project.accepted_by ? ` (${project.accepted_by})` : ''}`}:{' '}
+                  </strong>
                   {project.review_note}
                 </p>
               )}

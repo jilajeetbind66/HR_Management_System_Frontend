@@ -40,6 +40,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     notifications,
     refreshNotifications,
     markNotificationRead,
+    markAllNotificationsRead,
   } = useHRMS();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -73,6 +74,26 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     setSearchOpen(false);
     setNotificationsOpen(false);
     setProfileOpen(false);
+  };
+
+  const handleNotificationClick = (notification) => {
+    if (!notification.read_at) {
+      markNotificationRead(notification.id).catch((error) => {
+        setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
+      });
+    }
+    const eventKey = notification.event_key || '';
+    if (eventKey.startsWith('project.')) {
+      navigateTo('my_projects');
+    } else if (eventKey.startsWith('leave.')) {
+      navigateTo('leaves');
+    } else if (eventKey.startsWith('attendance.')) {
+      navigateTo('attendance');
+    } else if (eventKey.startsWith('payroll.')) {
+      navigateTo('payslips');
+    } else {
+      setNotificationsOpen(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -230,13 +251,28 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             <div className="absolute right-0 top-full z-50 mt-2 w-[min(21rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                 <h2 className="text-xs font-bold text-slate-900">Notifications & updates</h2>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('announcements')}
-                  className="text-[10px] font-semibold text-teal-700 hover:text-teal-800"
-                >
-                  View all
-                </button>
+                <div className="flex items-center gap-3">
+                  {unreadNotifications > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markAllNotificationsRead().catch((error) => {
+                          setNotificationError(error?.data?.message || error.message || 'Unable to mark all as read.');
+                        });
+                      }}
+                      className="text-[10px] font-semibold text-teal-700 hover:text-teal-800 hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => navigateTo('announcements')}
+                    className="text-[10px] font-semibold text-slate-500 hover:text-slate-700"
+                  >
+                    View all
+                  </button>
+                </div>
               </div>
               {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700">{notificationError}</p>}
               <section aria-label="Notifications">
@@ -249,14 +285,8 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                       <button
                         type="button"
                         key={notification.id}
-                        onClick={() => {
-                          if (!notification.read_at) {
-                            markNotificationRead(notification.id).catch((error) => {
-                              setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
-                            });
-                          }
-                        }}
-                        className={`block w-full px-4 py-3 text-left hover:bg-teal-50/60 ${notification.read_at ? '' : 'bg-teal-50/40'}`}
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`block w-full px-4 py-3 text-left transition hover:bg-teal-50/60 ${notification.read_at ? '' : 'bg-teal-50/40 border-l-2 border-teal-500'}`}
                       >
                         <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
                         <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{notification.message}</span>

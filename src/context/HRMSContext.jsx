@@ -587,6 +587,14 @@ export function HRMSProvider({ children }) {
     return response?.data;
   };
 
+  const markAllNotificationsRead = async () => {
+    await api.markAllNotificationsRead();
+    setNotifications((previous) => previous.map((item) => ({
+      ...item,
+      read_at: item.read_at || new Date().toISOString(),
+    })));
+  };
+
   const runPayroll = async (monthName, year, scopeKey = 'company') => {
     const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
     const response = await api.generatePayrollRun(year, monthNumber, scopeKey, `${monthName} ${year}`);
@@ -890,6 +898,7 @@ export function HRMSProvider({ children }) {
       notifications,
       refreshNotifications,
       markNotificationRead,
+      markAllNotificationsRead,
       createAnnouncement,
       markAnnouncementRead,
       auditLogs,
