@@ -57,9 +57,12 @@ export default function EmployeesView() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
-  const [selectedBranch, setSelectedBranch] = useState(
-    activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all'
-  );
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    if (currentUser?.role !== 'super_admin' && currentUser?.branch_name) {
+      return currentUser.branch_name;
+    }
+    return activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all';
+  });
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,14 +195,21 @@ export default function EmployeesView() {
   }, [searchTerm, selectedBranch, selectedDept, selectedStatus]);
 
   useEffect(() => {
-    if (activeBranch && activeBranch !== 'All Branches') {
-      setSelectedBranch(activeBranch);
-    } else if (activeBranch === 'All Branches') {
-      setSelectedBranch('all');
+    if (currentUser?.role === 'super_admin') {
+      if (activeBranch && activeBranch !== 'All Branches') {
+        setSelectedBranch(activeBranch);
+      } else if (activeBranch === 'All Branches') {
+        setSelectedBranch('all');
+      }
+    } else {
+      if (currentUser?.branch_name) {
+        setSelectedBranch(currentUser.branch_name);
+      }
     }
-  }, [activeBranch]);
+  }, [activeBranch, currentUser]);
 
   const handleBranchFilterChange = (value) => {
+    if (currentUser?.role !== 'super_admin') return;
     setSelectedBranch(value);
     if (setActiveBranch) {
       setActiveBranch(value === 'all' ? 'All Branches' : value);
@@ -638,16 +648,18 @@ export default function EmployeesView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <select
-            value={selectedBranch}
-            onChange={(e) => handleBranchFilterChange(e.target.value)}
-            className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
-          >
-            <option value="all">All Branches</option>
-            {availableBranches.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
-            ))}
-          </select>
+          {currentUser?.role === 'super_admin' && (
+            <select
+              value={selectedBranch}
+              onChange={(e) => handleBranchFilterChange(e.target.value)}
+              className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
+            >
+              <option value="all">All Branches</option>
+              {availableBranches.map(b => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          )}
 
           <select
             value={selectedDept}

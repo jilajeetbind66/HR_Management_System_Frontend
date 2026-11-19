@@ -223,16 +223,18 @@ export default function PlatformView() {
                   <option key={mod} value={mod}>{mod}</option>
                 ))}
               </select>
-              <select
-                value={activeBranch || 'All Branches'}
-                onChange={(e) => setActiveBranch(e.target.value)}
-                className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 font-medium"
-              >
-                <option value="All Branches">All Branches</option>
-                {availableBranches.map((b) => (
-                  <option key={b.id} value={b.name}>{b.name}</option>
-                ))}
-              </select>
+              {currentUser?.role === 'super_admin' && (
+                <select
+                  value={activeBranch || 'All Branches'}
+                  onChange={(e) => setActiveBranch(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 font-medium"
+                >
+                  <option value="All Branches">All Branches</option>
+                  {availableBranches.map((b) => (
+                    <option key={b.id} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
+              )}
               <Button size="sm" variant="secondary" icon={RefreshCw} disabled={auditLoading} onClick={() => loadAuditLogs(auditSearch, auditModule)}>
                 {auditLoading ? 'Refreshing...' : 'Refresh'}
               </Button>

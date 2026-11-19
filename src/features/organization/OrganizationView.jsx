@@ -665,16 +665,18 @@ export default function OrganizationView() {
           subtitle="Configurable across branches as per state labor acts"
           action={
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={selectedHolidayBranch}
-                onChange={(e) => setSelectedHolidayBranch(e.target.value)}
-                className="text-xs rounded-lg border border-slate-200 py-1.5 px-2 bg-slate-50"
-              >
-                <option value="all">All Branches</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name}</option>
-                ))}
-              </select>
+              {isSuperAdmin && (
+                <select
+                  value={selectedHolidayBranch}
+                  onChange={(e) => setSelectedHolidayBranch(e.target.value)}
+                  className="text-xs rounded-lg border border-slate-200 py-1.5 px-2 bg-slate-50"
+                >
+                  <option value="all">All Branches</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              )}
               {isSuperAdmin && (
                 <Button size="sm" variant="primary" icon={Plus} onClick={() => openHolidayModal()}>
                   Add Holiday
