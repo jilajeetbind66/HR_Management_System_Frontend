@@ -125,7 +125,7 @@ export default function LeadManagementView() {
       const params = {};
       if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
       if (statusFilter !== 'all') params.status = statusFilter;
-      if (isHr && employeeFilter !== 'all') params.employee_id = employeeFilter;
+      if (employeeFilter !== 'all') params.employee_id = employeeFilter;
       if (dateFrom) params.date_from = dateFrom;
       if (dateTo) params.date_to = dateTo;
       if (dueTodayOnly) params.follow_up_due_today = 1;
@@ -145,14 +145,19 @@ export default function LeadManagementView() {
 
   // Load employees for assignment
   useEffect(() => {
-    if (isHr) {
-      api.getEmployees()
-        .then((res) => {
-          const list = res?.data || [];
-          setAvailableEmployees(list.filter((emp) => emp.status === 'active'));
-        })
-        .catch((err) => console.error('Failed to load employees for assignment:', err));
-    }
+    api.getLeadAssignees()
+      .then((res) => {
+        const list = res?.data || [];
+        setAvailableEmployees(list.filter((emp) => emp.status === 'active' || emp.status === undefined));
+      })
+      .catch((err) => {
+        console.error('Failed to load lead assignees:', err);
+        if (isHr) {
+          api.getEmployees()
+            .then((res) => setAvailableEmployees((res?.data || []).filter((emp) => emp.status === 'active')))
+            .catch(() => {});
+        }
+      });
   }, [isHr]);
 
   // Refetch leads when filters or debounced search changes
@@ -198,7 +203,7 @@ export default function LeadManagementView() {
       lead_name: '',
       lead_date: new Date().toISOString().split('T')[0],
       status: 'New',
-      assigned_employee_ids: [],
+      assigned_employee_ids: currentUser?.employee_id ? [currentUser.employee_id] : [],
       follow_up_required: false,
       follow_up_date: '',
       remarks: '',
@@ -413,7 +418,7 @@ export default function LeadManagementView() {
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-teal-600 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 uppercase tracking-wide">
-              {isHr ? 'HR & Admin' : 'Assigned Leads'}
+              {isHr ? 'HR & Admin' : 'Workforce Pipeline'}
             </span>
             <span className="text-xs text-slate-500 font-medium">Sales & Outreach Pipeline</span>
           </div>
@@ -422,9 +427,7 @@ export default function LeadManagementView() {
             Lead Management
           </h1>
           <p className="text-xs text-slate-500">
-            {isHr
-              ? 'Track, assign, schedule follow-ups, and manage client and candidate leads across your workforce.'
-              : 'View and update your assigned leads, schedule follow-ups, and log progress notes.'}
+            Track, assign, schedule follow-ups, and manage client and candidate leads across your workforce.
           </p>
         </div>
 
@@ -448,16 +451,14 @@ export default function LeadManagementView() {
               Employee Access
             </Button>
           )}
-          {isHr && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenAddModal}
-              icon={Plus}
-            >
-              Add Lead
-            </Button>
-          )}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenAddModal}
+            icon={Plus}
+          >
+            Add Lead
+          </Button>
         </div>
       </div>
 
@@ -566,24 +567,22 @@ export default function LeadManagementView() {
               </select>
             </div>
 
-            {/* HR: Filter by Employee */}
-            {isHr && (
-              <div className="flex items-center gap-1.5 text-xs">
-                <User className="h-3.5 w-3.5 text-slate-400" />
-                <select
-                  value={employeeFilter}
-                  onChange={(e) => setEmployeeFilter(e.target.value)}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 max-w-[160px] truncate"
-                >
-                  <option value="all">All Assignees</option>
-                  {availableEmployees.map((emp) => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.first_name} {emp.last_name} ({emp.employee_code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            {/* Filter by Assignee */}
+            <div className="flex items-center gap-1.5 text-xs">
+              <User className="h-3.5 w-3.5 text-slate-400" />
+              <select
+                value={employeeFilter}
+                onChange={(e) => setEmployeeFilter(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 max-w-[160px] truncate"
+              >
+                <option value="all">All Assignees</option>
+                {availableEmployees.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.first_name} {emp.last_name} ({emp.employee_code})
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Lead Date From */}
             <div className="flex items-center gap-1 text-xs text-slate-500">
@@ -657,9 +656,7 @@ export default function LeadManagementView() {
                     <TrendingUp className="mx-auto h-8 w-8 text-slate-300 mb-2" />
                     <p className="font-semibold text-slate-700">No leads found</p>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      {isHr
-                        ? 'Try adjusting your search criteria or click "Add Lead" to register a new lead.'
-                        : 'No leads are currently assigned to you matching the filter.'}
+                      Try adjusting your search criteria or click "Add Lead" to register a new lead.
                     </p>
                   </td>
                 </tr>
@@ -764,17 +761,15 @@ export default function LeadManagementView() {
                             {isEmployee ? 'Update' : 'Progress'}
                           </button>
 
-                          {/* HR only: Edit */}
-                          {isHr && (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenEditModal(lead)}
-                              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
-                              title="Edit Lead"
-                            >
-                              <Edit2 className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                          {/* Edit Lead */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditModal(lead)}
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition"
+                            title="Edit Lead"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
 
                           {/* HR only: Delete */}
                           {isHr && (

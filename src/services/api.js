@@ -580,6 +580,7 @@ export const api = {
   }),
 
   // M17 Lead Management
+  getLeadAssignees: () => request('/leads/assignees'),
   getLeads: (params = {}) => {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);
