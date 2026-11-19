@@ -635,6 +635,16 @@ export function HRMSProvider({ children }) {
     )));
   };
 
+  const updateEmployeeLeadAccess = async (employeeId, hasLeadAccess) => {
+    const response = await api.updateEmployeeLeadAccess(employeeId, hasLeadAccess);
+    setEmployees((previous) => previous.map((employee) => (
+      Number(employee.id) === Number(employeeId)
+        ? { ...employee, has_lead_access: Boolean(hasLeadAccess) }
+        : employee
+    )));
+    return response;
+  };
+
   const upsertTicket = (ticket) => {
     setTickets((previous) => [
       ticket,
@@ -760,6 +770,7 @@ export function HRMSProvider({ children }) {
       updateEmployeeHierarchy,
       updateEmployeeCompensation,
       updateEmployeeAvatar,
+      updateEmployeeLeadAccess,
       projects,
       myProjects,
       selectedPersonaId,

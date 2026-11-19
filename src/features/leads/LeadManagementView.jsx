@@ -42,7 +42,7 @@ const STATUS_CONFIG = {
 
 export default function LeadManagementView() {
   const { currentUser } = useAuth();
-  const isHr = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const isHr = ['super_admin', 'hr_admin'].includes(currentUser?.role);
   const isEmployee = currentUser?.role === 'employee';
 
   // Leads list & stats
@@ -80,6 +80,9 @@ export default function LeadManagementView() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+  const [accessSearch, setAccessSearch] = useState('');
+  const [updatingAccessEmpId, setUpdatingAccessEmpId] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
 
   // Add / Edit Form state
@@ -170,6 +173,23 @@ export default function LeadManagementView() {
   const showToast = (message, type = 'success') => {
     setToastMessage({ message, type });
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const handleToggleEmployeeAccess = async (employeeId, currentStatus) => {
+    setUpdatingAccessEmpId(employeeId);
+    try {
+      await api.updateEmployeeLeadAccess(employeeId, !currentStatus);
+      setAvailableEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === employeeId ? { ...emp, has_lead_access: !currentStatus } : emp
+        )
+      );
+      showToast(`Lead Access ${!currentStatus ? 'enabled' : 'disabled'} successfully.`);
+    } catch (err) {
+      showToast(err?.data?.message || err.message || 'Failed to update access', 'error');
+    } finally {
+      setUpdatingAccessEmpId(null);
+    }
   };
 
   // Open Add Lead
@@ -418,6 +438,16 @@ export default function LeadManagementView() {
           >
             Refresh
           </Button>
+          {isHr && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsAccessModalOpen(true)}
+              icon={Users}
+            >
+              Employee Access
+            </Button>
+          )}
           {isHr && (
             <Button
               variant="primary"
@@ -1404,6 +1434,100 @@ export default function LeadManagementView() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Employee Lead Access Control Modal */}
+      <Modal
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        title="Lead Management Access Control"
+        subtitle="Enable or disable lead management access for employees. When enabled, the employee can view and manage their assigned leads."
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search employee by name, code or department..."
+              value={accessSearch}
+              onChange={(e) => setAccessSearch(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 pl-9 pr-4 py-2 text-xs focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+            />
+          </div>
+
+          <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100 rounded-lg border border-slate-200 bg-slate-50/50">
+            {availableEmployees
+              .filter((emp) => {
+                if (!accessSearch.trim()) return true;
+                const q = accessSearch.toLowerCase();
+                const name = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+                const code = (emp.employee_code || '').toLowerCase();
+                const dept = (emp.department || '').toLowerCase();
+                return name.includes(q) || code.includes(q) || dept.includes(q);
+              })
+              .map((emp) => {
+                const isEnabled = Boolean(emp.has_lead_access);
+                const isUpdating = updatingAccessEmpId === emp.id;
+                return (
+                  <div
+                    key={emp.id}
+                    className="flex items-center justify-between p-3 bg-white hover:bg-slate-50/80 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-teal-800 font-bold text-xs">
+                        {emp.first_name?.[0]}{emp.last_name?.[0]}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-slate-900">
+                            {emp.first_name} {emp.last_name}
+                          </p>
+                          <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 rounded">
+                            {emp.employee_code}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                          {emp.designation || 'Staff'} • {emp.department}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className={`text-[10px] font-bold ${isEnabled ? 'text-teal-700' : 'text-slate-400'}`}>
+                        {isEnabled ? 'Access Granted' : 'Disabled'}
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={isEnabled}
+                        disabled={isUpdating}
+                        onClick={() => handleToggleEmployeeAccess(emp.id, isEnabled)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 disabled:opacity-50 ${
+                          isEnabled ? 'bg-teal-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                            isEnabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+
+          <div className="flex justify-end pt-2 border-t border-slate-100">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsAccessModalOpen(false)}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

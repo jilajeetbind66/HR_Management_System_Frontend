@@ -38,7 +38,7 @@ const modulesByRole = {
     'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   hr_executive: [
-    'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
+    'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
     'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'account'],
@@ -103,16 +103,16 @@ const permissions = {
   'attendance.approve': ['manager', 'hr_admin', 'hr_executive', 'super_admin'],
   'leaves.approve': ['manager', 'hr_admin', 'hr_executive', 'super_admin'],
   'announcements.create': ['hr_admin', 'super_admin'],
-  'leads.manage': ['hr_admin', 'hr_executive', 'super_admin'],
-  'leads.view': ['employee', 'hr_admin', 'hr_executive', 'super_admin'],
+  'leads.manage': ['hr_admin', 'super_admin'],
+  'leads.view': ['employee', 'manager', 'recruiter', 'payroll_admin', 'auditor', 'hr_executive', 'hr_admin', 'super_admin'],
 };
 
 export function canAccessModule(userOrRole, module) {
   const role = typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.role : userOrRole;
   if (module === 'leads') {
-    if (['super_admin', 'hr_admin', 'hr_executive'].includes(role)) return true;
-    if (role === 'employee') {
-      return Boolean(typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.has_lead_access : false);
+    if (['super_admin', 'hr_admin'].includes(role)) return true;
+    if (typeof userOrRole === 'object' && userOrRole !== null) {
+      return Boolean(userOrRole.has_lead_access);
     }
     return false;
   }
@@ -132,13 +132,13 @@ export function getModuleLabel(role, module) {
 export function getRoleMenuItems(userOrRole) {
   const role = typeof userOrRole === 'object' && userOrRole !== null ? userOrRole.role : userOrRole;
   let modules = [...(modulesByRole[role] || [])];
-  if (role === 'employee' && typeof userOrRole === 'object' && userOrRole?.has_lead_access) {
+  if (typeof userOrRole === 'object' && userOrRole?.has_lead_access) {
     if (!modules.includes('leads')) {
       const idx = modules.indexOf('my_projects');
       if (idx !== -1) {
         modules.splice(idx + 1, 0, 'leads');
       } else {
-        modules.push('leads');
+        modules.splice(1, 0, 'leads');
       }
     }
   }

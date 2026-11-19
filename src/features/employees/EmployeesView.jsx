@@ -48,6 +48,7 @@ export default function EmployeesView() {
     updateEmployeeHierarchy,
     updateEmployeeCompensation,
     updateEmployeeAvatar,
+    updateEmployeeLeadAccess,
   } = useHRMS();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -82,8 +83,9 @@ export default function EmployeesView() {
   const showAddModal = pathname.replace(/\/+$/, '') === '/employees/create';
   const [activeProfileTab, setActiveProfileTab] = useState('job'); // 'job' | 'statutory' | 'salary'
   const [isUpdatingLeadAccess, setIsUpdatingLeadAccess] = useState(false);
+  const [updatingLeadEmployeeId, setUpdatingLeadEmployeeId] = useState(null);
   const [leadAccessSuccess, setLeadAccessSuccess] = useState('');
-  const canManageLeadAccess = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canManageLeadAccess = ['super_admin', 'hr_admin'].includes(currentUser?.role);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState(null);
   const [successToast, setSuccessToast] = useState(null);
@@ -354,16 +356,22 @@ export default function EmployeesView() {
 
   const handleToggleLeadAccess = async (employeeId, nextValue) => {
     setIsUpdatingLeadAccess(true);
+    setUpdatingLeadEmployeeId(employeeId);
     setLeadAccessSuccess('');
     try {
-      await api.updateEmployeeLeadAccess(employeeId, nextValue);
-      setSelectedEmployee((prev) => (prev ? { ...prev, has_lead_access: nextValue } : null));
-      setLeadAccessSuccess(`Lead Management access ${nextValue ? 'granted' : 'revoked'} successfully.`);
+      if (updateEmployeeLeadAccess) {
+        await updateEmployeeLeadAccess(employeeId, nextValue);
+      } else {
+        await api.updateEmployeeLeadAccess(employeeId, nextValue);
+      }
+      setSelectedEmployee((prev) => (prev && Number(prev.id) === Number(employeeId) ? { ...prev, has_lead_access: nextValue } : prev));
+      setLeadAccessSuccess(`Lead Management access ${nextValue ? 'enabled' : 'disabled'} successfully.`);
       setTimeout(() => setLeadAccessSuccess(''), 3500);
     } catch (err) {
       alert(err?.data?.message || err.message || 'Failed to update lead access');
     } finally {
       setIsUpdatingLeadAccess(false);
+      setUpdatingLeadEmployeeId(null);
     }
   };
 
@@ -613,6 +621,7 @@ export default function EmployeesView() {
                 {canViewStatutoryDetails && <th className="px-4 py-3">India Statutory (PF / PT)</th>}
                 <th className="px-4 py-3">Joining Date</th>
                 <th className="px-4 py-3">Status</th>
+                {canManageLeadAccess && <th className="px-4 py-3 text-center">Lead Access</th>}
                 <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
@@ -620,7 +629,7 @@ export default function EmployeesView() {
               {filteredEmployees.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={canViewStatutoryDetails ? 7 : 6}
+                    colSpan={(canViewStatutoryDetails ? 7 : 6) + (canManageLeadAccess ? 1 : 0)}
                     role="status"
                     className="px-5 py-8 text-center text-slate-500"
                   >
@@ -684,12 +693,42 @@ export default function EmployeesView() {
                         {(emp.status || 'unknown').replace('_', ' ')}
                       </Badge>
                       {Boolean(emp.has_lead_access) && (
-                        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-indigo-700 border border-indigo-200">
-                          <TrendingUp className="w-2.5 h-2.5" /> Leads
+                        <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[9px] font-bold text-teal-700 border border-teal-200">
+                          <TrendingUp className="w-2.5 h-2.5" /> Leads ON
                         </span>
                       )}
                     </div>
                   </td>
+
+                  {canManageLeadAccess && (
+                    <td className="px-4 py-3 text-center">
+                      <div className="inline-flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={Boolean(emp.has_lead_access)}
+                          aria-label={`Toggle Lead Management Access for ${emp.first_name} ${emp.last_name}`}
+                          disabled={isUpdatingLeadAccess && updatingLeadEmployeeId === emp.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleLeadAccess(emp.id, !emp.has_lead_access);
+                          }}
+                          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-1 disabled:opacity-50 ${
+                            emp.has_lead_access ? 'bg-teal-600' : 'bg-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              emp.has_lead_access ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-[10px] font-bold ${emp.has_lead_access ? 'text-teal-700' : 'text-slate-400'}`}>
+                          {emp.has_lead_access ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+                    </td>
+                  )}
 
                   <td className="px-4 py-3 text-right">
                     <button
