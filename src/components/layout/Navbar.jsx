@@ -77,15 +77,30 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   return (
     <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between gap-2 border-b border-slate-200/90 bg-white/95 px-3 backdrop-blur sm:px-6">
       {/* Left: Mobile hamburger & Brand */}
-      <div className={`flex min-w-0 items-center gap-2 sm:gap-4 ${isAdminWorkspace ? 'flex-1' : ''}`}>
+      <div className={`flex min-w-0 items-center gap-1.5 sm:gap-4 ${isAdminWorkspace ? 'flex-1' : ''}`}>
         <button
           onClick={onMenuToggle}
-          className="rounded-lg p-2 text-slate-500 hover:bg-teal-50 hover:text-teal-700 lg:hidden"
+          className="rounded-lg p-2 text-slate-500 hover:bg-teal-50 hover:text-teal-700 lg:hidden shrink-0"
         >
           <SlidersHorizontal className="h-5 w-5" />
         </button>
 
-        {/* Branch Selector */}
+        {/* Mobile Branch Selector (Compact) */}
+        <div className="flex sm:hidden items-center gap-1 border border-slate-200 bg-slate-50/90 rounded-lg px-2 py-1 text-[11px] text-slate-700 max-w-[125px]">
+          <Building2 className="h-3 w-3 text-teal-600 shrink-0" />
+          <select
+            value={activeBranch}
+            onChange={(e) => setActiveBranch(e.target.value)}
+            className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer truncate w-full text-[11px]"
+          >
+            <option value="All Branches">All Branches</option>
+            {availableBranches.map((b) => (
+              <option key={b.id} value={b.name}>{b.city || b.name.replace(' Branch', '')}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Desktop Branch Selector */}
         <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
           <Building2 className="h-3.5 w-3.5 text-teal-600" />
           <span className="font-semibold text-slate-500">Branch:</span>
