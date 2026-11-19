@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import UserAccessManagement from './UserAccessManagement';
 import { useAuth } from '../../context/AuthContext';
+import { initialBranches } from '../../data/mockData';
 import api from '../../services/api';
 import {
   History,
@@ -13,12 +14,47 @@ import {
   KeyRound,
   RefreshCw,
   Search,
+  Building2,
 } from 'lucide-react';
 
 export default function PlatformView() {
-  const { auditLogs, refreshAuditLogs } = useHRMS();
-  const { currentUser } = useAuth();
+  const { auditLogs, refreshAuditLogs, employees, branches } = useHRMS();
+  const { currentUser, activeBranch, setActiveBranch } = useAuth();
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const [activeTab, setActiveTab] = useState('audit'); // 'audit' | 'sequences' | 'scheduler' | 'users'
+
+  // Map employee name/code to their branch for audit attribution
+  const employeeBranchMap = useMemo(() => {
+    const map = new Map();
+    (employees || []).forEach((emp) => {
+      const fullName = `${emp.first_name || ''} ${emp.last_name || ''}`.trim().toLowerCase();
+      const bName = emp.branch_name || (Number(emp.branch_id) === 1 ? 'Prayagraj Branch' : Number(emp.branch_id) === 2 ? 'Kaushambi Branch' : '');
+      if (fullName && bName) map.set(fullName, bName);
+      if (emp.name && bName) map.set(emp.name.trim().toLowerCase(), bName);
+      if (emp.employee_code && bName) map.set(emp.employee_code.toLowerCase(), bName);
+    });
+    return map;
+  }, [employees]);
+
+  const getLogBranch = useCallback((log) => {
+    if (!log) return 'All Branches';
+    const actorLower = String(log.actor || '').trim().toLowerCase();
+    const descLower = String(log.description || '').toLowerCase();
+
+    for (const [name, branch] of employeeBranchMap.entries()) {
+      if (actorLower === name || actorLower.includes(name) || name.includes(actorLower)) {
+        return branch;
+      }
+    }
+
+    if (descLower.includes('prayagraj') && descLower.includes('kaushambi')) {
+      return 'All Branches';
+    }
+    if (descLower.includes('prayagraj')) return 'Prayagraj Branch';
+    if (descLower.includes('kaushambi')) return 'Kaushambi Branch';
+
+    return 'All Branches';
+  }, [employeeBranchMap]);
 
   // Audit logs filter/refresh state
   const [auditSearch, setAuditSearch] = useState('');
@@ -81,6 +117,15 @@ export default function PlatformView() {
     }
   }, []);
 
+  const filteredAuditLogs = useMemo(() => {
+    return auditLogs.filter((log) => {
+      if (!activeBranch || activeBranch === 'All Branches') return true;
+      const logBranch = getLogBranch(log);
+      if (logBranch === 'All Branches') return true;
+      return logBranch === activeBranch;
+    });
+  }, [auditLogs, activeBranch, getLogBranch]);
+
   useEffect(() => {
     if (activeTab === 'audit') {
       loadAuditLogs(auditSearch, auditModule);
@@ -115,7 +160,7 @@ export default function PlatformView() {
             activeTab === 'audit' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <History className="w-4 h-4" /> Audit Log Stream ({auditMeta.total || auditLogs.length})
+          <History className="w-4 h-4" /> Audit Log Stream ({filteredAuditLogs.length})
         </button>
 
         <button
@@ -151,7 +196,7 @@ export default function PlatformView() {
       {activeTab === 'audit' && (
         <Card
           title="Audit Log Stream"
-          subtitle={`Showing ${auditLogs.length} of ${auditMeta.total || auditLogs.length} matching records`}
+          subtitle={`Showing ${filteredAuditLogs.length} of ${auditLogs.length} matching records ${activeBranch && activeBranch !== 'All Branches' ? `(${activeBranch})` : '(All Branches)'}`}
           action={
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
@@ -178,6 +223,16 @@ export default function PlatformView() {
                   <option key={mod} value={mod}>{mod}</option>
                 ))}
               </select>
+              <select
+                value={activeBranch || 'All Branches'}
+                onChange={(e) => setActiveBranch(e.target.value)}
+                className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white text-slate-700 font-medium"
+              >
+                <option value="All Branches">All Branches</option>
+                {availableBranches.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
               <Button size="sm" variant="secondary" icon={RefreshCw} disabled={auditLoading} onClick={() => loadAuditLogs(auditSearch, auditModule)}>
                 {auditLoading ? 'Refreshing...' : 'Refresh'}
               </Button>
@@ -196,6 +251,7 @@ export default function PlatformView() {
                 <tr>
                   <th className="px-5 py-3">Timestamp (UTC/IST)</th>
                   <th className="px-4 py-3">Actor</th>
+                  <th className="px-4 py-3">Branch Location</th>
                   <th className="px-4 py-3">Module</th>
                   <th className="px-4 py-3">Event Action</th>
                   <th className="px-4 py-3">Audit Details</th>
@@ -203,22 +259,37 @@ export default function PlatformView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {auditLogs.map(log => (
-                  <tr key={log.id} className="hover:bg-slate-50 font-mono text-[11px]">
-                    <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{log.created_at}</td>
-                    <td className="px-4 py-3 font-sans font-semibold text-slate-900">{log.actor}</td>
-                    <td className="px-4 py-3 font-sans text-teal-600 font-medium">{log.module}</td>
-                    <td className="px-4 py-3">
-                      <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold text-[10px]">
-                        {log.action}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-sans text-slate-600 max-w-md">{log.description}</td>
-                    <td className="px-4 py-3 text-slate-400">{log.ip}</td>
-                  </tr>
-                ))}
-                {!auditLoading && auditLogs.length === 0 && (
-                  <tr><td colSpan="6" className="px-4 py-8 text-center text-slate-500">No audit records match your filter.</td></tr>
+                {filteredAuditLogs.map(log => {
+                  const logBranch = getLogBranch(log);
+                  return (
+                    <tr key={log.id} className="hover:bg-slate-50 font-mono text-[11px]">
+                      <td className="px-5 py-3 text-slate-500 whitespace-nowrap">{log.created_at}</td>
+                      <td className="px-4 py-3 font-sans font-semibold text-slate-900">{log.actor}</td>
+                      <td className="px-4 py-3 font-sans">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          logBranch === 'Prayagraj Branch'
+                            ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                            : logBranch === 'Kaushambi Branch'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-slate-100 text-slate-600 border border-slate-200'
+                        }`}>
+                          <Building2 className="w-3 h-3" />
+                          {logBranch === 'All Branches' ? 'All / System' : logBranch.replace(' Branch', '')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-sans text-teal-600 font-medium">{log.module}</td>
+                      <td className="px-4 py-3">
+                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold text-[10px]">
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-sans text-slate-600 max-w-md">{log.description}</td>
+                      <td className="px-4 py-3 text-slate-400">{log.ip}</td>
+                    </tr>
+                  );
+                })}
+                {!auditLoading && filteredAuditLogs.length === 0 && (
+                  <tr><td colSpan="7" className="px-4 py-8 text-center text-slate-500">No audit records match your branch and search filter.</td></tr>
                 )}
               </tbody>
             </table>
