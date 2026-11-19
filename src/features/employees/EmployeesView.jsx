@@ -1253,6 +1253,18 @@ export default function EmployeesView() {
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Professional Tax (PT) State</span>
                     <span className="font-semibold text-slate-700">{selectedEmployee.pt_state || '—'}</span>
                   </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Name</span>
+                    <span className="font-semibold text-slate-700">{selectedEmployee.bank_name || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Account Number</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.account_number || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank IFSC Code</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.ifsc_code || '—'}</span>
+                  </div>
                 </div>
                 {currentUser?.role === 'super_admin' && (
                   <div className="pt-2 flex justify-end">
