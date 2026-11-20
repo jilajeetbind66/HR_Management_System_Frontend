@@ -113,6 +113,25 @@ export default function AttendanceView() {
   const isPunchComplete = Boolean(myPunch?.punch_in && myPunch?.punch_out);
   const currentEmployeeName = [currentUser.first_name, currentUser.last_name].filter(Boolean).join(' ') || currentUser.name;
 
+  const myMissingPunches = useMemo(() => {
+    if (!currentUser?.employee_id) return [];
+    return attendance.filter((a) => (
+      Number(a.employee_id) === Number(currentUser.employee_id) &&
+      a.date < today &&
+      !a.punch_out &&
+      !regularizationRequests.some((r) => Number(r.employee_id) === Number(currentUser.employee_id) && r.date === a.date && r.status === 'pending')
+    ));
+  }, [attendance, currentUser, today, regularizationRequests]);
+
+  const handleOpenRegularizeForRecord = (record) => {
+    setRegDate(record.date);
+    setRegIn(record.punch_in || '09:15 AM');
+    setRegOut('06:30 PM');
+    setRegReason(`Missed punch-out on ${record.date}. Requested standard exit time.`);
+    setRegModalError('');
+    setShowRegModal(true);
+  };
+
   const handlePunchClick = async () => {
     if (!hasEmployeeProfile || isPunchComplete) return;
 
@@ -272,6 +291,30 @@ export default function AttendanceView() {
         </div>
       )}
 
+      {myMissingPunches.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="font-bold text-amber-950">
+                You have {myMissingPunches.length} missed punch-out session(s) awaiting regularization.
+              </p>
+              <p className="text-amber-800 text-[11px] mt-0.5">
+                Dates: {myMissingPunches.map(p => p.date).join(', ')}. Submit a regularization request to clear work hours for payroll.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => handleOpenRegularizeForRecord(myMissingPunches[0])}
+            className="bg-white border-amber-300 text-amber-900 hover:bg-amber-100/50 shrink-0"
+          >
+            Regularize Now
+          </Button>
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="border-b border-slate-200 flex flex-wrap items-center gap-4 text-xs">
         <button
@@ -325,12 +368,13 @@ export default function AttendanceView() {
                   <th className="px-4 py-3">Work Hours</th>
                   <th className="px-4 py-3">IP & Location</th>
                   <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredAttendance.length === 0 ? (
                   <tr>
-                    <td colSpan={7} role="status" className="px-5 py-8 text-center text-slate-500">
+                    <td colSpan={8} role="status" className="px-5 py-8 text-center text-slate-500">
                       {isBranchScoped
                         ? `No attendance records found for ${activeBranch}.`
                         : 'No attendance records are available for your team.'}
@@ -347,6 +391,12 @@ export default function AttendanceView() {
                       : [att.first_name, att.last_name].filter(Boolean).join(' ') || (att.employee_code ? `${att.employee_code}` : `EMP-${att.employee_id}`);
                   const employeeInfo = emp?.designation || (isCurrentEmployee ? currentUser.employee_code : '');
 
+                  const isPastDate = att.date < today;
+                  const isMissingPunchOut = isPastDate && !att.punch_out;
+                  const regReq = regularizationRequests.find((r) => (
+                    Number(r.employee_id) === employeeId && r.date === att.date
+                  ));
+
                   return (
                     <tr key={att.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3">
@@ -355,16 +405,69 @@ export default function AttendanceView() {
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-800">{att.date}</td>
                       <td className="px-4 py-3 font-semibold text-emerald-600">{att.punch_in}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-600">{att.punch_out || '— (Working)'}</td>
-                      <td className="px-4 py-3 font-medium">{att.punch_out ? `${att.work_hours} hrs` : 'In Progress'}</td>
+                      <td className="px-4 py-3">
+                        {att.punch_out ? (
+                          <span className="font-semibold text-slate-700">{att.punch_out}</span>
+                        ) : isMissingPunchOut ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-200">
+                              <AlertTriangle className="w-3 h-3 text-amber-500" />
+                              Missing Punch Out
+                            </span>
+                            {regReq && (
+                              <span className="text-[10px] text-teal-600 font-medium">
+                                Reg {regReq.status} ({regReq.punch_out_requested})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="font-semibold text-teal-600">— (Working)</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium">
+                        {att.punch_out ? (
+                          <span>{att.work_hours} hrs</span>
+                        ) : isMissingPunchOut ? (
+                          <span className="text-slate-400">0.00 hrs</span>
+                        ) : (
+                          <span className="text-teal-600">In Progress</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-slate-500">
                         <span>{att.location}</span>
                         <span className="block font-mono text-[10px] text-slate-400">{att.ip_address}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={att.status === 'Present' ? 'success' : 'warning'} size="sm">
-                          {att.status}
-                        </Badge>
+                        {isMissingPunchOut && att.status === 'Present' ? (
+                          <Badge variant="warning" size="sm">
+                            Incomplete
+                          </Badge>
+                        ) : (
+                          <Badge variant={att.status === 'Present' ? 'success' : 'warning'} size="sm">
+                            {att.status}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {isMissingPunchOut ? (
+                          regReq?.status === 'pending' ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+                              <Clock className="w-3 h-3" /> Reg Pending
+                            </span>
+                          ) : (isCurrentEmployee || canManageAttendance) ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenRegularizeForRecord(att)}
+                              className="inline-flex items-center gap-1 rounded bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700 hover:bg-teal-100 border border-teal-200 transition"
+                            >
+                              <Clock className="w-3 h-3 text-teal-600" /> Regularize
+                            </button>
+                          ) : (
+                            <span className="text-slate-300 text-xs">—</span>
+                          )
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -589,18 +692,22 @@ export default function AttendanceView() {
                 required
                 value={regIn}
                 onChange={(e) => setRegIn(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-200"
+                placeholder="e.g. 09:30 AM"
+                className="w-full p-2 rounded-lg border border-slate-200 font-mono"
               />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM (e.g. 09:30 AM)</span>
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Punch Out Time:</label>
+              <label className="block font-semibold text-slate-700 mb-1">Requested Punch Out Time:</label>
               <input
                 type="text"
                 required
                 value={regOut}
                 onChange={(e) => setRegOut(e.target.value)}
-                className="w-full p-2 rounded-lg border border-slate-200"
+                placeholder="e.g. 06:30 PM"
+                className="w-full p-2 rounded-lg border border-slate-200 font-mono"
               />
+              <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM (e.g. 06:30 PM)</span>
             </div>
           </div>
 
