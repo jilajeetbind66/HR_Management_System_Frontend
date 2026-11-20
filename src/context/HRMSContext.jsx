@@ -605,19 +605,18 @@ export function HRMSProvider({ children }) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Periodic lightweight background sync for real-time notification badge updates
-    const interval = setInterval(() => {
-      refreshNotifications().catch(() => {});
-    }, 25000);
-
-    const handleFocus = () => {
-      refreshNotifications().catch(() => {});
+    // Refresh notification badge when user switches back to this tab
+    const handleSync = () => {
+      if (document.visibilityState === 'visible') {
+        refreshNotifications().catch(() => {});
+      }
     };
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('focus', handleSync);
+    document.addEventListener('visibilitychange', handleSync);
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', handleSync);
+      document.removeEventListener('visibilitychange', handleSync);
     };
   }, [isAuthenticated, refreshNotifications]);
 
