@@ -266,21 +266,23 @@ export default function RecruitmentView() {
 
                   <div className="space-y-3">
                     {stageCandidates.map(cand => (
-                      <div key={cand.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm space-y-2 text-xs">
-                        <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-slate-900">{cand.name}</h4>
-                          <span className="flex items-center gap-0.5 text-amber-500 font-bold text-[11px]">
-                          <Star className="h-3 w-3 fill-amber-400" />
-                          {Number(cand.rating) > 0 ? `${Number(cand.rating).toFixed(1)}/5` : 'Not rated'}
+                      <div key={cand.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm space-y-2 text-xs min-w-0">
+                        <div className="flex justify-between items-start gap-1.5 min-w-0">
+                          <h4 className="font-bold text-slate-900 truncate" title={cand.name}>{cand.name}</h4>
+                          <span className="flex items-center gap-0.5 text-amber-500 font-bold text-[11px] shrink-0">
+                            <Star className="h-3 w-3 fill-amber-400" />
+                            {Number(cand.rating) > 0 ? `${Number(cand.rating).toFixed(1)}/5` : 'Not rated'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500">{cand.email}</p>
+                        <p className="text-[11px] text-slate-500 truncate" title={cand.email}>
+                          {cand.email}
+                        </p>
                         {cand.evaluation_note && (
-                          <p className="line-clamp-2 text-[11px] text-slate-600">{cand.evaluation_note}</p>
+                          <p className="line-clamp-2 text-[11px] text-slate-600 break-words">{cand.evaluation_note}</p>
                         )}
-                        <div className="text-[10px] text-slate-400 flex justify-between">
-                          <span>Notice: {cand.notice_period}</span>
-                          <span>CTC: {cand.expected_ctc}</span>
+                        <div className="text-[10px] text-slate-400 flex justify-between gap-1">
+                          <span className="truncate">Notice: {cand.notice_period}</span>
+                          <span className="shrink-0">CTC: {cand.expected_ctc}</span>
                         </div>
 
                         {/* Stage actions */}

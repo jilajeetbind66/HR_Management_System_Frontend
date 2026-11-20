@@ -655,7 +655,7 @@ export default function EmployeesView() {
                           <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 rounded">{emp.employee_code}</span>
                         </div>
                         {currentUser?.role !== 'manager' && (
-                          <p className="text-[11px] text-slate-400">{emp.email}</p>
+                          <p className="text-[11px] text-slate-400 truncate max-w-[220px]" title={emp.email}>{emp.email}</p>
                         )}
                       </div>
                     </div>
