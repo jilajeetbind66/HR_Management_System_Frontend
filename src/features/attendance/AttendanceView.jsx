@@ -52,18 +52,19 @@ export default function AttendanceView() {
   }, [attendance, employees, activeBranch, isBranchScoped]);
 
   const filteredRegularization = useMemo(() => {
+    if (currentUser?.role === 'employee') return regularizationRequests;
     if (!isBranchScoped) return regularizationRequests;
     return regularizationRequests.filter((req) => {
       const emp = employees.find((e) => Number(e.id) === Number(req.employee_id));
-      const branchName = emp?.branch_name;
-      if (!branchName) return false;
+      const branchName = req.branch_name || emp?.branch_name;
+      if (!branchName) return true;
       return (
         branchName === activeBranch ||
         (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
         (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
       );
     });
-  }, [regularizationRequests, employees, activeBranch, isBranchScoped]);
+  }, [regularizationRequests, employees, activeBranch, isBranchScoped, currentUser?.role]);
 
   const [activeTab, setActiveTab] = useState('punches'); // 'punches' | 'regularization' | 'import'
   const [showRegModal, setShowRegModal] = useState(false);
