@@ -453,7 +453,7 @@ export default function AttendanceView() {
                           <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
                             <Clock className="w-3 h-3" /> Reg Pending
                           </span>
-                        ) : (isCurrentEmployee || canManageAttendance) ? (
+                        ) : isMissingPunchOut && (isCurrentEmployee || canManageAttendance) ? (
                           <button
                             type="button"
                             onClick={() => handleOpenRegularizeForRecord(att)}
