@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export default function DeveloperDashboard({ onNavigate }) {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     employees,
     projects,
@@ -50,6 +50,47 @@ export default function DeveloperDashboard({ onNavigate }) {
   const workspaceEmployeeId = Number(workspaceUser.employee_id);
   const isViewingOwnWorkspace = workspaceEmployeeId === Number(currentUser.employee_id);
   const isWorkspaceExecutive = isViewingOwnWorkspace && currentUser.role === 'super_admin';
+
+  // Branch-scoped calculations for Company Project Delivery Desk & Management Approvals (Super Admin)
+  const isBranchScoped = Boolean(isWorkspaceExecutive && activeBranch && activeBranch !== 'All Branches');
+  const executiveScopedProjects = useMemo(() => {
+    if (!isBranchScoped) return projects;
+    return projects.filter((project) => {
+      const assignedEmp = employees.find((e) => Number(e.id) === Number(project.assigned_employee_id));
+      const bName = assignedEmp?.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    });
+  }, [projects, employees, isBranchScoped, activeBranch]);
+
+  const executiveScopedLeaves = useMemo(() => {
+    if (!isBranchScoped) return leaveRequests;
+    return leaveRequests.filter((leave) => {
+      const emp = employees.find((e) => Number(e.id) === Number(leave.employee_id));
+      const bName = emp?.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    });
+  }, [leaveRequests, employees, isBranchScoped, activeBranch]);
+
+  const executiveScopedRegularizations = useMemo(() => {
+    if (!isBranchScoped) return regularizationRequests;
+    return regularizationRequests.filter((reg) => {
+      const emp = employees.find((e) => Number(e.id) === Number(reg.employee_id));
+      const bName = emp?.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    });
+  }, [regularizationRequests, employees, isBranchScoped, activeBranch]);
   const projectSource = currentUser.role === 'super_admin' ? projects : assignedProjects;
   const myProjects = projectSource.filter(
     (project) => Number(project.assigned_employee_id) === workspaceEmployeeId
@@ -533,7 +574,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                     </div>
                     <div>
                       <h4 className="font-bold text-slate-900 text-sm">Company Project Delivery Desk</h4>
-                      <p className="text-slate-500 text-[11px]">Real-time milestone tracking and developer assignment status</p>
+                      <p className="text-slate-500 text-[11px]">Real-time milestone tracking and developer assignment status{isBranchScoped ? ` · Filtered: ${activeBranch}` : ''}</p>
                     </div>
                   </div>
                   <Button size="sm" variant="primary" onClick={() => onNavigate('projects')}>
@@ -545,21 +586,21 @@ export default function DeveloperDashboard({ onNavigate }) {
                   <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
                     <span className="text-slate-500 font-medium">Active Track</span>
                     <p className="text-xl font-bold text-slate-800 mt-1">
-                      {projects.filter(p => p.status !== 'completed').length} Projects
+                      {executiveScopedProjects.filter(p => p.status !== 'completed').length} Projects
                     </p>
                     <span className="text-[10px] text-teal-600 font-semibold mt-1 block">In development</span>
                   </div>
                   <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
                     <span className="text-slate-500 font-medium">Overdue Deadlines</span>
                     <p className="text-xl font-bold text-rose-700 mt-1">
-                      {projects.filter(p => p.status === 'overdue').length} Projects
+                      {executiveScopedProjects.filter(p => p.status === 'overdue').length} Projects
                     </p>
                     <span className="text-[10px] text-rose-600 font-semibold mt-1 block">Needs attention</span>
                   </div>
                   <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
                     <span className="text-slate-500 font-medium">Under Review</span>
                     <p className="text-xl font-bold text-blue-700 mt-1">
-                      {projects.filter(p => p.status === 'under_review').length} Deliverables
+                      {executiveScopedProjects.filter(p => p.status === 'under_review').length} Deliverables
                     </p>
                     <span className="text-[10px] text-blue-600 font-semibold mt-1 block">Awaiting review</span>
                   </div>
@@ -659,7 +700,7 @@ export default function DeveloperDashboard({ onNavigate }) {
           {isWorkspaceExecutive ? (
             <Card
               title="Management Approvals"
-              subtitle="Pending Company Actions"
+              subtitle={`Pending Company Actions${isBranchScoped ? ` · ${activeBranch}` : ''}`}
               action={
                 <button
                   type="button"
@@ -678,7 +719,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   <div>
                     <span className="text-slate-500 font-medium">Pending Leave Requests</span>
                     <p className="text-base font-bold text-slate-800 mt-0.5">
-                      {leaveRequests.filter(l => l.status === 'pending').length} Awaiting Decision
+                      {executiveScopedLeaves.filter(l => l.status === 'pending').length} Awaiting Decision
                     </p>
                   </div>
                   <span className="text-xs font-semibold text-teal-700 bg-teal-100/80 px-2 py-1 rounded">Review →</span>
@@ -691,7 +732,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   <div>
                     <span className="text-slate-500 font-medium">Overdue Project Deadlines</span>
                     <p className="text-base font-bold text-rose-700 mt-0.5">
-                      {projects.filter(p => p.status === 'overdue').length} Overdue
+                      {executiveScopedProjects.filter(p => p.status === 'overdue').length} Overdue
                     </p>
                   </div>
                   <span className="text-xs font-semibold text-rose-700 bg-rose-100/80 px-2 py-1 rounded">Review →</span>
@@ -704,7 +745,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   <div>
                     <span className="text-slate-500 font-medium">Regularization Requests</span>
                     <p className="text-base font-bold text-slate-800 mt-0.5">
-                      {(regularizationRequests || []).filter(r => r.status === 'pending').length} Pending
+                      {executiveScopedRegularizations.filter(r => r.status === 'pending').length} Pending
                     </p>
                   </div>
                   <span className="text-xs font-semibold text-sky-700 bg-sky-100/80 px-2 py-1 rounded">Inspect →</span>
