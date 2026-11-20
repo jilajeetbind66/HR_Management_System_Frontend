@@ -270,7 +270,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
       items: [
         { id: 'attendance', icon: Clock },
         { id: 'leaves', icon: CalendarCheck2, badge: pendingLeaves > 0 ? `${pendingLeaves} Req` : null },
-        { id: 'payslips', icon: Banknote },
+        ...(!isAdminWorkspace ? [{ id: 'payslips', icon: Banknote }] : []),
         { id: 'payroll', icon: Banknote },
         { id: 'expenses', icon: Receipt }
       ]
