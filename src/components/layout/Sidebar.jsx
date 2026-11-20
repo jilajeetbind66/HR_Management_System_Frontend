@@ -246,7 +246,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
     {
       items: [
         { id: 'dashboard', icon: LayoutDashboard },
-        { id: 'developer_space', icon: Code2, badge: 'Self-Service' },
+        { id: 'developer_space', icon: Code2, badge: isAdminWorkspace ? 'Executive' : 'Self-Service' },
         {
           id: 'projects',
           icon: FolderGit2,

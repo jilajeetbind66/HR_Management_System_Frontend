@@ -18,7 +18,8 @@ import {
   Sliders,
   Sparkles,
   Link2,
-  Calendar
+  Calendar,
+  LayoutDashboard
 } from 'lucide-react';
 
 export default function DeveloperDashboard({ onNavigate }) {
@@ -305,6 +306,17 @@ export default function DeveloperDashboard({ onNavigate }) {
               Review Leaves
             </Button>
           )}
+          {isWorkspaceExecutive && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={LayoutDashboard}
+              onClick={() => onNavigate('dashboard')}
+              className="w-full justify-center sm:w-auto bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              Admin Dashboard
+            </Button>
+          )}
           {!isWorkspaceExecutive && (
             <Button
               variant={isPunchComplete ? "secondary" : "primary"}
@@ -513,18 +525,44 @@ export default function DeveloperDashboard({ onNavigate }) {
                 })}
               </div>
             ) : isWorkspaceExecutive ? (
-              <div className="text-center py-8 px-4 text-xs">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 mb-3 border border-teal-100 shadow-sm">
-                  <FolderGit2 className="w-6 h-6" />
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm">No Personal Tasks Assigned</h4>
-                <p className="text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
-                  As Founder & Super Admin, project deliverables are executed by assigned team members. You can assign deliverables, set deadlines, and review submissions in the Project Management console.
-                </p>
-                <div className="mt-4 flex items-center justify-center gap-2">
+              <div className="p-5 text-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-600 border border-teal-100 shadow-xs">
+                      <FolderGit2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">Company Project Delivery Desk</h4>
+                      <p className="text-slate-500 text-[11px]">Real-time milestone tracking and developer assignment status</p>
+                    </div>
+                  </div>
                   <Button size="sm" variant="primary" onClick={() => onNavigate('projects')}>
-                    Open Projects & Deadlines →
+                    Open Projects Console →
                   </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
+                    <span className="text-slate-500 font-medium">Active Track</span>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {projects.filter(p => p.status !== 'completed').length} Projects
+                    </p>
+                    <span className="text-[10px] text-teal-600 font-semibold mt-1 block">In development</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
+                    <span className="text-slate-500 font-medium">Overdue Deadlines</span>
+                    <p className="text-xl font-bold text-rose-700 mt-1">
+                      {projects.filter(p => p.status === 'overdue').length} Projects
+                    </p>
+                    <span className="text-[10px] text-rose-600 font-semibold mt-1 block">Needs attention</span>
+                  </div>
+                  <div className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70">
+                    <span className="text-slate-500 font-medium">Under Review</span>
+                    <p className="text-xl font-bold text-blue-700 mt-1">
+                      {projects.filter(p => p.status === 'under_review').length} Deliverables
+                    </p>
+                    <span className="text-[10px] text-blue-600 font-semibold mt-1 block">Awaiting review</span>
+                  </div>
                 </div>
               </div>
             ) : (
