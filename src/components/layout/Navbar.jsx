@@ -154,31 +154,33 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
 
       {/* Right Controls */}
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
-        {/* Quick Web Punch Clock */}
-        <div className="relative">
-          <Button
-            size="sm"
-            variant={isPunchComplete
-              ? 'secondary'
-              : hasPunchedIn
-              ? 'danger'
-              : 'orange'}
-            disabled={!hasEmployeeProfile || isPunchComplete}
-            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
-            onClick={handlePunch}
-            icon={Clock}
-            className="shadow-sm font-medium"
-          >
-            {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
-          </Button>
+        {/* Quick Web Punch Clock (Only for staff whose attendance is tracked, NOT for Super Admin/Founder) */}
+        {currentUser?.role !== 'super_admin' && (
+          <div className="relative">
+            <Button
+              size="sm"
+              variant={isPunchComplete
+                ? 'secondary'
+                : hasPunchedIn
+                ? 'danger'
+                : 'orange'}
+              disabled={!hasEmployeeProfile || isPunchComplete}
+              title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
+              onClick={handlePunch}
+              icon={Clock}
+              className="shadow-sm font-medium"
+            >
+              {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
+            </Button>
 
-          {punchFeedback && (
-            <div className="absolute right-0 top-10 z-50 rounded-lg bg-slate-900 text-white text-xs px-3 py-1.5 shadow-xl whitespace-nowrap animate-fade-in flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-              {punchFeedback}
-            </div>
-          )}
-        </div>
+            {punchFeedback && (
+              <div className="absolute right-0 top-10 z-50 rounded-lg bg-slate-900 text-white text-xs px-3 py-1.5 shadow-xl whitespace-nowrap animate-fade-in flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                {punchFeedback}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="hidden items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-800 sm:flex">
           <span className="font-bold uppercase tracking-wider text-teal-700">

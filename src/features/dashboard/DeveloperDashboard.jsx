@@ -47,6 +47,7 @@ export default function DeveloperDashboard({ onNavigate }) {
     : currentUser;
   const workspaceEmployeeId = Number(workspaceUser.employee_id);
   const isViewingOwnWorkspace = workspaceEmployeeId === Number(currentUser.employee_id);
+  const isWorkspaceExecutive = isViewingOwnWorkspace && currentUser.role === 'super_admin';
   const projectSource = currentUser.role === 'super_admin' ? projects : assignedProjects;
   const myProjects = projectSource.filter(
     (project) => Number(project.assigned_employee_id) === workspaceEmployeeId
@@ -286,33 +287,40 @@ export default function DeveloperDashboard({ onNavigate }) {
           >
             Apply Leave
           </Button>
-          <Button
-            variant={isPunchComplete ? "secondary" : "primary"}
-            size="sm"
-            icon={Clock}
-            disabled={!isViewingOwnWorkspace || isPunchComplete}
-            title={!isViewingOwnWorkspace ? 'Punch actions can only be performed by the employee.' : undefined}
-            onClick={handleDeveloperPunch}
-            className={`w-full justify-center sm:w-auto ${
-              !isViewingOwnWorkspace
-                ? 'opacity-60 cursor-not-allowed bg-slate-800/60 border border-slate-600'
+          {!isWorkspaceExecutive && (
+            <Button
+              variant={isPunchComplete ? "secondary" : "primary"}
+              size="sm"
+              icon={Clock}
+              disabled={!isViewingOwnWorkspace || isPunchComplete}
+              title={!isViewingOwnWorkspace ? 'Punch actions can only be performed by the employee.' : undefined}
+              onClick={handleDeveloperPunch}
+              className={`w-full justify-center sm:w-auto ${
+                !isViewingOwnWorkspace
+                  ? 'opacity-60 cursor-not-allowed bg-slate-800/60 border border-slate-600'
+                  : isPunchComplete
+                    ? ''
+                    : 'bg-teal-600 hover:bg-teal-500 shadow'
+              }`}
+            >
+              {!isViewingOwnWorkspace
+                ? isPunchComplete
+                  ? "Punch Completed"
+                  : myPunch
+                    ? "Shift Active (Read-Only)"
+                    : "Not Punched (Read-Only)"
                 : isPunchComplete
-                  ? ''
-                  : 'bg-teal-600 hover:bg-teal-500 shadow'
-            }`}
-          >
-            {!isViewingOwnWorkspace
-              ? isPunchComplete
-                ? "Punch Completed"
-                : myPunch
-                  ? "Shift Active (Read-Only)"
-                  : "Not Punched (Read-Only)"
-              : isPunchComplete
-                ? "Punch Completed"
-                : myPunch
-                  ? "Punch Out"
-                  : "Punch In"}
-          </Button>
+                  ? "Punch Completed"
+                  : myPunch
+                    ? "Punch Out"
+                    : "Punch In"}
+            </Button>
+          )}
+          {isWorkspaceExecutive && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg bg-teal-500/25 border border-teal-300/40 px-3 py-1.5 text-xs font-semibold text-teal-50">
+              👑 Founder & Executive (Exempted)
+            </span>
+          )}
         </div>
       </div>
 
@@ -497,63 +505,84 @@ export default function DeveloperDashboard({ onNavigate }) {
 
         {/* Right Column: Attendance & Leaves Snapshot */}
         <div className="space-y-6">
-          {/* Today's Punch Status */}
-          <Card title="Today's Web Attendance" subtitle="Web Punch Clock">
-            <div className="space-y-4 text-xs">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 text-center">
-                <p className="text-slate-500 font-medium">Status for {today}</p>
-                <div className="my-2">
-                  {myPunch ? (
-                    <span className="text-lg font-bold text-emerald-600 flex items-center justify-center gap-1.5">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      {myPunch.punch_out ? 'Completed Shift' : 'Present (Working)'} ({myPunch.punch_in})
+          {/* Today's Punch Status / Executive Attendance Policy */}
+          {isWorkspaceExecutive ? (
+            <Card title="Attendance Policy" subtitle="Executive Self-Service">
+              <div className="space-y-4 text-xs">
+                <div className="p-5 rounded-xl bg-gradient-to-br from-emerald-50 via-teal-50 to-slate-50 border border-emerald-200/90 text-center space-y-2.5">
+                  <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 font-bold text-xl shadow-sm">
+                    👑
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Company Founder & Super Admin</p>
+                    <span className="inline-block mt-1 text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-3 py-0.5 rounded-full">
+                      Attendance Exempted • Always Present
                     </span>
-                  ) : (
-                    <span className="text-lg font-bold text-slate-400">Not Punched In</span>
-                  )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed pt-1">
+                    As Company Founder, daily clock-in/out is not applicable per enterprise HRMS standards. Full attendance is automatically accredited for all payroll and compliance cycles.
+                  </p>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  {myPunch?.punch_out 
-                    ? `Punched out at ${myPunch.punch_out} • Work Hours: ${myPunch.work_hours || '0.00'} hrs` 
-                    : myPunch 
-                      ? `Punched in via ${myPunch.location || 'Branch'} • Shift in progress` 
-                      : "Click below to clock in for today's work shift"}
-                </p>
               </div>
+            </Card>
+          ) : (
+            <Card title="Today's Web Attendance" subtitle="Web Punch Clock">
+              <div className="space-y-4 text-xs">
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/90 text-center">
+                  <p className="text-slate-500 font-medium">Status for {today}</p>
+                  <div className="my-2">
+                    {myPunch ? (
+                      <span className="text-lg font-bold text-emerald-600 flex items-center justify-center gap-1.5">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                        {myPunch.punch_out ? 'Completed Shift' : 'Present (Working)'} ({myPunch.punch_in})
+                      </span>
+                    ) : (
+                      <span className="text-lg font-bold text-slate-400">Not Punched In</span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    {myPunch?.punch_out 
+                      ? `Punched out at ${myPunch.punch_out} • Work Hours: ${myPunch.work_hours || '0.00'} hrs` 
+                      : myPunch 
+                        ? `Punched in via ${myPunch.location || 'Branch'} • Shift in progress` 
+                        : "Click below to clock in for today's work shift"}
+                  </p>
+                </div>
 
-              <Button
-                variant={
-                  isPunchComplete
-                    ? "secondary"
-                    : !isViewingOwnWorkspace
+                <Button
+                  variant={
+                    isPunchComplete
                       ? "secondary"
+                      : !isViewingOwnWorkspace
+                        ? "secondary"
+                        : hasPunchedIn
+                          ? "danger"
+                          : "primary"
+                  }
+                  className={`w-full ${
+                    !isViewingOwnWorkspace
+                      ? 'opacity-70 cursor-not-allowed bg-slate-100 text-slate-600 border border-slate-200'
+                      : ''
+                  }`}
+                  disabled={!isViewingOwnWorkspace || !workspaceEmployeeId || isPunchComplete}
+                  onClick={handleDeveloperPunch}
+                  title={!isViewingOwnWorkspace ? 'Attendance punch can only be recorded by the employee.' : undefined}
+                >
+                  {!isViewingOwnWorkspace
+                    ? isPunchComplete
+                      ? "Punch Completed"
                       : hasPunchedIn
-                        ? "danger"
-                        : "primary"
-                }
-                className={`w-full ${
-                  !isViewingOwnWorkspace
-                    ? 'opacity-70 cursor-not-allowed bg-slate-100 text-slate-600 border border-slate-200'
-                    : ''
-                }`}
-                disabled={!isViewingOwnWorkspace || !workspaceEmployeeId || isPunchComplete}
-                onClick={handleDeveloperPunch}
-                title={!isViewingOwnWorkspace ? 'Attendance punch can only be recorded by the employee.' : undefined}
-              >
-                {!isViewingOwnWorkspace
-                  ? isPunchComplete
-                    ? "Punch Completed"
-                    : hasPunchedIn
-                      ? "Shift Active (Viewing Mode)"
-                      : "Not Punched In (Viewing Mode)"
-                  : isPunchComplete
-                    ? "Punch Completed"
-                    : hasPunchedIn
-                      ? "Punch Out Now"
-                      : "Punch In Now"}
-              </Button>
-            </div>
-          </Card>
+                        ? "Shift Active (Viewing Mode)"
+                        : "Not Punched In (Viewing Mode)"
+                    : isPunchComplete
+                      ? "Punch Completed"
+                      : hasPunchedIn
+                        ? "Punch Out Now"
+                        : "Punch In Now"}
+                </Button>
+              </div>
+            </Card>
+          )}
 
           {/* Leave Balances */}
           <Card
