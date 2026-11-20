@@ -254,29 +254,36 @@ export default function AttendanceView() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            disabled={!hasEmployeeProfile}
-            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
-            onClick={() => {
-              setRegModalError('');
-              setShowRegModal(true);
-            }}
-          >
-            Request Regularization
-          </Button>
+        {currentUser.role !== 'super_admin' && (
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="secondary"
+              disabled={!hasEmployeeProfile}
+              title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
+              onClick={() => {
+                setRegModalError('');
+                setShowRegModal(true);
+              }}
+            >
+              Request Regularization
+            </Button>
 
-          <Button
-            variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
-            icon={Clock}
-            disabled={!hasEmployeeProfile || isPunchComplete}
-            title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
-            onClick={handlePunchClick}
-          >
-            {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
-          </Button>
-        </div>
+            <Button
+              variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
+              icon={Clock}
+              disabled={!hasEmployeeProfile || isPunchComplete}
+              title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
+              onClick={handlePunchClick}
+            >
+              {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
+            </Button>
+          </div>
+        )}
+        {currentUser.role === 'super_admin' && (
+          <div className="flex items-center gap-2">
+            <Badge variant="primary" size="md">👑 Executive Attendance Supervisor</Badge>
+          </div>
+        )}
       </div>
 
       {punchFeedback && (
@@ -291,7 +298,8 @@ export default function AttendanceView() {
         </div>
       )}
 
-      {myMissingPunches.length > 0 && (
+      {/* Employee Missing Punch Alert (Only for regular employees, NOT Super Admin) */}
+      {currentUser.role !== 'super_admin' && myMissingPunches.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
@@ -311,6 +319,31 @@ export default function AttendanceView() {
             className="bg-white border-amber-300 text-amber-900 hover:bg-amber-100/50 shrink-0"
           >
             Regularize Now
+          </Button>
+        </div>
+      )}
+
+      {/* Super Admin / Approver Review Notification Banner */}
+      {currentUser.role === 'super_admin' && regularizationRequests.filter(r => r.status === 'pending').length > 0 && (
+        <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-4 text-xs text-teal-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <Clock className="w-5 h-5 text-teal-600 shrink-0" />
+            <div>
+              <p className="font-bold text-teal-950">
+                {regularizationRequests.filter(r => r.status === 'pending').length} Employee Regularization Request(s) awaiting your decision.
+              </p>
+              <p className="text-teal-700 text-[11px] mt-0.5">
+                Staff members have requested punch corrections. Review them to finalize work hours for payroll.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={() => setActiveTab('regularization')}
+            className="shrink-0"
+          >
+            Review Requests ({regularizationRequests.filter(r => r.status === 'pending').length})
           </Button>
         </div>
       )}
