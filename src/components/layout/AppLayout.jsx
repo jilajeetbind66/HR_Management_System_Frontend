@@ -18,10 +18,10 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
   const isNavyWorkspace = isManagerWorkspace || isAdminWorkspace;
   const isEmployeeWorkspace = currentUser?.role === 'employee';
   const mainPadding = isEmployeeWorkspace
-    ? 'max-w-none px-3 py-3 sm:px-4 lg:px-5'
+    ? 'max-w-none px-2.5 py-3 sm:px-4 lg:px-5'
     : isHrWorkspace || isNavyWorkspace
-      ? 'max-w-none p-4 sm:p-5 lg:p-6'
-      : 'max-w-7xl p-4 sm:p-6 lg:p-8';
+      ? 'max-w-none p-3 sm:p-5 lg:p-6'
+      : 'max-w-7xl p-3 sm:p-6 lg:p-8';
 
   useEffect(() => {
     let active = true;
@@ -51,7 +51,7 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div className="flex flex-1 flex-col overflow-y-auto min-w-0">
         {isEmployeeWorkspace ? (
           <EmployeeNavbar
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}

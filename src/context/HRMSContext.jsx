@@ -11,6 +11,7 @@ const responseDataArray = (response) => Array.isArray(response?.data) ? response
 const ROUTE_TABS = {
   '/dashboard': 'dashboard',
   '/developer-space': 'developer_space',
+  '/developer_space': 'developer_space',
   '/my-projects': 'my_projects',
   '/projects': 'projects',
   '/employees': 'employees',
@@ -44,22 +45,22 @@ const DASHBOARD_DATA_BY_ROLE = {
 };
 
 const MODULE_DATA = {
-  developer_space: ['myProjects', 'attendance', 'leaves', 'leaveBalances'],
-  my_projects: ['myProjects'],
-  projects: ['projects', 'employees', 'penaltyPolicy'],
+  developer_space: ['myProjects', 'attendance', 'leaves', 'leaveBalances', 'branches'],
+  my_projects: ['myProjects', 'branches'],
+  projects: ['projects', 'employees', 'penaltyPolicy', 'branches'],
   employees: ['employees', 'branches', 'departments', 'designations'],
   organization: ['company', 'branches', 'departments', 'designations', 'holidays'],
-  documents: ['employees'],
-  attendance: ['attendance', 'regularizations', 'employees'],
-  leaves: ['leaves', 'leaveBalances'],
+  documents: ['employees', 'branches'],
+  attendance: ['attendance', 'regularizations', 'employees', 'branches'],
+  leaves: ['leaves', 'leaveBalances', 'branches'],
   payroll: ['payrollRuns', 'branches'],
   recruitment: ['recruitment', 'branches'],
-  lifecycle: ['employees'],
-  training: ['employees'],
+  lifecycle: ['employees', 'branches'],
+  training: ['employees', 'branches'],
   assets: ['assets', 'employees', 'branches'],
-  helpdesk: ['tickets'],
+  helpdesk: ['tickets', 'branches'],
   announcements: ['announcements', 'branches'],
-  platform: ['auditLogs'],
+  platform: ['auditLogs', 'branches'],
 };
 
 export function HRMSProvider({ children }) {
@@ -124,7 +125,7 @@ export function HRMSProvider({ children }) {
 
   const syncWithBackend = useCallback(async (tab = activeTab) => {
     const role = currentUser?.role;
-    const canViewOrganization = ['super_admin', 'hr_admin', 'hr_executive', 'recruiter', 'manager', 'auditor'].includes(role);
+    const canViewOrganization = ['super_admin', 'hr_admin', 'hr_executive', 'recruiter', 'manager', 'auditor', 'employee'].includes(role);
     const canViewEmployees = ['super_admin', 'hr_admin', 'hr_executive', 'manager', 'auditor'].includes(role);
     const canViewProjects = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
     const canReviewLeaves = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
@@ -211,6 +212,7 @@ export function HRMSProvider({ children }) {
       ...moduleResources,
       ...(canViewProjects ? ['projects'] : []),
       ...(canReviewLeaves ? ['leaves'] : []),
+      ...(canViewOrganization ? ['branches'] : []),
       'notifications',
       'health',
     ]);

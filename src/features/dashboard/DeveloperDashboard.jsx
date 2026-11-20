@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
@@ -90,6 +90,18 @@ export default function DeveloperDashboard({ onNavigate }) {
   const [leaveReason, setLeaveReason] = useState('');
   const [workflowError, setWorkflowError] = useState('');
 
+  const isSickLeave = leaveType.toLowerCase().includes('sick');
+  const estimatedDays = useMemo(() => {
+    if (!fromDate || !toDate) return 0;
+    if (isHalfDay) return 0.5;
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    if (end < start) return 0;
+    const diffTime = Math.abs(end - start);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }, [fromDate, toDate, isHalfDay]);
+  const isCertificateMandatory = isSickLeave && estimatedDays > 2;
+
   const handleUpdateProgressSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject) return;
@@ -134,6 +146,10 @@ export default function DeveloperDashboard({ onNavigate }) {
   const handleApplyLeaveSubmit = async (e) => {
     e.preventDefault();
     if (!fromDate || !toDate || !leaveReason) return;
+    if (isCertificateMandatory && !sickCertificateFile) {
+      setWorkflowError('Medical certificate is required for Sick Leave exceeding 2 days. Please choose a file before submitting.');
+      return;
+    }
     try {
       const saved = await applyLeave({
         employee_id: workspaceEmployeeId,
@@ -662,7 +678,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">From Date:</label>
               <input
@@ -712,8 +728,19 @@ export default function DeveloperDashboard({ onNavigate }) {
             </p>
           </div>
 
-          <label className="block font-semibold text-slate-700">
-            Medical certificate (required for sick leave over 2 days)
+          <div className={`p-3 rounded-xl border ${
+            isCertificateMandatory 
+              ? 'border-amber-300 bg-amber-50/50' 
+              : 'border-slate-200 bg-slate-50/70'
+          }`}>
+            <label className="block text-xs font-semibold text-slate-800">
+              {isSickLeave ? 'Medical Certificate' : 'Supporting Document / Attachment'}
+              {isCertificateMandatory ? (
+                <span className="ml-1 text-red-500 font-bold">* Mandatory (&gt; 2 Days Sick Leave)</span>
+              ) : (
+                <span className="ml-1 text-slate-400 font-normal">(Optional)</span>
+              )}
+            </label>
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
@@ -733,12 +760,14 @@ export default function DeveloperDashboard({ onNavigate }) {
                 setWorkflowError('');
                 setSickCertificateFile(file);
               }}
-              className="mt-1 block w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
+              className="mt-1.5 block w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"
             />
-            <span className="mt-1 block text-[11px] font-normal text-slate-500">
-              PDF/JPG/PNG only; maximum 10 MB. The uploaded file is private.
-            </span>
-          </label>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {isCertificateMandatory
+                ? 'A valid medical certificate is required by policy for sick leaves exceeding 2 days (PDF/JPG/PNG, max 10MB).'
+                : `Certificate is optional for ${leaveType.split('(')[0].trim()}. You may leave this blank or attach any relevant document.`}
+            </p>
+          </div>
 
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Reason for Leave:</label>

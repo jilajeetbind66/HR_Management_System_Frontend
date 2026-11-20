@@ -173,7 +173,7 @@ export default function LifecycleView() {
         </p>
       </div>
 
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs" role="tablist" aria-label="Lifecycle case type">
+      <div className="border-b border-slate-200 flex items-center gap-4 text-xs overflow-x-auto whitespace-nowrap" role="tablist" aria-label="Lifecycle case type">
         <button
           type="button"
           role="tab"

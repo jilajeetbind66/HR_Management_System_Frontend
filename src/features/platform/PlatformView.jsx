@@ -32,7 +32,7 @@ export default function PlatformView() {
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
+      <div className="border-b border-slate-200 flex items-center gap-4 text-xs overflow-x-auto whitespace-nowrap">
         <button
           onClick={() => setActiveTab('audit')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${

@@ -146,7 +146,7 @@ export default function LoginPage() {
             <h3 className="mt-2 text-center text-xl font-bold text-slate-900 sm:text-2xl lg:mt-1 lg:text-xl">Welcome Back!</h3>
             <p className="mt-2 text-center text-base text-slate-500 lg:mt-1 lg:text-sm">Sign in to your account to continue</p>
 
-            <div className="mt-5 grid grid-cols-4 gap-1 rounded-2xl border border-slate-200 bg-slate-100 p-1 lg:mt-3" role="group" aria-label="Account type">
+            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-slate-100 p-1 lg:mt-3" role="group" aria-label="Account type">
               {roleChoices.map(({ id, label, icon: Icon }) => {
                 const selected = roleType === id;
                 return (

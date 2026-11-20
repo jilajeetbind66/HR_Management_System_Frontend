@@ -630,7 +630,7 @@ export default function LeadManagementView() {
       {/* Leads Table */}
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[720px] text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
               <tr>
                 <th className="px-5 py-3">Lead Details</th>

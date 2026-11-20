@@ -506,7 +506,7 @@ export default function PayrollView() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
+      <div className="border-b border-slate-200 flex items-center gap-4 text-xs overflow-x-auto whitespace-nowrap">
         {canViewPayrollRuns && <button
           onClick={() => setActiveTab('runs')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
@@ -563,7 +563,7 @@ export default function PayrollView() {
                   >
                     <div className="space-y-4 text-xs">
                       {/* Numbers Grid */}
-                      <div className="grid grid-cols-3 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 rounded-xl bg-slate-50 border border-slate-100 text-center">
                         <div>
                           <span className="text-[10px] text-slate-400 uppercase font-bold block">Gross Payout</span>
                           <span className="font-bold text-slate-800 text-sm">₹{run.gross_payout_inr?.toLocaleString('en-IN')}</span>
@@ -1109,7 +1109,7 @@ export default function PayrollView() {
         subtitle="Architecture Section 7.2: Unique period_year, period_month, scope_key"
       >
         <form onSubmit={handleStartPayroll} className="space-y-4 text-xs">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Period Month:</label>
               <select

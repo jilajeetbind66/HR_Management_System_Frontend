@@ -270,7 +270,7 @@ export default function ReportsView() {
               {projects && (
                 <Card title="Project Milestone Health" subtitle="Assignment-level status and recorded deadlines">
                   <div className="space-y-4 text-xs">
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                       <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
                         <span className="block text-[10px] font-bold uppercase text-slate-400">Active</span>
                         <span className="text-lg font-bold text-slate-800">{projects.active_milestone_count}</span>

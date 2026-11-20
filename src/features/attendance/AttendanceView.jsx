@@ -224,7 +224,7 @@ export default function AttendanceView() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
+      <div className="border-b border-slate-200 flex items-center gap-4 text-xs overflow-x-auto whitespace-nowrap">
         <button
           onClick={() => setActiveTab('punches')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
@@ -259,7 +259,7 @@ export default function AttendanceView() {
       {activeTab === 'punches' && (
         <Card bodyClassName="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[650px] text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px]">
                 <tr>
                   <th className="px-5 py-3">Employee</th>
@@ -508,7 +508,7 @@ export default function AttendanceView() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Punch In Time:</label>
               <input

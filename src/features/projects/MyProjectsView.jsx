@@ -212,7 +212,7 @@ export default function MyProjectsView() {
                   </ol>
                 </details>
               )}
-              <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+              <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 <div>
                   <dt className="text-slate-500">Start date</dt>
                   <dd className="mt-1 font-medium text-slate-800">{project.start_date || '—'}</dd>

@@ -169,8 +169,8 @@ export default function RecruiterDashboard({ onNavigate }) {
       </section>
 
       {/* Pipeline Funnel Visual Stage Bar */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
             <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-emerald-600" />
@@ -181,34 +181,34 @@ export default function RecruiterDashboard({ onNavigate }) {
           <button
             type="button"
             onClick={() => onNavigate('recruitment')}
-            className="text-xs font-semibold text-emerald-700 hover:underline"
+            className="text-xs font-semibold text-emerald-700 hover:underline self-start sm:self-auto"
           >
             Open Kanban Board &rarr;
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3.5 text-center transition hover:border-slate-200">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 sm:gap-3">
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 sm:p-3.5 text-center transition hover:border-slate-200">
             <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">1. Applied</p>
             <p className="mt-1 text-2xl font-bold text-slate-800">{appliedCount}</p>
             <p className="text-[10px] text-slate-400 mt-0.5">New Applications</p>
           </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-center transition hover:border-blue-200">
+          <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 sm:p-3.5 text-center transition hover:border-blue-200">
             <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">2. Screening</p>
             <p className="mt-1 text-2xl font-bold text-blue-900">{screeningCount}</p>
             <p className="text-[10px] text-blue-500 mt-0.5">Resume Review</p>
           </div>
-          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3.5 text-center transition hover:border-amber-200">
+          <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 sm:p-3.5 text-center transition hover:border-amber-200">
             <p className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">3. Interview</p>
             <p className="mt-1 text-2xl font-bold text-amber-900">{interviewCount}</p>
             <p className="text-[10px] text-amber-500 mt-0.5">Assessment & Rating</p>
           </div>
-          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3.5 text-center transition hover:border-indigo-200">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 sm:p-3.5 text-center transition hover:border-indigo-200">
             <p className="text-[11px] font-semibold text-indigo-700 uppercase tracking-wide">4. Offered</p>
             <p className="mt-1 text-2xl font-bold text-indigo-900">{offeredCount}</p>
             <p className="text-[10px] text-indigo-500 mt-0.5">Offer Extended</p>
           </div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3.5 text-center transition hover:border-emerald-200">
+          <div className="col-span-2 sm:col-span-1 lg:col-span-1 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 sm:p-3.5 text-center transition hover:border-emerald-200">
             <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">5. Hired</p>
             <p className="mt-1 text-2xl font-bold text-emerald-900">{hiredCount}</p>
             <p className="text-[10px] text-emerald-500 mt-0.5">Converted to Staff</p>

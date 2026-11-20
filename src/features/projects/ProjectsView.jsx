@@ -418,7 +418,7 @@ export default function ProjectsView() {
       </div>
 
       {/* Sub-Tabs: List View vs Extension History vs Policy Safeguards */}
-      <div className="border-b border-slate-200 flex items-center justify-between">
+      <div className="border-b border-slate-200 flex items-center justify-between overflow-x-auto whitespace-nowrap">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setActiveTab('list')}

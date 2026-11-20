@@ -250,12 +250,12 @@ export default function RecruitmentView() {
 
       {/* TAB 1: KANBAN BOARD */}
       {activeTab === 'kanban' && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="flex lg:grid lg:grid-cols-5 gap-4 overflow-x-auto pb-4 snap-x">
           {stages.map(stage => {
             const stageCandidates = candidates.filter(c => c.stage === stage);
 
             return (
-              <div key={stage} className="bg-slate-100/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
+              <div key={stage} className="min-w-[270px] lg:min-w-0 flex-1 snap-start bg-slate-100/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
                     <h3 className="font-bold text-slate-800 text-xs">{stage}</h3>
@@ -407,7 +407,7 @@ export default function RecruitmentView() {
               ))}
             </select>
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block font-semibold text-slate-700">
               Vacancies
               <input
@@ -497,7 +497,7 @@ export default function RecruitmentView() {
               {openJobs.map((job) => <option key={job.id} value={job.id}>{job.title}</option>)}
             </select>
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block font-semibold text-slate-700">
               First name
               <input required value={candidateForm.first_name} onChange={(event) => setCandidateForm({ ...candidateForm, first_name: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" />
@@ -511,7 +511,7 @@ export default function RecruitmentView() {
             Email
             <input type="email" required value={candidateForm.email} onChange={(event) => setCandidateForm({ ...candidateForm, email: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" />
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block font-semibold text-slate-700">
               Phone
               <PhoneInput autoComplete="tel-national" placeholder="Enter 10-digit number" value={candidateForm.phone} onChange={(phone) => setCandidateForm({ ...candidateForm, phone })} className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" />
@@ -521,7 +521,7 @@ export default function RecruitmentView() {
               <input value={candidateForm.notice_period} onChange={(event) => setCandidateForm({ ...candidateForm, notice_period: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" />
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block font-semibold text-slate-700">
               Current CTC
               <input value={candidateForm.current_ctc} onChange={(event) => setCandidateForm({ ...candidateForm, current_ctc: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 font-normal" />

@@ -80,13 +80,13 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
         </button>
 
         {/* Branch Selector */}
-        <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
-          <Building2 className="h-3.5 w-3.5 text-teal-600" />
-          <span className="font-semibold text-slate-500">Branch:</span>
+        <div className="flex items-center gap-1.5 sm:gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-2 sm:px-3 py-1 sm:py-1.5 text-xs text-slate-700 max-w-[135px] sm:max-w-none">
+          <Building2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+          <span className="hidden md:inline font-semibold text-slate-500">Branch:</span>
           <select
             value={activeBranch}
             onChange={(e) => setActiveBranch(e.target.value)}
-            className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
+            className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer truncate max-w-[95px] sm:max-w-none"
           >
             <option value="All Branches">All Branches</option>
             {branches.map(b => (
@@ -182,7 +182,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto rounded-xl bg-white p-3 shadow-2xl border border-slate-200 z-50">
+            <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-80 max-h-[28rem] overflow-y-auto rounded-xl bg-white p-3 shadow-2xl border border-slate-200 z-50">
               <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
                 <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
                 <Badge variant="neutral" size="sm">{unreadNotifications} New</Badge>

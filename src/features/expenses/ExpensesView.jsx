@@ -260,7 +260,7 @@ export default function ExpensesView() {
         </div>
       )}
 
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs" role="tablist" aria-label="Finance records">
+      <div className="border-b border-slate-200 flex items-center gap-4 text-xs overflow-x-auto whitespace-nowrap" role="tablist" aria-label="Finance records">
         <button
           type="button"
           role="tab"

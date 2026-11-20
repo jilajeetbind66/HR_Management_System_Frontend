@@ -612,7 +612,7 @@ export default function EmployeesView() {
       {/* Employees Table */}
       <Card bodyClassName="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[700px] text-left text-xs">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px] tracking-wider">
               <tr>
                 <th className="px-5 py-3">Employee</th>
@@ -926,7 +926,7 @@ export default function EmployeesView() {
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Branch Office</span>
                     <span className="font-semibold text-slate-800">{selectedEmployee.branch_name}</span>
@@ -1088,7 +1088,7 @@ export default function EmployeesView() {
             {/* TAB CONTENT: STATUTORY (Architecture Section 7.4 & 8) */}
             {activeProfileTab === 'statutory' && canViewStatutoryDetails && (
               <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Income Tax PAN</span>
                     <span className="font-mono font-bold text-slate-900">{selectedEmployee.pan}</span>
@@ -1193,7 +1193,7 @@ export default function EmployeesView() {
                 </form>
               ) : (
                 <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="grid grid-cols-3 gap-3 pb-3 border-b border-slate-200">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pb-3 border-b border-slate-200">
                     <div>
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">Annual CTC</span>
                       <span className="text-base font-bold text-slate-900">₹{Number(selectedEmployee.ctc_annual || 0).toLocaleString('en-IN')}</span>
@@ -1333,7 +1333,7 @@ export default function EmployeesView() {
               <span>{formError}</span>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">First Name:</label>
               <input
@@ -1411,7 +1411,7 @@ export default function EmployeesView() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Work Email:</label>
               <input
@@ -1539,7 +1539,7 @@ export default function EmployeesView() {
 
           <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
             <h4 className="font-bold text-slate-800 text-xs">India Statutory Configuration</h4>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">PAN Number:</label>
                 <input
