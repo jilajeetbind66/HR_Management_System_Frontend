@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
@@ -51,6 +51,19 @@ export default function LeavesView() {
   const [leaveSuccessToast, setLeaveSuccessToast] = useState(null);
   const [leaveWarnings, setLeaveWarnings] = useState([]);
   const [reviewError, setReviewError] = useState(null);
+
+  const isSickLeave = leaveType.toLowerCase().includes('sick') || leaveType.includes('(SL)');
+  const estimatedDays = useMemo(() => {
+    if (!fromDate || !toDate) return 0;
+    if (isHalfDay) return 0.5;
+    const start = new Date(fromDate);
+    const end = new Date(toDate);
+    if (end < start) return 0;
+    const diffTime = Math.abs(end - start);
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  }, [fromDate, toDate, isHalfDay]);
+
+  const isCertificateMandatory = isSickLeave && estimatedDays > 2;
 
   const myBalance = {
     cl: 0,
@@ -136,6 +149,12 @@ export default function LeavesView() {
     e.preventDefault();
     if (!fromDate || !toDate || !leaveReason) return;
     setLeaveFormError(null);
+
+    if (isCertificateMandatory && !sickCertificateFile) {
+      setLeaveFormError('Medical certificate is required for Sick Leave exceeding 2 days. Please choose a PDF, JPG, or PNG document.');
+      return;
+    }
+
     setSubmittingLeave(true);
 
     try {
@@ -643,33 +662,54 @@ export default function LeavesView() {
             </p>
           </div>
 
-          <label className="block font-semibold text-slate-700">
-            Medical certificate (required for sick leave over 2 days)
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              onChange={(event) => {
-                const file = event.target.files?.[0] || null;
-                if (!file) {
-                  setSickCertificateFile(null);
-                  return;
-                }
-                const extension = file.name.split('.').pop()?.toLowerCase();
-                if (file.size > 10 * 1024 * 1024 || !['pdf', 'jpg', 'jpeg', 'png'].includes(extension)) {
-                  setLeaveFormError('Choose a PDF, JPG, or PNG certificate up to 10 MB.');
-                  event.target.value = '';
-                  setSickCertificateFile(null);
-                  return;
-                }
-                setLeaveFormError(null);
-                setSickCertificateFile(file);
-              }}
-              className="mt-1 block w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-            />
-            <span className="mt-1 block text-[11px] font-normal text-slate-500">
-              PDF/JPG/PNG only; maximum 10 MB. The uploaded file is private and linked to this request.
-            </span>
-          </label>
+          <div className={`rounded-xl border p-3.5 transition ${
+            isCertificateMandatory
+              ? 'border-amber-300 bg-amber-50/50'
+              : 'border-slate-200 bg-slate-50/40'
+          }`}>
+            <label className="block font-semibold text-slate-700">
+              <span className="flex items-center justify-between">
+                <span>
+                  {isSickLeave ? 'Medical Certificate' : 'Supporting Document / Attachment'}
+                </span>
+                {isCertificateMandatory ? (
+                  <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                    * Mandatory (&gt; 2 Days Sick Leave)
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                    Optional
+                  </span>
+                )}
+              </span>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  if (!file) {
+                    setSickCertificateFile(null);
+                    return;
+                  }
+                  const extension = file.name.split('.').pop()?.toLowerCase();
+                  if (file.size > 10 * 1024 * 1024 || !['pdf', 'jpg', 'jpeg', 'png'].includes(extension)) {
+                    setLeaveFormError('Choose a PDF, JPG, or PNG certificate up to 10 MB.');
+                    event.target.value = '';
+                    setSickCertificateFile(null);
+                    return;
+                  }
+                  setLeaveFormError(null);
+                  setSickCertificateFile(file);
+                }}
+                className="mt-2 block w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
+              />
+              <span className="mt-1.5 block text-[11px] font-normal text-slate-500">
+                {isCertificateMandatory
+                  ? 'A valid medical certificate is required by policy for sick leaves exceeding 2 days (PDF/JPG/PNG, max 10 MB).'
+                  : `Certificate is optional for ${leaveType.split('(')[0].trim()}. You may leave this blank or attach any document.`}
+              </span>
+            </label>
+          </div>
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Reason for Leave:</label>
             <textarea
