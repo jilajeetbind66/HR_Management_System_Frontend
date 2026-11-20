@@ -153,6 +153,9 @@ export const api = {
   markAllNotificationsRead: () => request('/notifications/read-all', {
     method: 'POST',
   }),
+  clearAllNotifications: () => request('/notifications/clear-all', {
+    method: 'DELETE',
+  }),
   changePassword: (currentPassword, password, passwordConfirmation) => request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({

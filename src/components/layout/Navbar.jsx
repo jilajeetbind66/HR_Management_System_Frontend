@@ -26,11 +26,13 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     refreshNotifications,
     markNotificationRead,
     markAllNotificationsRead,
+    clearAllNotifications,
     selectedPersonaId,
     setSelectedPersonaId,
   } = useHRMS();
 
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notificationTab, setNotificationTab] = useState('unread');
   const [notificationError, setNotificationError] = useState('');
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -54,6 +56,10 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
         onNavigate('attendance');
       } else if (eventKey.startsWith('payroll.')) {
         onNavigate('payslips');
+      } else if (eventKey.startsWith('staffing.')) {
+        onNavigate('employees');
+      } else if (eventKey.startsWith('lead.')) {
+        onNavigate('leads');
       }
     }
   };
@@ -216,43 +222,147 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
           </button>
 
           {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 max-h-[28rem] overflow-y-auto rounded-xl bg-white p-3 shadow-2xl border border-slate-200 z-50">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
-                  <Badge variant="neutral" size="sm">{unreadNotifications} New</Badge>
+            <div className="absolute right-0 mt-2 w-84 max-h-[30rem] overflow-hidden rounded-xl bg-white shadow-2xl border border-slate-200 z-50 flex flex-col">
+              {/* Dropdown Header */}
+              <div className="border-b border-slate-100 p-3 bg-slate-50/70">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
+                    {unreadNotifications > 0 && (
+                      <Badge variant="teal" size="sm">{unreadNotifications} New</Badge>
+                    )}
+                  </div>
+                  {notificationTab === 'unread' && unreadNotifications > 0 && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await markAllNotificationsRead();
+                        } catch (err) {
+                          setNotificationError(err?.data?.message || err.message || 'Unable to mark all as read.');
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-teal-600 hover:text-teal-800 hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                  {notificationTab === 'all' && notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await clearAllNotifications();
+                        } catch (err) {
+                          setNotificationError(err?.data?.message || err.message || 'Unable to clear notifications.');
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-800 hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
-                {unreadNotifications > 0 && (
+
+                {/* Filter Tabs */}
+                <div className="flex items-center gap-1 bg-slate-200/70 p-0.5 rounded-lg">
                   <button
                     type="button"
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      try {
-                        await markAllNotificationsRead();
-                      } catch (err) {
-                        setNotificationError(err?.data?.message || err.message || 'Unable to mark all as read.');
-                      }
-                    }}
-                    className="text-[10px] font-semibold text-teal-600 hover:text-teal-800 hover:underline"
+                    onClick={() => setNotificationTab('unread')}
+                    className={`flex-1 py-1 text-[11px] font-bold rounded-md transition ${
+                      notificationTab === 'unread'
+                        ? 'bg-white text-teal-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
                   >
-                    Mark all read
+                    Unread {unreadNotifications > 0 ? `(${unreadNotifications})` : '(0)'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotificationTab('all')}
+                    className={`flex-1 py-1 text-[11px] font-bold rounded-md transition ${
+                      notificationTab === 'all'
+                        ? 'bg-white text-slate-800 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    All ({notifications.length})
+                  </button>
+                </div>
+              </div>
+
+              {notificationError && (
+                <p role="alert" className="p-2 text-xs text-rose-700 bg-rose-50 border-b border-rose-100">
+                  {notificationError}
+                </p>
+              )}
+
+              {/* Notifications List */}
+              <div className="overflow-y-auto p-2 divide-y divide-slate-100 max-h-80">
+                {notificationTab === 'unread' ? (
+                  notifications.filter((n) => !n.read_at).length > 0 ? (
+                    notifications
+                      .filter((n) => !n.read_at)
+                      .map((notification) => (
+                        <button
+                          type="button"
+                          key={notification.id}
+                          onClick={() => handleNotificationClick(notification)}
+                          className="block w-full rounded-lg px-2.5 py-2.5 text-left transition bg-teal-50/60 border-l-2 border-teal-500 hover:bg-teal-50 my-1"
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="block text-xs font-bold text-slate-900 leading-tight">
+                              {notification.title}
+                            </span>
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
+                          </div>
+                          <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">
+                            {notification.message}
+                          </span>
+                        </button>
+                      ))
+                  ) : (
+                    <div className="py-8 text-center">
+                      <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">You're all caught up!</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">No unread notifications.</p>
+                    </div>
+                  )
+                ) : notifications.length > 0 ? (
+                  notifications.map((notification) => (
+                    <button
+                      type="button"
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`block w-full rounded-lg px-2.5 py-2 text-left transition my-0.5 ${
+                        notification.read_at
+                          ? 'bg-white opacity-85 hover:bg-slate-50'
+                          : 'bg-teal-50/60 border-l-2 border-teal-500 hover:bg-teal-50 font-medium'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1">
+                        <span className={`block text-xs leading-tight ${notification.read_at ? 'font-semibold text-slate-700' : 'font-bold text-slate-900'}`}>
+                          {notification.title}
+                        </span>
+                        {!notification.read_at && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
+                        )}
+                      </div>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                        {notification.message}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-xs text-slate-500">No notifications history.</p>
+                  </div>
                 )}
               </div>
-              {notificationError && <p role="alert" className="py-2 text-xs text-rose-700">{notificationError}</p>}
-              {notifications.length ? notifications.map((notification) => (
-                <button
-                  type="button"
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification)}
-                  className={`block w-full rounded-lg px-2.5 py-2 text-left transition ${notification.read_at ? 'bg-white' : 'bg-teal-50/70 border-l-2 border-teal-500'} hover:bg-slate-50`}
-                >
-                  <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
-                  <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">{notification.message}</span>
-                </button>
-              )) : !notificationError ? (
-                <p className="py-5 text-center text-xs text-slate-500">No notifications yet.</p>
-              ) : null}
             </div>
           )}
         </div>
