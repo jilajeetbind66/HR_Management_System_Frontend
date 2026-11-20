@@ -6,7 +6,6 @@ import Button from '../../components/common/Button';
 import Badge from '../../components/common/Badge';
 import Modal from '../../components/common/Modal';
 import StatCard from '../../components/common/StatCard';
-import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import api from '../../services/api';
 import { getIndiaDateString } from '../../utils/date';
 import { getCurrentPositionAsync } from '../../utils/geolocation';
@@ -21,8 +20,44 @@ import {
   MapPin,
   Laptop,
   Download,
-  Building2
+  Building2,
+  Sliders,
+  ShieldAlert,
+  Sparkles,
+  Filter,
 } from 'lucide-react';
+
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return null;
+  const match = String(timeStr).trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (!match) return null;
+  let hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const period = match[3] ? match[3].toUpperCase() : null;
+
+  if (period === 'PM' && hours < 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+
+  return hours * 60 + minutes;
+};
+
+const getLateArrivalInfo = (punchInTime, shift) => {
+  if (!punchInTime || !shift) return { isLate: false, minutesLate: 0 };
+  const punchMinutes = parseTimeToMinutes(punchInTime);
+  const shiftStartMinutes = parseTimeToMinutes(shift.start_time || '09:30 AM');
+  if (punchMinutes === null || shiftStartMinutes === null) return { isLate: false, minutesLate: 0 };
+
+  const grace = parseInt(shift.grace_period_minutes || 15, 10);
+  const allowedCutoff = shiftStartMinutes + grace;
+
+  if (punchMinutes > allowedCutoff) {
+    return {
+      isLate: true,
+      minutesLate: punchMinutes - allowedCutoff,
+    };
+  }
+  return { isLate: false, minutesLate: 0 };
+};
 
 export default function AttendanceView() {
   const { currentUser, activeBranch } = useAuth();
@@ -33,7 +68,8 @@ export default function AttendanceView() {
     submitRegularization,
     reviewRegularization,
     refreshAttendance,
-    employees
+    employees,
+    leaveRequests,
   } = useHRMS();
 
   const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
@@ -87,38 +123,43 @@ export default function AttendanceView() {
   const [regOut, setRegOut] = useState('06:30 PM');
   const [regReason, setRegReason] = useState('');
   const [regModalError, setRegModalError] = useState('');
-  const [importFiles, setImportFiles] = useState([]);
-  const [importError, setImportError] = useState('');
-  const [importSuccess, setImportSuccess] = useState('');
-  const [busyImportId, setBusyImportId] = useState(null);
-  const [importRefresh, setImportRefresh] = useState(0);
   const [workflowError, setWorkflowError] = useState('');
   const canManageAttendance = ['super_admin', 'hr_admin', 'hr_executive', 'manager'].includes(currentUser.role);
-  const canViewCsvImports = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser.role);
-  const canProcessCsvImports = ['super_admin', 'hr_admin'].includes(currentUser.role);
   const canApprove = canManageAttendance;
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [isPunching, setIsPunching] = useState(false);
 
+  // Shift & Grace Period State
+  const [shiftSettings, setShiftSettings] = useState({
+    shift_name: 'General Day Shift',
+    start_time: '09:30 AM',
+    end_time: '06:30 PM',
+    grace_period_minutes: 15,
+    late_mark_threshold: 3,
+    auto_half_day_deduction: true,
+  });
+  const [savingShiftSettings, setSavingShiftSettings] = useState(false);
+  const [shiftFeedback, setShiftFeedback] = useState(null);
+
+  // Muster Roll Period State
+  const [selectedMonth, setSelectedMonth] = useState(11); // November
+  const [selectedYear, setSelectedYear] = useState(2026);
+
   useEffect(() => {
-    if (!canViewCsvImports) {
-      setImportFiles([]);
-      return;
-    }
-
     let active = true;
-    api.getAttendanceImports()
-      .then((response) => {
-        if (active) setImportFiles(response?.data || []);
+    api.getAttendanceShiftSettings()
+      .then((res) => {
+        if (active && res?.data) {
+          setShiftSettings(res.data);
+        }
       })
-      .catch((error) => {
-        if (active) setImportError(error?.data?.message || error.message || 'Unable to load uploaded files.');
+      .catch((err) => {
+        console.warn('Could not load shift settings:', err?.message || err);
       });
-
     return () => {
       active = false;
     };
-  }, [canViewCsvImports, importRefresh]);
+  }, []);
 
   const today = getIndiaDateString();
   const hasEmployeeProfile = Boolean(currentUser?.employee_id);
@@ -210,61 +251,212 @@ export default function AttendanceView() {
     }
   };
 
-  const updateImportSummary = (uploadId, summary) => {
-    setImportFiles((previous) => previous.map((file) => (
-      Number(file.id) === Number(uploadId)
-        ? { ...file, import_status: summary.status, summary }
-        : file
-    )));
-  };
-
-  const handlePreviewImport = async (file) => {
-    setBusyImportId(file.id);
-    setImportError('');
-    setImportSuccess('');
+  const handleSaveShiftSettings = async (e) => {
+    e.preventDefault();
+    setSavingShiftSettings(true);
+    setShiftFeedback(null);
     try {
-      const response = await api.previewAttendanceImport(file.id);
-      updateImportSummary(file.id, response.data);
-      setImportSuccess(`Preview ready for ${file.original_filename}.`);
-    } catch (error) {
-      setImportError(error?.data?.message || error.message || 'Unable to preview the attendance file.');
-    } finally {
-      setBusyImportId(null);
-    }
-  };
-
-  const handleProcessImport = async (file) => {
-    setBusyImportId(file.id);
-    setImportError('');
-    setImportSuccess('');
-    try {
-      const response = await api.processAttendanceImport(file.id);
-      updateImportSummary(file.id, response.data);
-      setImportSuccess(
-        `Import complete: ${response.data.imported_count} attendance day(s) saved; ${response.data.existing_count} existing day(s) skipped.`
-      );
-      if (refreshAttendance) {
-        await refreshAttendance();
+      const res = await api.updateAttendanceShiftSettings(shiftSettings);
+      if (res?.data) {
+        setShiftSettings(res.data);
       }
-    } catch (error) {
-      if (error?.data?.data) updateImportSummary(file.id, error.data.data);
-      setImportError(error?.data?.message || error.message || 'Unable to process the attendance file.');
+      setShiftFeedback({ text: 'Shift timing & grace period settings saved successfully.', type: 'success' });
+    } catch (err) {
+      setShiftFeedback({ text: err?.data?.message || err.message || 'Unable to update shift settings.', type: 'error' });
     } finally {
-      setBusyImportId(null);
+      setSavingShiftSettings(false);
+      setTimeout(() => setShiftFeedback(null), 4000);
     }
   };
 
-  const handleDownloadImport = async (file) => {
-    const newWindow = window.open('about:blank', '_blank');
-    setImportError('');
-    try {
-      const response = await api.getUploadDownload(file.id);
-      if (newWindow) newWindow.location.href = response.data.url;
-      else setImportError('Allow pop-ups to download this private attendance file.');
-    } catch (error) {
-      newWindow?.close();
-      setImportError(error?.data?.message || error.message || 'Unable to download the attendance file.');
-    }
+  // Days in selected month
+  const totalDaysInMonth = useMemo(() => {
+    return new Date(selectedYear, selectedMonth, 0).getDate();
+  }, [selectedYear, selectedMonth]);
+
+  const daysArray = useMemo(() => {
+    return Array.from({ length: totalDaysInMonth }, (_, i) => i + 1);
+  }, [totalDaysInMonth]);
+
+  // Compute Muster Roll data for active employees
+  const musterRollData = useMemo(() => {
+    const list = employees.filter((emp) => {
+      if (emp.status === 'resigned' || emp.status === 'terminated') return false;
+      if (isBranchScoped) {
+        return (
+          emp.branch_name === activeBranch ||
+          (activeBranch.includes('Prayagraj') && emp.branch_name?.includes('Prayagraj')) ||
+          (activeBranch.includes('Kaushambi') && emp.branch_name?.includes('Kaushambi'))
+        );
+      }
+      return true;
+    });
+
+    const monthStr = String(selectedMonth).padStart(2, '0');
+    const todayStr = getIndiaDateString();
+
+    return list.map((emp) => {
+      let presentCount = 0;
+      let leaveCount = 0;
+      let halfDayCount = 0;
+      let absentCount = 0;
+      let weekOffCount = 0;
+      let lateCount = 0;
+
+      const dailyRecords = {};
+
+      for (let day = 1; day <= totalDaysInMonth; day++) {
+        const dayStr = String(day).padStart(2, '0');
+        const dateKey = `${selectedYear}-${monthStr}-${dayStr}`;
+        const dayOfWeek = new Date(selectedYear, selectedMonth - 1, day).getDay(); // 0 is Sunday
+        const isSunday = dayOfWeek === 0;
+
+        const attRec = attendance.find(
+          (a) => Number(a.employee_id) === Number(emp.id) && a.date === dateKey
+        );
+
+        const leaveRec = (leaveRequests || []).find(
+          (l) => Number(l.employee_id) === Number(emp.id) &&
+                 l.status === 'approved' &&
+                 dateKey >= l.from_date &&
+                 dateKey <= l.to_date
+        );
+
+        let cell = { status: '—', text: '—', color: 'text-slate-300', bg: 'bg-slate-50', hours: 0, isLate: false };
+
+        if (attRec && attRec.punch_in) {
+          const hours = parseFloat(attRec.work_hours || 0);
+          const late = getLateArrivalInfo(attRec.punch_in, shiftSettings);
+          if (late.isLate) lateCount++;
+
+          if (hours > 0 && hours < 4.5) {
+            halfDayCount++;
+            cell = { status: 'HD', text: 'HD', color: 'text-amber-700', bg: 'bg-amber-100 font-bold', hours, isLate: late.isLate };
+          } else {
+            presentCount++;
+            cell = { status: 'P', text: 'P', color: 'text-emerald-700', bg: 'bg-emerald-100 font-bold', hours, isLate: late.isLate };
+          }
+        } else if (leaveRec) {
+          leaveCount++;
+          cell = { status: 'L', text: 'L', color: 'text-purple-700', bg: 'bg-purple-100 font-bold', hours: 0, isLate: false };
+        } else if (isSunday) {
+          weekOffCount++;
+          cell = { status: 'WO', text: 'WO', color: 'text-slate-400', bg: 'bg-slate-100', hours: 0, isLate: false };
+        } else if (dateKey <= todayStr) {
+          absentCount++;
+          cell = { status: 'A', text: 'A', color: 'text-rose-700', bg: 'bg-rose-100 font-bold', hours: 0, isLate: false };
+        } else {
+          cell = { status: '—', text: '—', color: 'text-slate-300', bg: 'bg-white', hours: 0, isLate: false };
+        }
+
+        dailyRecords[day] = cell;
+      }
+
+      const lateThreshold = parseInt(shiftSettings?.late_mark_threshold || 3, 10);
+      const penaltyCount = (shiftSettings?.auto_half_day_deduction && lateCount >= lateThreshold)
+        ? Math.floor(lateCount / lateThreshold) * 0.5
+        : 0;
+
+      const payableDays = Math.max(0, presentCount + (halfDayCount * 0.5) + leaveCount + weekOffCount - penaltyCount);
+
+      return {
+        employee: emp,
+        dailyRecords,
+        presentCount,
+        leaveCount,
+        halfDayCount,
+        absentCount,
+        weekOffCount,
+        lateCount,
+        penaltyCount,
+        payableDays,
+      };
+    });
+  }, [employees, attendance, leaveRequests, isBranchScoped, activeBranch, selectedYear, selectedMonth, totalDaysInMonth, shiftSettings]);
+
+  // Late Comers Summary for Shift Automation
+  const lateComersSummary = useMemo(() => {
+    const monthStr = String(selectedMonth).padStart(2, '0');
+    const lateList = [];
+
+    musterRollData.forEach((row) => {
+      if (row.lateCount > 0) {
+        const lateDays = [];
+        for (let d = 1; d <= totalDaysInMonth; d++) {
+          if (row.dailyRecords[d]?.isLate) {
+            const dateKey = `${selectedYear}-${monthStr}-${String(d).padStart(2, '0')}`;
+            const punch = attendance.find(a => Number(a.employee_id) === Number(row.employee.id) && a.date === dateKey);
+            lateDays.push({
+              date: dateKey,
+              day: d,
+              punchIn: punch?.punch_in,
+              lateInfo: getLateArrivalInfo(punch?.punch_in, shiftSettings)
+            });
+          }
+        }
+        lateList.push({
+          employee: row.employee,
+          lateCount: row.lateCount,
+          penaltyTriggered: row.penaltyCount > 0,
+          penaltyDays: row.penaltyCount,
+          lateDays,
+        });
+      }
+    });
+
+    return lateList.sort((a, b) => b.lateCount - a.lateCount);
+  }, [musterRollData, selectedMonth, selectedYear, totalDaysInMonth, attendance, shiftSettings]);
+
+  // 1-Click Muster Roll CSV Export
+  const handleExportMusterRoll = () => {
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthName = monthNames[selectedMonth - 1] || `Month-${selectedMonth}`;
+
+    const headers = [
+      'Employee Code',
+      'Employee Name',
+      'Designation',
+      'Branch',
+      ...daysArray.map((d) => `Day ${d}`),
+      'Present Days',
+      'Leaves',
+      'Half Days',
+      'Absent Days',
+      'Week Offs',
+      'Late Marks',
+      'Late Penalty Days',
+      'Total Payable Days',
+    ];
+
+    const rows = musterRollData.map((row) => [
+      `"${row.employee.employee_code || ''}"`,
+      `"${row.employee.first_name || ''} ${row.employee.last_name || ''}"`,
+      `"${row.employee.designation || ''}"`,
+      `"${row.employee.branch_name || ''}"`,
+      ...daysArray.map((d) => `"${row.dailyRecords[d]?.status || '—'}"`),
+      row.presentCount,
+      row.leaveCount,
+      row.halfDayCount,
+      row.absentCount,
+      row.weekOffCount,
+      row.lateCount,
+      row.penaltyCount,
+      row.payableDays,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Pinweb_Muster_Roll_${monthName}_${selectedYear}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -413,16 +605,23 @@ export default function AttendanceView() {
           <UserCheck className="w-4 h-4" /> Regularization Requests ({filteredRegularization.length})
         </button>
 
-        {canViewCsvImports && (
-          <button
-            onClick={() => setActiveTab('import')}
-            className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'import' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Upload className="w-4 h-4" /> CSV Biometric Punch Import
-          </button>
-        )}
+        <button
+          onClick={() => setActiveTab('muster_roll')}
+          className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+            activeTab === 'muster_roll' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4" /> Monthly Muster Roll & Reports
+        </button>
+
+        <button
+          onClick={() => setActiveTab('shifts')}
+          className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+            activeTab === 'shifts' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Sliders className="w-4 h-4" /> Shift & Grace Automation
+        </button>
 
         {isBranchScoped && (
           <div className="ml-auto pb-2 flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
@@ -482,7 +681,27 @@ export default function AttendanceView() {
                         {employeeInfo && <div className="text-[11px] text-slate-400">{employeeInfo}</div>}
                       </td>
                       <td className="px-4 py-3 font-medium text-slate-800">{att.date}</td>
-                      <td className="px-4 py-3 font-semibold text-emerald-600">{att.punch_in}</td>
+                      <td className="px-4 py-3">
+                        {(() => {
+                          const lateInfo = getLateArrivalInfo(att.punch_in, shiftSettings);
+                          return (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-semibold ${lateInfo.isLate ? 'text-amber-800 font-bold' : 'text-emerald-600'}`}>
+                                {att.punch_in}
+                              </span>
+                              {lateInfo.isLate && (
+                                <span
+                                  className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200"
+                                  title={`Late by ${lateInfo.minutesLate} minutes (After ${shiftSettings?.start_time || '09:30 AM'} + ${shiftSettings?.grace_period_minutes || 15}m grace)`}
+                                >
+                                  <Clock className="w-2.5 h-2.5 text-amber-600" />
+                                  Late (+{lateInfo.minutesLate}m)
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         {att.punch_out ? (
                           <span className="font-semibold text-slate-700">{att.punch_out}</span>
@@ -630,136 +849,396 @@ export default function AttendanceView() {
         </Card>
       )}
 
-      {/* TAB 3: CSV IMPORT */}
-      {activeTab === 'import' && canViewCsvImports && (
-        <Card
-          title="Biometric Punch CSV Imports"
-          subtitle="Private Cloudinary files are validated before import; existing attendance records are never overwritten"
-        >
-          <div className="space-y-4 text-xs">
-            {canProcessCsvImports ? (
-              <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p className="font-semibold text-slate-700">Upload a biometric CSV file (CSV or TXT, max 20 MB and 100,000 punch rows)</p>
-                <p className="text-slate-600">
-                  Required columns: <code>employee_code</code>, <code>punch_time</code>. Optional: <code>device_id</code>, <code>location_code</code>.
-                </p>
-                <p className="text-slate-500">
-                  Supported timestamps include <code>YYYY-MM-DD HH:MM[:SS]</code>, <code>DD/MM/YYYY HH:MM[:SS]</code>, 12-hour AM/PM, and ISO 8601 with an offset.
-                </p>
-                <p className="text-slate-500">
-                  Each row is a punch event. The earliest and latest punches per employee and India-local day become punch in/out.
-                  A single punch creates an in-progress day. Timestamps without a timezone are treated as India time; ISO timestamps with offsets are converted to India time.
-                  Invalid rows block the whole batch. Existing attendance days are skipped.
-                </p>
-                <CloudinaryUpload
-                  module="attendance_csv"
-                  accept=".csv,.txt"
-                  onUploaded={() => setImportRefresh((value) => value + 1)}
-                />
+      {/* TAB 3: MONTHLY MUSTER ROLL & REPORTS */}
+      {activeTab === 'muster_roll' && (
+        <div className="space-y-6">
+          {/* Controls Bar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-teal-600" />
+                <span className="text-xs font-bold text-slate-700">Month:</span>
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value={1}>January</option>
+                  <option value={2}>February</option>
+                  <option value={3}>March</option>
+                  <option value={4}>April</option>
+                  <option value={5}>May</option>
+                  <option value={6}>June</option>
+                  <option value={7}>July</option>
+                  <option value={8}>August</option>
+                  <option value={9}>September</option>
+                  <option value={10}>October</option>
+                  <option value={11}>November</option>
+                  <option value={12}>December</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-700">Year:</span>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                >
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
+                  <option value={2027}>2027</option>
+                </select>
+              </div>
+
+              <span className="text-xs text-slate-400">
+                ({totalDaysInMonth} Days in Month · {isBranchScoped ? activeBranch : 'All Branches'})
+              </span>
+            </div>
+
+            <Button
+              variant="primary"
+              size="sm"
+              icon={Download}
+              onClick={handleExportMusterRoll}
+              className="shadow-sm"
+            >
+              📥 Download Muster Roll (Excel/CSV)
+            </Button>
+          </div>
+
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Active Staff Tracked</span>
+              <span className="text-xl font-bold text-slate-900 mt-1 block">{musterRollData.length} Employees</span>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Working Days</span>
+              <span className="text-xl font-bold text-teal-700 mt-1 block">
+                {totalDaysInMonth - daysArray.filter(d => new Date(selectedYear, selectedMonth - 1, d).getDay() === 0).length} Days
+              </span>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Late Marks</span>
+              <span className="text-xl font-bold text-amber-600 mt-1 block">
+                {musterRollData.reduce((acc, row) => acc + row.lateCount, 0)} Recorded
+              </span>
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Penalties Triggered</span>
+              <span className="text-xl font-bold text-rose-600 mt-1 block">
+                {musterRollData.filter(r => r.penaltyCount > 0).length} Staff (3+ Late)
+              </span>
+            </div>
+          </div>
+
+          {/* Muster Roll Matrix Card */}
+          <Card
+            title={`Muster Roll Ledger — ${selectedMonth === 11 ? 'November' : selectedMonth} ${selectedYear}`}
+            subtitle="P = Present · HD = Half Day (<4.5 hrs) · L = Approved Leave · WO = Week Off (Sunday) · A = Absent"
+            bodyClassName="p-0 overflow-hidden"
+          >
+            <div className="overflow-x-auto max-w-full">
+              <table className="w-full text-xs border-collapse">
+                <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-700 font-bold text-[10px] uppercase">
+                  <tr>
+                    <th className="sticky left-0 z-20 bg-slate-100 px-3 py-2.5 min-w-44 border-r border-slate-200 shadow-sm text-left">
+                      Staff Member
+                    </th>
+                    {daysArray.map((d) => {
+                      const dayOfWeek = new Date(selectedYear, selectedMonth - 1, d).getDay();
+                      const isSun = dayOfWeek === 0;
+                      return (
+                        <th
+                          key={d}
+                          className={`px-1.5 py-2 text-center min-w-7 border-r border-slate-200/60 ${isSun ? 'bg-amber-50/70 text-amber-800' : ''}`}
+                        >
+                          <div>{d}</div>
+                          <div className="text-[8px] font-normal text-slate-400">
+                            {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'][dayOfWeek]}
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="px-2 py-2 bg-emerald-50 text-emerald-800 text-center font-bold min-w-10">P</th>
+                    <th className="px-2 py-2 bg-purple-50 text-purple-800 text-center font-bold min-w-10">L</th>
+                    <th className="px-2 py-2 bg-amber-50 text-amber-800 text-center font-bold min-w-10">HD</th>
+                    <th className="px-2 py-2 bg-rose-50 text-rose-800 text-center font-bold min-w-10">A</th>
+                    <th className="px-2 py-2 bg-amber-100/60 text-amber-900 text-center font-bold min-w-12">Late</th>
+                    <th className="px-3 py-2 bg-slate-900 text-white text-center font-bold min-w-14">Payable</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-[11px]">
+                  {musterRollData.length === 0 ? (
+                    <tr>
+                      <td colSpan={daysArray.length + 7} className="px-5 py-8 text-center text-slate-500">
+                        No employees found for this muster period.
+                      </td>
+                    </tr>
+                  ) : (
+                    musterRollData.map((row) => (
+                      <tr key={row.employee.id} className="hover:bg-slate-50/70 transition">
+                        <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-slate-200 shadow-sm text-left">
+                          <div className="font-bold text-slate-900 leading-tight">
+                            {row.employee.first_name} {row.employee.last_name}
+                          </div>
+                          <div className="text-[10px] text-slate-400 font-mono">
+                            {row.employee.employee_code} · {row.employee.branch_name || 'Office'}
+                          </div>
+                        </td>
+                        {daysArray.map((d) => {
+                          const cell = row.dailyRecords[d];
+                          return (
+                            <td
+                              key={d}
+                              className={`p-1 text-center border-r border-slate-100 text-[10px] ${cell.bg}`}
+                              title={`Day ${d}: ${cell.status === 'P' ? 'Present' : cell.status === 'L' ? 'Leave' : cell.status === 'HD' ? 'Half Day' : cell.status === 'WO' ? 'Week Off' : cell.status === 'A' ? 'Absent' : 'Future'}${cell.hours ? ` (${cell.hours} hrs)` : ''}${cell.isLate ? ' · Late' : ''}`}
+                            >
+                              <span className={cell.color}>{cell.text}</span>
+                            </td>
+                          );
+                        })}
+                        <td className="px-2 py-2 text-center font-bold text-emerald-700 bg-emerald-50/40">{row.presentCount}</td>
+                        <td className="px-2 py-2 text-center font-bold text-purple-700 bg-purple-50/40">{row.leaveCount}</td>
+                        <td className="px-2 py-2 text-center font-bold text-amber-700 bg-amber-50/40">{row.halfDayCount}</td>
+                        <td className="px-2 py-2 text-center font-bold text-rose-700 bg-rose-50/40">{row.absentCount}</td>
+                        <td className="px-2 py-2 text-center font-bold text-amber-800 bg-amber-50/40">
+                          {row.lateCount > 0 ? (
+                            <span className={row.penaltyCount > 0 ? 'text-rose-600 underline font-black' : ''}>
+                              {row.lateCount}
+                            </span>
+                          ) : '0'}
+                        </td>
+                        <td className="px-3 py-2 text-center font-bold text-slate-900 bg-slate-100">
+                          {row.payableDays.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+              <div className="flex items-center gap-3 flex-wrap text-[11px]">
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-200 border border-emerald-400" /> P: Present</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-200 border border-purple-400" /> L: Approved Leave</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-200 border border-amber-400" /> HD: Half Day (&lt;4.5h)</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-300" /> WO: Week Off</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-200 border border-rose-400" /> A: Absent</span>
+              </div>
+              <div className="text-[11px] font-medium text-slate-500">
+                Formula: Payable Days = Present + (HD × 0.5) + Leaves + WeekOffs − Late Penalties
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* TAB 4: SHIFT & GRACE AUTOMATION */}
+      {activeTab === 'shifts' && (
+        <div className="space-y-6">
+          {/* Shift Timing and Policy Configuration */}
+          <Card
+            title="Office Shift Timing & Grace Period Rules"
+            subtitle="Configure standard work timings, grace period tolerance, and automated late-mark penalties"
+          >
+            {shiftFeedback && (
+              <div className={`p-3 rounded-lg text-xs font-semibold mb-4 border flex items-center gap-2 ${
+                shiftFeedback.type === 'error'
+                  ? 'bg-rose-50 border-rose-200 text-rose-800'
+                  : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+              }`}>
+                {shiftFeedback.type === 'error' ? <AlertTriangle className="w-4 h-4 text-rose-600" /> : <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                <span>{shiftFeedback.text}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveShiftSettings} className="space-y-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Shift Name:</label>
+                  <input
+                    type="text"
+                    value={shiftSettings.shift_name || ''}
+                    disabled={!canManageAttendance}
+                    onChange={(e) => setShiftSettings((p) => ({ ...p, shift_name: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Standard Shift Start Time:</label>
+                  <input
+                    type="text"
+                    value={shiftSettings.start_time || '09:30 AM'}
+                    disabled={!canManageAttendance}
+                    placeholder="e.g. 09:30 AM"
+                    onChange={(e) => setShiftSettings((p) => ({ ...p, start_time: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Standard Shift End Time:</label>
+                  <input
+                    type="text"
+                    value={shiftSettings.end_time || '06:30 PM'}
+                    disabled={!canManageAttendance}
+                    placeholder="e.g. 06:30 PM"
+                    onChange={(e) => setShiftSettings((p) => ({ ...p, end_time: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-0.5 block">Total Duration: 9.0 Hours</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+                <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200/80">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <span>Grace Period Allowance</span>
+                  </div>
+                  <label className="block font-medium text-slate-700 mb-1">Grace Period (Minutes):</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={shiftSettings.grace_period_minutes}
+                      disabled={!canManageAttendance}
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, grace_period_minutes: Number(e.target.value) }))}
+                      className="w-24 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
+                    />
+                    <span className="text-xs text-amber-800 font-medium">
+                      Punches up to {(() => {
+                        const startMins = parseTimeToMinutes(shiftSettings.start_time || '09:30 AM') || 570;
+                        const cutoff = startMins + Number(shiftSettings.grace_period_minutes || 15);
+                        const h = Math.floor(cutoff / 60);
+                        const m = cutoff % 60;
+                        return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                      })()} will NOT be marked late.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-teal-50/60 p-3.5 rounded-xl border border-teal-200/80">
+                  <div className="flex items-center gap-1.5 font-bold text-teal-900 mb-1">
+                    <ShieldAlert className="w-4 h-4 text-teal-600" />
+                    <span>Late-Mark Deduction Policy</span>
+                  </div>
+                  <label className="block font-medium text-slate-700 mb-1">Threshold for Half-Day (0.5) Penalty:</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={shiftSettings.late_mark_threshold}
+                      disabled={!canManageAttendance}
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, late_mark_threshold: Number(e.target.value) }))}
+                      className="w-24 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
+                    />
+                    <span className="text-xs text-teal-800 font-medium">Late arrivals per month = 0.5 Day Leave Deduction</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-between flex-wrap gap-3">
+                <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 select-none">
+                  <input
+                    type="checkbox"
+                    checked={shiftSettings.auto_half_day_deduction}
+                    disabled={!canManageAttendance}
+                    onChange={(e) => setShiftSettings((p) => ({ ...p, auto_half_day_deduction: e.target.checked }))}
+                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 w-4 h-4"
+                  />
+                  <span>Automate 0.5 Day Leave deduction in Muster Roll & Payroll when late threshold is crossed</span>
+                </label>
+
+                {canManageAttendance && (
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={savingShiftSettings}
+                  >
+                    {savingShiftSettings ? 'Saving Settings...' : 'Save Shift Timing Rules'}
+                  </Button>
+                )}
+              </div>
+            </form>
+          </Card>
+
+          {/* Late Comers Policy Audit Table */}
+          <Card
+            title={`Late Arrivals & Penalty Audit — ${selectedMonth === 11 ? 'November' : selectedMonth} ${selectedYear}`}
+            subtitle="Staff members who exceeded shift start time + grace period this calendar month"
+          >
+            {lateComersSummary.length === 0 ? (
+              <div className="py-8 text-center text-slate-500">
+                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                <p className="font-semibold text-slate-800">Excellent punctuality!</p>
+                <p className="text-xs text-slate-400 mt-0.5">No late arrivals recorded for this period.</p>
               </div>
             ) : (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-600">
-                HR Executive access is read-only. HR Admin or Super Admin uploads and processes organization-wide files.
-              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-[10px]">
+                    <tr>
+                      <th className="px-4 py-3">Employee</th>
+                      <th className="px-4 py-3">Branch</th>
+                      <th className="px-4 py-3 text-center">Late Marks This Month</th>
+                      <th className="px-4 py-3">Policy Status</th>
+                      <th className="px-4 py-3">Dates & Punch In Times</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {lateComersSummary.map((item) => (
+                      <tr key={item.employee.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3">
+                          <div className="font-bold text-slate-900">{item.employee.first_name} {item.employee.last_name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">{item.employee.employee_code} · {item.employee.designation}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 font-medium">{item.employee.branch_name || 'Office'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex items-center gap-1 font-bold px-2 py-0.5 rounded-full text-xs ${
+                            item.penaltyTriggered
+                              ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}>
+                            <Clock className="w-3 h-3" />
+                            {item.lateCount} / {shiftSettings?.late_mark_threshold || 3} Late
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          {item.penaltyTriggered ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-1 rounded-lg border border-rose-200">
+                              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+                              ⚠️ {item.penaltyDays} Day Penalty Triggered (0.5D Deduction)
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              Within Tolerance Limit ({item.lateCount}/{shiftSettings?.late_mark_threshold || 3})
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.lateDays.map((ld, idx) => (
+                              <span key={idx} className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[10px] border border-slate-200">
+                                <strong>{ld.date}</strong>: {ld.punchIn} <span className="text-amber-700 font-bold">(+{ld.lateInfo.minutesLate}m)</span>
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-            {importError && <p role="alert" className="text-rose-700">{importError}</p>}
-            {importSuccess && <p role="status" className="text-emerald-700">{importSuccess}</p>}
-            {importFiles.map((file) => {
-              const summary = file.summary;
-              const busy = Number(busyImportId) === Number(file.id);
-
-              return (
-                <article key={file.id} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-700">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{file.original_filename}</p>
-                      <p className="mt-1 text-slate-500">
-                        Uploaded {file.uploaded_at?.slice(0, 10) || '—'}
-                        {file.uploaded_by_name ? ` by ${file.uploaded_by_name}` : ''}
-                        {Number.isFinite(Number(file.file_size)) ? ` · ${(Number(file.file_size) / 1024).toFixed(1)} KB` : ''}
-                      </p>
-                      <p className="mt-1 text-slate-500">
-                        Import status: <span className="font-semibold text-slate-700">{file.import_status || 'Not previewed'}</span>
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={busyImportId !== null}
-                        onClick={() => handleDownloadImport(file)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        <Download className="h-3.5 w-3.5" aria-hidden="true" />
-                        Download CSV
-                      </button>
-                      {canProcessCsvImports && !file.import_status && (
-                        <button
-                          type="button"
-                          disabled={busyImportId !== null}
-                          onClick={() => handlePreviewImport(file)}
-                          className="rounded-lg bg-teal-600 px-3 py-2 font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
-                        >
-                          {busy ? 'Validating…' : 'Preview'}
-                        </button>
-                      )}
-                      {canProcessCsvImports && file.import_status === 'previewed' && summary?.can_process && (
-                        <button
-                          type="button"
-                          disabled={busyImportId !== null}
-                          onClick={() => handleProcessImport(file)}
-                          className="rounded-lg bg-emerald-600 px-3 py-2 font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {busy ? 'Importing…' : 'Process import'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {summary && (
-                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-5">
-                      <p>Rows: <strong>{summary.row_count}</strong></p>
-                      <p>Employee-days: <strong>{summary.attendance_day_count}</strong></p>
-                      <p>
-                        {summary.status === 'processed'
-                          ? 'Imported'
-                          : summary.can_process
-                            ? 'Ready to add'
-                            : 'Potential new days'}: <strong>
-                          {summary.status === 'processed' ? summary.imported_count : summary.new_record_count}
-                        </strong>
-                      </p>
-                      <p>Existing skipped: <strong>{summary.existing_count}</strong></p>
-                      <p>Duplicate events: <strong>{summary.duplicate_count}</strong></p>
-                    </div>
-                  )}
-                  {summary?.errors?.length > 0 && (
-                    <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-700">
-                      <p className="font-semibold">
-                        {summary.error_count} invalid row(s). Upload a corrected file; this batch was not imported.
-                      </p>
-                      <ul className="mt-2 list-inside list-disc space-y-1">
-                        {summary.errors.map((error, index) => (
-                          <li key={`${error.row}-${index}`}>Row {error.row}: {error.message}</li>
-                        ))}
-                      </ul>
-                      {summary.error_count > summary.errors.length && (
-                        <p className="mt-2">Showing the first {summary.errors.length} errors.</p>
-                      )}
-                    </div>
-                  )}
-                  {file.import_status === 'processed' && (
-                    <p className="text-emerald-700">
-                      {summary?.imported_count || file.imported_count || 0} attendance day(s) imported
-                      {file.processed_at ? ` · processed ${file.processed_at.slice(0, 10)}` : ''}.
-                    </p>
-                  )}
-                </article>
-              );
-            })}
-            {importFiles.length === 0 && !importError && (
-              <p className="py-6 text-center text-slate-500">No attendance CSV files uploaded yet.</p>
-            )}
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
       {/* REGULARIZATION MODAL */}

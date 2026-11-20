@@ -321,6 +321,11 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ status }),
   }),
+  getAttendanceShiftSettings: () => request('/attendance/shift-settings'),
+  updateAttendanceShiftSettings: (settings) => request('/attendance/shift-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  }),
 
   // M06 Leave Management
   getLeaves: (scope) => request(scope ? `/leaves?scope=${encodeURIComponent(scope)}` : '/leaves'),
