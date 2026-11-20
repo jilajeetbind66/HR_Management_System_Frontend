@@ -466,8 +466,13 @@ export function HRMSProvider({ children }) {
     await refreshProjectData();
   };
 
-  const punchAttendance = async (employeeId, location = 'Web Client Portal') => {
-    const response = await api.punchAttendance(Number(employeeId), location);
+  const punchAttendance = async (employeeId, location = 'Web Client Portal', coords = null) => {
+    const response = await api.punchAttendance(
+      Number(employeeId),
+      location,
+      coords?.latitude,
+      coords?.longitude
+    );
     if (response?.data) {
       setAttendance((previous) => {
         const isSameRecord = (record) => (

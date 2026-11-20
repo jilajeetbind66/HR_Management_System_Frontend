@@ -9,6 +9,7 @@ import StatCard from '../../components/common/StatCard';
 import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import api from '../../services/api';
 import { getIndiaDateString } from '../../utils/date';
+import { getCurrentPositionAsync } from '../../utils/geolocation';
 import {
   Clock,
   Calendar,
@@ -84,6 +85,7 @@ export default function AttendanceView() {
   const canProcessCsvImports = ['super_admin', 'hr_admin'].includes(currentUser.role);
   const canApprove = canManageAttendance;
   const [punchFeedback, setPunchFeedback] = useState(null);
+  const [isPunching, setIsPunching] = useState(false);
 
   useEffect(() => {
     if (!canViewCsvImports) {
@@ -134,21 +136,35 @@ export default function AttendanceView() {
   };
 
   const handlePunchClick = async () => {
-    if (!hasEmployeeProfile || isPunchComplete) return;
+    if (!hasEmployeeProfile || isPunchComplete || isPunching) return;
+
+    setIsPunching(true);
+    setPunchFeedback({ text: 'Acquiring GPS location...', type: 'info' });
+
+    let coords = null;
+    try {
+      coords = await getCurrentPositionAsync();
+    } catch (geoErr) {
+      console.warn('Geolocation warning:', geoErr.message);
+    }
 
     try {
-      const res = await punchAttendance(currentUser.employee_id, currentUser.branch_name || 'Web Portal');
+      const res = await punchAttendance(currentUser.employee_id, currentUser.branch_name || 'Web Portal', coords);
       if (res?.type === 'in') {
-        setPunchFeedback(`Punched IN at ${res.punch?.punch_in || 'now'}`);
+        const distStr = res.punch?.distance_meters != null ? ` (📍 ${Math.round(res.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched IN at ${res.punch?.punch_in || 'now'}${distStr}`, type: 'success' });
       } else if (res?.type === 'out') {
-        setPunchFeedback(`Punched OUT at ${res.punch?.punch_out || 'now'}`);
+        const distStr = res.punch?.distance_meters != null ? ` (📍 ${Math.round(res.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched OUT at ${res.punch?.punch_out || 'now'}${distStr}`, type: 'success' });
       } else {
-        setPunchFeedback('Already completed attendance for today');
+        setPunchFeedback({ text: 'Already completed attendance for today', type: 'info' });
       }
     } catch (err) {
-      setPunchFeedback(`Error saving punch: ${err?.data?.message || err.message}`);
+      setPunchFeedback({ text: `Error saving punch: ${err?.data?.message || err.message}`, type: 'error' });
+    } finally {
+      setIsPunching(false);
+      setTimeout(() => setPunchFeedback(null), 5000);
     }
-    setTimeout(() => setPunchFeedback(null), 3500);
   };
 
   const handleRegSubmit = async (e) => {
@@ -272,11 +288,11 @@ export default function AttendanceView() {
             <Button
               variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
               icon={Clock}
-              disabled={!hasEmployeeProfile || isPunchComplete}
+              disabled={!hasEmployeeProfile || isPunchComplete || isPunching}
               title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
               onClick={handlePunchClick}
             >
-              {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
+              {isPunching ? "Locating GPS..." : isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
             </Button>
           </div>
         )}
@@ -288,9 +304,24 @@ export default function AttendanceView() {
       </div>
 
       {punchFeedback && (
-        <div className="bg-teal-50 border border-teal-200 text-teal-700 text-xs px-4 py-2.5 rounded-xl font-medium flex items-center justify-between animate-fadeIn">
-          <span>{punchFeedback}</span>
-          <span className="text-[10px] text-teal-500 font-mono">Saved in MySQL Database</span>
+        <div className={`border text-xs px-4 py-2.5 rounded-xl font-medium flex items-center justify-between animate-fadeIn ${
+          punchFeedback.type === 'error'
+            ? 'bg-rose-50 border-rose-200 text-rose-700'
+            : punchFeedback.type === 'info'
+            ? 'bg-slate-100 border-slate-200 text-slate-700'
+            : 'bg-teal-50 border-teal-200 text-teal-700'
+        }`}>
+          <div className="flex items-center gap-2">
+            {punchFeedback.type === 'error' ? (
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-teal-600 shrink-0" />
+            )}
+            <span>{punchFeedback.text}</span>
+          </div>
+          <span className={`text-[10px] font-mono ${punchFeedback.type === 'error' ? 'text-rose-400' : 'text-teal-600'}`}>
+            {punchFeedback.type === 'error' ? 'Geofence Validation' : 'Saved in MySQL Database'}
+          </span>
         </div>
       )}
       {workflowError && (
@@ -468,8 +499,26 @@ export default function AttendanceView() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-slate-500">
-                        <span>{att.location}</span>
-                        <span className="block font-mono text-[10px] text-slate-400">{att.ip_address}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span>{att.location}</span>
+                          {att.geofence_status === 'within_geofence' && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200"
+                              title={`GPS Verified · Distance: ${att.distance_meters != null ? Math.round(att.distance_meters) + 'm' : 'Within boundary'}`}
+                            >
+                              <MapPin className="w-2.5 h-2.5 text-emerald-600" />
+                              GPS Verified{att.distance_meters != null ? ` · ${Math.round(att.distance_meters)}m` : ''}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="font-mono text-[10px] text-slate-400">{att.ip_address}</span>
+                          {att.latitude && att.longitude && (
+                            <span className="text-[10px] text-slate-400 font-mono" title={`GPS: ${att.latitude}, ${att.longitude}`}>
+                              ({Number(att.latitude).toFixed(4)}, {Number(att.longitude).toFixed(4)})
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {isMissingPunchOut && att.status === 'Present' ? (
