@@ -7,12 +7,14 @@ import {
   Clock,
   Building2,
   CheckCircle2,
+  AlertCircle,
   LogOut,
   SlidersHorizontal
 } from 'lucide-react';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
 import { getIndiaDateString } from '../../utils/date';
+import { getCurrentPositionAsync } from '../../utils/geolocation';
 
 export default function Navbar({ onMenuToggle, onNavigate }) {
   const { currentUser, activeBranch, setActiveBranch, logout } = useAuth();
@@ -35,6 +37,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [notificationTab, setNotificationTab] = useState('unread');
   const [notificationError, setNotificationError] = useState('');
   const [punchFeedback, setPunchFeedback] = useState(null);
+  const [isPunching, setIsPunching] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   const handleNotificationClick = async (notification) => {
@@ -87,21 +90,40 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
 
   const handlePunch = async () => {
-    if (!hasEmployeeProfile || isPunchComplete) return;
+    if (!hasEmployeeProfile || isPunchComplete || isPunching) return;
+
+    setIsPunching(true);
+    setPunchFeedback({ text: 'Acquiring GPS location...', type: 'info' });
+
+    let coords = null;
+    try {
+      coords = await getCurrentPositionAsync();
+    } catch (geoErr) {
+      console.warn('Geolocation acquisition warning:', geoErr.message);
+    }
 
     try {
-      const res = await punchAttendance(currentUser.employee_id, `${currentUser.branch_name || 'Web Portal'}`);
+      const res = await punchAttendance(
+        currentUser.employee_id,
+        `${currentUser.branch_name || 'Web Portal'}`,
+        coords
+      );
       if (res?.type === 'in') {
-        setPunchFeedback(`Punched IN at ${res.punch?.punch_in || 'now'}`);
+        const distStr = res.punch?.distance_meters != null ? ` (📍 ${Math.round(res.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched IN at ${res.punch?.punch_in || 'now'}${distStr}`, type: 'success' });
       } else if (res?.type === 'out') {
-        setPunchFeedback(`Punched OUT at ${res.punch?.punch_out || 'now'}`);
+        const distStr = res.punch?.distance_meters != null ? ` (📍 ${Math.round(res.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched OUT at ${res.punch?.punch_out || 'now'}${distStr}`, type: 'success' });
       } else {
-        setPunchFeedback(`Already completed attendance for today`);
+        setPunchFeedback({ text: `Already completed attendance for today`, type: 'info' });
       }
     } catch (err) {
-      setPunchFeedback(`Punch error: ${err.message || 'Failed'}`);
+      const errorMsg = err?.data?.message || err?.message || 'Punch action failed';
+      setPunchFeedback({ text: errorMsg, type: 'error' });
+    } finally {
+      setIsPunching(false);
+      setTimeout(() => setPunchFeedback(null), 4500);
     }
-    setTimeout(() => setPunchFeedback(null), 3500);
   };
 
   return (
@@ -170,19 +192,29 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
                 : hasPunchedIn
                 ? 'danger'
                 : 'orange'}
-              disabled={!hasEmployeeProfile || isPunchComplete}
+              disabled={!hasEmployeeProfile || isPunchComplete || isPunching}
               title={!hasEmployeeProfile ? 'Account is not linked to an employee record' : undefined}
               onClick={handlePunch}
               icon={Clock}
               className="shadow-sm font-medium"
             >
-              {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
+              {isPunching ? "Locating GPS..." : isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out" : "Punch In"}
             </Button>
 
             {punchFeedback && (
-              <div className="absolute right-0 top-10 z-50 rounded-lg bg-slate-900 text-white text-xs px-3 py-1.5 shadow-xl whitespace-nowrap animate-fade-in flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                {punchFeedback}
+              <div className={`absolute right-0 top-10 z-50 rounded-lg text-xs px-3 py-2 shadow-xl animate-fade-in flex items-center gap-1.5 max-w-xs sm:max-w-sm whitespace-normal ${
+                punchFeedback.type === 'error'
+                  ? 'bg-rose-950 text-rose-100 border border-rose-800'
+                  : punchFeedback.type === 'info'
+                  ? 'bg-slate-900 text-slate-100'
+                  : 'bg-emerald-950 text-emerald-100 border border-emerald-800'
+              }`}>
+                {punchFeedback.type === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                )}
+                <span>{punchFeedback.text}</span>
               </div>
             )}
           </div>

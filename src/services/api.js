@@ -300,9 +300,14 @@ export const api = {
     request(`/attendance/imports/${uploadId}/preview`, { method: 'POST' }),
   processAttendanceImport: (uploadId) =>
     request(`/attendance/imports/${uploadId}/process`, { method: 'POST' }),
-  punchAttendance: (employeeId, location) => request('/attendance/punch', {
+  punchAttendance: (employeeId, location, latitude, longitude) => request('/attendance/punch', {
     method: 'POST',
-    body: JSON.stringify({ employee_id: employeeId, location }),
+    body: JSON.stringify({
+      employee_id: employeeId,
+      location,
+      ...(latitude !== undefined && latitude !== null ? { latitude } : {}),
+      ...(longitude !== undefined && longitude !== null ? { longitude } : {}),
+    }),
   }),
   getRegularizations: () => request('/attendance/regularizations'),
   requestRegularization: (regularization) => request('/attendance/regularizations', {

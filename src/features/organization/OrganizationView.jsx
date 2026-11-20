@@ -15,7 +15,9 @@ import {
   Plus,
   Pencil,
   Trash2,
+  Navigation,
 } from 'lucide-react';
+import { getCurrentPositionAsync } from '../../utils/geolocation';
 
 function extractError(error, fallback) {
   const fieldErrors = error?.data?.errors;
@@ -139,6 +141,10 @@ export default function OrganizationView() {
       code: branch.code || '',
       city: branch.city || '',
       state: branch.state || '',
+      latitude: branch.latitude ?? '',
+      longitude: branch.longitude ?? '',
+      radius_meters: branch.radius_meters ?? 150,
+      geofence_enabled: branch.geofence_enabled !== false,
       pt_applicable: Boolean(branch.pt_applicable),
       is_active: branch.is_active !== false,
     } : {
@@ -146,10 +152,29 @@ export default function OrganizationView() {
       code: '',
       city: '',
       state: company?.registered_state || 'Uttar Pradesh',
+      latitude: '',
+      longitude: '',
+      radius_meters: 150,
+      geofence_enabled: true,
       pt_applicable: false,
       is_active: true,
     });
     setBranchModal({ open: true, editing: branch });
+  };
+
+  const handleCaptureCurrentLocation = async () => {
+    try {
+      const pos = await getCurrentPositionAsync();
+      if (pos) {
+        setBranchForm((prev) => ({
+          ...prev,
+          latitude: Number(pos.latitude.toFixed(7)),
+          longitude: Number(pos.longitude.toFixed(7)),
+        }));
+      }
+    } catch (err) {
+      setModalError(err.message || 'Unable to capture GPS location.');
+    }
   };
 
   const handleSaveBranch = async (e) => {
@@ -157,10 +182,17 @@ export default function OrganizationView() {
     setSaving(true);
     setModalError('');
     try {
+      const payload = {
+        ...branchForm,
+        latitude: branchForm.latitude !== '' && branchForm.latitude !== null ? Number(branchForm.latitude) : null,
+        longitude: branchForm.longitude !== '' && branchForm.longitude !== null ? Number(branchForm.longitude) : null,
+        radius_meters: Number(branchForm.radius_meters || 150),
+        geofence_enabled: Boolean(branchForm.geofence_enabled),
+      };
       if (branchModal.editing) {
-        await api.updateBranch(branchModal.editing.id, branchForm);
+        await api.updateBranch(branchModal.editing.id, payload);
       } else {
-        await api.createBranch(branchForm);
+        await api.createBranch(payload);
       }
       await refreshOrganization();
       setBranchModal({ open: false, editing: null });
@@ -543,6 +575,17 @@ export default function OrganizationView() {
                         )}
                       </div>
 
+                      <div className="flex items-center justify-between py-1 border-b border-slate-100">
+                        <span className="text-slate-500">GPS Geofencing (100m Lock)</span>
+                        {branch.geofence_enabled && branch.latitude && branch.longitude ? (
+                          <Badge variant="success" size="sm">
+                            Active · {branch.radius_meters || 150}m Lock
+                          </Badge>
+                        ) : (
+                          <Badge variant="neutral" size="sm">Not Configured</Badge>
+                        )}
+                      </div>
+
                       {['super_admin', 'hr_admin'].includes(currentUser?.role) && (
                         <Button
                           size="sm"
@@ -813,6 +856,72 @@ export default function OrganizationView() {
               <input required value={branchForm.state} onChange={(e) => setBranchForm((p) => ({ ...p, state: e.target.value }))} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
             </label>
           </div>
+          <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 font-bold text-teal-900">
+                <MapPin className="w-4 h-4 text-teal-600" />
+                <span>GPS Geofencing Settings (Office Boundary)</span>
+              </div>
+              <label className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-teal-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(branchForm.geofence_enabled)}
+                  onChange={(e) => setBranchForm((p) => ({ ...p, geofence_enabled: e.target.checked }))}
+                />
+                Enable GPS Lock
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <label className="block font-medium text-slate-700">
+                Office Latitude
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 25.452600"
+                  value={branchForm.latitude ?? ''}
+                  onChange={(e) => setBranchForm((p) => ({ ...p, latitude: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 bg-white font-mono"
+                />
+              </label>
+              <label className="block font-medium text-slate-700">
+                Office Longitude
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="e.g. 81.834900"
+                  value={branchForm.longitude ?? ''}
+                  onChange={(e) => setBranchForm((p) => ({ ...p, longitude: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 bg-white font-mono"
+                />
+              </label>
+              <label className="block font-medium text-slate-700">
+                Allowed Radius (Meters)
+                <input
+                  type="number"
+                  min={20}
+                  max={2000}
+                  value={branchForm.radius_meters ?? 150}
+                  onChange={(e) => setBranchForm((p) => ({ ...p, radius_meters: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-1.5 bg-white font-mono"
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-teal-100">
+              <button
+                type="button"
+                onClick={handleCaptureCurrentLocation}
+                className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-700 transition self-start"
+              >
+                <Navigation className="w-3.5 h-3.5" /> 📍 Pin My Current GPS Location
+              </button>
+              <span className="text-[10px] text-slate-500">
+                Employees outside this boundary cannot punch.
+              </span>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-5 pt-1">
             <label className="inline-flex items-center gap-2 font-medium text-slate-700">
               <input type="checkbox" checked={branchForm.pt_applicable} onChange={(e) => setBranchForm((p) => ({ ...p, pt_applicable: e.target.checked }))} />

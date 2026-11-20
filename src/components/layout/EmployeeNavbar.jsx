@@ -3,6 +3,7 @@ import {
   Bell,
   Building2,
   CheckCircle2,
+  AlertCircle,
   ChevronDown,
   Clock,
   LogOut,
@@ -15,6 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import { getIndiaDateString } from '../../utils/date';
 import { getRoleMenuItems } from '../../config/roleAccess';
+import { getCurrentPositionAsync } from '../../utils/geolocation';
 
 const employeeLinks = getRoleMenuItems('employee');
 
@@ -49,6 +51,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [punchFeedback, setPunchFeedback] = useState(null);
+  const [isPunching, setIsPunching] = useState(false);
   const matches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
@@ -107,25 +110,39 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   };
 
   const handlePunch = async () => {
-    if (isPunchComplete || !currentUser?.employee_id) return;
+    if (isPunchComplete || !currentUser?.employee_id || isPunching) return;
+
+    setIsPunching(true);
+    setPunchFeedback({ text: 'Acquiring GPS location...', type: 'info' });
+
+    let coords = null;
+    try {
+      coords = await getCurrentPositionAsync();
+    } catch (geoErr) {
+      console.warn('Geolocation warning:', geoErr.message);
+    }
 
     try {
       const result = await punchAttendance(
         currentUser.employee_id,
         currentUser.branch_name || 'Web Portal',
+        coords
       );
       if (result?.type === 'in') {
-        setPunchFeedback(`Punched in at ${result.punch?.punch_in || 'now'}`);
+        const distStr = result.punch?.distance_meters != null ? ` (📍 ${Math.round(result.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched in at ${result.punch?.punch_in || 'now'}${distStr}`, type: 'success' });
       } else if (result?.type === 'out') {
-        setPunchFeedback(`Punched out at ${result.punch?.punch_out || 'now'}`);
+        const distStr = result.punch?.distance_meters != null ? ` (📍 ${Math.round(result.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched out at ${result.punch?.punch_out || 'now'}${distStr}`, type: 'success' });
       } else {
-        setPunchFeedback('Attendance is already complete for today.');
+        setPunchFeedback({ text: 'Attendance is already complete for today.', type: 'info' });
       }
     } catch (error) {
-      setPunchFeedback(error?.data?.message || error.message || 'Punch action failed.');
+      setPunchFeedback({ text: error?.data?.message || error.message || 'Punch action failed.', type: 'error' });
+    } finally {
+      setIsPunching(false);
+      setTimeout(() => setPunchFeedback(null), 4500);
     }
-
-    setTimeout(() => setPunchFeedback(null), 3500);
   };
 
   return (
@@ -204,7 +221,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
         <div className="relative">
           <button
             type="button"
-            disabled={isPunchComplete || !currentUser?.employee_id}
+            disabled={isPunchComplete || !currentUser?.employee_id || isPunching}
             onClick={handlePunch}
             aria-label={isPunchComplete ? 'Punch completed for today' : todayPunch ? 'Punch out' : 'Punch in'}
             className={`flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed ${
@@ -215,13 +232,33 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                   : 'bg-teal-600 text-white hover:bg-teal-700'
             }`}
           >
-            {isPunchComplete ? <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> : <Clock aria-hidden="true" className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{isPunchComplete ? 'Completed' : todayPunch ? 'Punch Out' : 'Punch In'}</span>
+            {isPunchComplete ? (
+              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+            ) : (
+              <Clock aria-hidden="true" className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">
+              {isPunching ? 'Locating...' : isPunchComplete ? 'Completed' : todayPunch ? 'Punch Out' : 'Punch In'}
+            </span>
           </button>
           {punchFeedback && (
-            <p role="status" className="absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] text-white shadow-xl">
-              {punchFeedback}
-            </p>
+            <div
+              role="status"
+              className={`absolute right-0 top-full z-50 mt-2 max-w-xs sm:max-w-sm whitespace-normal rounded-lg px-3 py-2 text-xs shadow-xl animate-fade-in flex items-center gap-1.5 ${
+                punchFeedback.type === 'error'
+                  ? 'bg-rose-950 text-rose-100 border border-rose-800'
+                  : punchFeedback.type === 'info'
+                  ? 'bg-slate-900 text-slate-100'
+                  : 'bg-emerald-950 text-emerald-100 border border-emerald-800'
+              }`}
+            >
+              {punchFeedback.type === 'error' ? (
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              )}
+              <span>{punchFeedback.text}</span>
+            </div>
           )}
         </div>
         <div className="relative">
