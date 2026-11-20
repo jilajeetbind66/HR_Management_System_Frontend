@@ -14,7 +14,7 @@ const initialForm = {
 };
 
 export default function EmployeeStaffingRequests() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const { employees, refreshEmployees } = useHRMS();
   const isManager = currentUser?.role === 'manager';
   const isHr = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
@@ -25,6 +25,17 @@ export default function EmployeeStaffingRequests() {
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const isBranchScoped = Boolean(isHr && activeBranch && activeBranch !== 'All Branches');
+  const filteredRequests = requests.filter((request) => {
+    if (!isBranchScoped) return true;
+    const branchName = request.manager_branch_name || '';
+    return (
+      branchName === activeBranch ||
+      (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+      (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+    );
+  });
 
   const loadRequests = async () => {
     if (!isManager && !isHr) return;
@@ -91,7 +102,7 @@ export default function EmployeeStaffingRequests() {
   if (!isManager && !isHr) return null;
 
   return (
-    <Card title="Staffing requests" subtitle={isManager ? 'Submit requests for HR approval and track their status.' : 'Review manager hiring and team-member requests.'}>
+    <Card title="Staffing requests" subtitle={isManager ? 'Submit requests for HR approval and track their status.' : `Review manager hiring and team-member requests${isBranchScoped ? ` · Filtered: ${activeBranch}` : ''}`}>
       <div className="space-y-4 text-xs">
         {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">{error}</p>}
         {status && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">{status}</p>}
@@ -167,12 +178,17 @@ export default function EmployeeStaffingRequests() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {requests.map((request) => (
+              {filteredRequests.map((request) => (
                 <tr key={request.id} className="align-top">
                   {isHr && (
                     <td className="py-3 pr-3 font-medium text-slate-800">
                       {request.manager_first_name} {request.manager_last_name}
-                      <span className="block text-slate-500">{request.manager_employee_code}</span>
+                      <span className="block text-slate-500 font-mono text-[10px]">{request.manager_employee_code}</span>
+                      {request.manager_branch_name && (
+                        <span className="inline-block mt-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                          {request.manager_branch_name}
+                        </span>
+                      )}
                     </td>
                   )}
                   <td className="py-3 pr-3">
@@ -230,8 +246,10 @@ export default function EmployeeStaffingRequests() {
                   )}
                 </tr>
               ))}
-              {requests.length === 0 && (
-                <tr><td colSpan={isHr ? 6 : 4} className="py-6 text-center text-slate-500">No staffing requests yet.</td></tr>
+              {filteredRequests.length === 0 && (
+                <tr><td colSpan={isHr ? 6 : 4} className="py-6 text-center text-slate-500">
+                  {isBranchScoped ? `No staffing requests found for ${activeBranch}.` : 'No staffing requests yet.'}
+                </td></tr>
               )}
             </tbody>
           </table>
