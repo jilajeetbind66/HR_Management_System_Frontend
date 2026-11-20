@@ -607,6 +607,11 @@ export function HRMSProvider({ children }) {
     setNotifications([]);
   };
 
+  const deleteNotification = async (notificationId) => {
+    await api.deleteNotification(notificationId);
+    setNotifications((previous) => previous.filter((item) => Number(item.id) !== Number(notificationId)));
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -930,6 +935,7 @@ export function HRMSProvider({ children }) {
       markNotificationRead,
       markAllNotificationsRead,
       clearAllNotifications,
+      deleteNotification,
       createAnnouncement,
       markAnnouncementRead,
       auditLogs,

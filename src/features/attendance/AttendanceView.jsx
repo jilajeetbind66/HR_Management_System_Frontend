@@ -67,7 +67,20 @@ export default function AttendanceView() {
     });
   }, [regularizationRequests, employees, activeBranch, isBranchScoped, currentUser?.role]);
 
-  const [activeTab, setActiveTab] = useState('punches'); // 'punches' | 'regularization' | 'import'
+  const [activeTab, setActiveTab] = useState(() => {
+    return window.location.hash === '#regularization' ? 'regularization' : 'punches';
+  });
+
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#regularization') {
+        setActiveTab('regularization');
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
   const [showRegModal, setShowRegModal] = useState(false);
   const [regDate, setRegDate] = useState(getIndiaDateString);
   const [regIn, setRegIn] = useState('09:15 AM');

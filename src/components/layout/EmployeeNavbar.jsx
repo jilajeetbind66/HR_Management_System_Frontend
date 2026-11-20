@@ -10,6 +10,7 @@ import {
   Search,
   UserRound,
   KeyRound,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -43,6 +44,8 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     refreshNotifications,
     markNotificationRead,
     markAllNotificationsRead,
+    clearAllNotifications,
+    deleteNotification,
   } = useHRMS();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -79,25 +82,46 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     setProfileOpen(false);
   };
 
-  const handleNotificationClick = (notification) => {
-    if (!notification.read_at) {
-      markNotificationRead(notification.id).catch((error) => {
-        setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
-      });
+  const handleNotificationClick = async (notification) => {
+    // 1. Delete notification from database and list on click
+    try {
+      await deleteNotification(notification.id);
+    } catch (err) {
+      console.warn('Unable to delete notification:', err);
+      try {
+        await markNotificationRead(notification.id);
+      } catch (_) {}
     }
+
+    // 2. Redirect to exact module
     const eventKey = notification.event_key || '';
-    if (eventKey.startsWith('project.')) {
-      navigateTo('my_projects');
+    if (eventKey.startsWith('attendance.')) {
+      if (eventKey.includes('regularization')) {
+        window.location.hash = 'regularization';
+      }
+      navigateTo('attendance');
     } else if (eventKey.startsWith('leave.')) {
       navigateTo('leaves');
-    } else if (eventKey.startsWith('attendance.')) {
-      navigateTo('attendance');
+    } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
+      navigateTo('my_projects');
     } else if (eventKey.startsWith('payroll.')) {
       navigateTo('payslips');
+    } else if (eventKey.startsWith('training.')) {
+      navigateTo('training');
+    } else if (eventKey.startsWith('expense.')) {
+      navigateTo('expenses');
+    } else if (eventKey.startsWith('document.')) {
+      navigateTo('documents');
+    } else if (eventKey.startsWith('announcement.')) {
+      navigateTo('announcements');
+    } else if (eventKey.startsWith('performance.')) {
+      navigateTo('performance');
+    } else if (eventKey.startsWith('helpdesk.')) {
+      navigateTo('helpdesk');
     } else if (eventKey.startsWith('lead.')) {
       navigateTo('leads');
     } else {
-      setNotificationsOpen(false);
+      navigateTo('dashboard');
     }
   };
 
@@ -288,10 +312,17 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-[min(21rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <h2 className="text-xs font-bold text-slate-900">Notifications & updates</h2>
-                <div className="flex items-center gap-3">
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold text-slate-900">Notifications</h2>
+                  {unreadNotifications > 0 && (
+                    <span className="rounded-full bg-teal-100 px-1.5 py-0.2 text-[10px] font-bold text-teal-700">
+                      {unreadNotifications} new
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5">
                   {unreadNotifications > 0 && (
                     <button
                       type="button"
@@ -302,39 +333,73 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                       }}
                       className="text-[10px] font-semibold text-teal-700 hover:text-teal-800 hover:underline"
                     >
-                      Mark all read
+                      Mark read
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => navigateTo('announcements')}
-                    className="text-[10px] font-semibold text-slate-500 hover:text-slate-700"
-                  >
-                    View all
-                  </button>
+                  {notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await clearAllNotifications();
+                        } catch (error) {
+                          setNotificationError(error?.data?.message || error.message || 'Unable to clear notifications.');
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  )}
                 </div>
               </div>
-              {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700">{notificationError}</p>}
+              {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700 bg-rose-50 border-b border-rose-100">{notificationError}</p>}
               <section aria-label="Notifications">
-                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  Notifications
-                </h3>
+                <div className="flex items-center justify-between px-4 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  <span>Messages ({notifications.length})</span>
+                  <span className="text-[9px] font-normal lowercase text-slate-400">Click to open & dismiss</span>
+                </div>
                 {notifications.length ? (
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                     {notifications.map((notification) => (
-                      <button
-                        type="button"
+                      <div
                         key={notification.id}
                         onClick={() => handleNotificationClick(notification)}
-                        className={`block w-full px-4 py-3 text-left transition hover:bg-teal-50/60 ${notification.read_at ? '' : 'bg-teal-50/40 border-l-2 border-teal-500'}`}
+                        className={`group flex items-start justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-teal-50/70 cursor-pointer ${
+                          notification.read_at ? '' : 'bg-teal-50/40 border-l-2 border-teal-500'
+                        }`}
                       >
-                        <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
-                        <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{notification.message}</span>
-                      </button>
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold text-slate-800 group-hover:text-teal-800">
+                            {notification.title}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                            {notification.message}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          title="Dismiss notification"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await deleteNotification(notification.id);
+                            } catch (err) {
+                              setNotificationError(err?.data?.message || err.message || 'Unable to delete notification.');
+                            }
+                          }}
+                          className="shrink-0 p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition mt-0.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : !notificationError ? (
-                  <p role="status" className="px-4 py-3 text-center text-xs text-slate-500">No notifications yet.</p>
+                  <div className="px-4 py-5 text-center text-xs text-slate-400">
+                    <p className="font-medium text-slate-600">No notifications</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">You're all caught up!</p>
+                  </div>
                 ) : null}
               </section>
               <section aria-label="Company updates" className="border-t border-slate-100">

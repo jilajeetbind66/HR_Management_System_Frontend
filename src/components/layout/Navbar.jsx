@@ -8,6 +8,7 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
+  Trash2,
   LogOut,
   SlidersHorizontal
 } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     markNotificationRead,
     markAllNotificationsRead,
     clearAllNotifications,
+    deleteNotification,
     selectedPersonaId,
     setSelectedPersonaId,
   } = useHRMS();
@@ -41,28 +43,42 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
   const handleNotificationClick = async (notification) => {
-    if (!notification.read_at) {
-      try {
-        await markNotificationRead(notification.id);
-      } catch (error) {
-        setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
-      }
+    try {
+      await deleteNotification(notification.id);
+    } catch (error) {
+      console.warn('Unable to delete notification:', error);
+      try { await markNotificationRead(notification.id); } catch (_) {}
     }
     setShowNotifications(false);
     if (typeof onNavigate === 'function') {
       const eventKey = notification.event_key || '';
-      if (eventKey.startsWith('project.')) {
-        onNavigate('projects');
+      if (eventKey.startsWith('attendance.')) {
+        if (eventKey.includes('regularization')) {
+          window.location.hash = 'regularization';
+        }
+        onNavigate('attendance');
+      } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
+        onNavigate(currentUser?.role === 'employee' ? 'my_projects' : 'projects');
       } else if (eventKey.startsWith('leave.')) {
         onNavigate('leaves');
-      } else if (eventKey.startsWith('attendance.')) {
-        onNavigate('attendance');
       } else if (eventKey.startsWith('payroll.')) {
-        onNavigate('payslips');
-      } else if (eventKey.startsWith('staffing.')) {
-        onNavigate('employees');
+        onNavigate(['super_admin', 'payroll_admin', 'auditor'].includes(currentUser?.role) ? 'payroll' : 'payslips');
       } else if (eventKey.startsWith('lead.')) {
         onNavigate('leads');
+      } else if (eventKey.startsWith('training.')) {
+        onNavigate('training');
+      } else if (eventKey.startsWith('expense.')) {
+        onNavigate('expenses');
+      } else if (eventKey.startsWith('document.')) {
+        onNavigate('documents');
+      } else if (eventKey.startsWith('announcement.')) {
+        onNavigate('announcements');
+      } else if (eventKey.startsWith('performance.')) {
+        onNavigate('performance');
+      } else if (eventKey.startsWith('helpdesk.')) {
+        onNavigate('helpdesk');
+      } else {
+        onNavigate('dashboard');
       }
     }
   };
@@ -338,22 +354,38 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
                     notifications
                       .filter((n) => !n.read_at)
                       .map((notification) => (
-                        <button
-                          type="button"
+                        <div
                           key={notification.id}
                           onClick={() => handleNotificationClick(notification)}
-                          className="block w-full rounded-lg px-2.5 py-2.5 text-left transition bg-teal-50/60 border-l-2 border-teal-500 hover:bg-teal-50 my-1"
+                          className="group flex items-start justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left transition bg-teal-50/60 border-l-2 border-teal-500 hover:bg-teal-50 my-1 cursor-pointer"
                         >
-                          <div className="flex items-start justify-between gap-1">
-                            <span className="block text-xs font-bold text-slate-900 leading-tight">
-                              {notification.title}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="block text-xs font-bold text-slate-900 leading-tight">
+                                {notification.title}
+                              </span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
+                            </div>
+                            <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">
+                              {notification.message}
                             </span>
-                            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
                           </div>
-                          <span className="mt-1 block text-[11px] leading-relaxed text-slate-600">
-                            {notification.message}
-                          </span>
-                        </button>
+                          <button
+                            type="button"
+                            title="Delete notification"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await deleteNotification(notification.id);
+                              } catch (err) {
+                                setNotificationError(err?.data?.message || err.message || 'Unable to delete notification.');
+                              }
+                            }}
+                            className="shrink-0 p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ))
                   ) : (
                     <div className="py-8 text-center">
@@ -366,28 +398,44 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
                   )
                 ) : notifications.length > 0 ? (
                   notifications.map((notification) => (
-                    <button
-                      type="button"
+                    <div
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`block w-full rounded-lg px-2.5 py-2 text-left transition my-0.5 ${
+                      className={`group flex items-start justify-between gap-2 rounded-lg px-2.5 py-2 text-left transition my-0.5 cursor-pointer ${
                         notification.read_at
                           ? 'bg-white opacity-85 hover:bg-slate-50'
                           : 'bg-teal-50/60 border-l-2 border-teal-500 hover:bg-teal-50 font-medium'
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-1">
-                        <span className={`block text-xs leading-tight ${notification.read_at ? 'font-semibold text-slate-700' : 'font-bold text-slate-900'}`}>
-                          {notification.title}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-1">
+                          <span className={`block text-xs leading-tight ${notification.read_at ? 'font-semibold text-slate-700' : 'font-bold text-slate-900'}`}>
+                            {notification.title}
+                          </span>
+                          {!notification.read_at && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
+                          )}
+                        </div>
+                        <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
+                          {notification.message}
                         </span>
-                        {!notification.read_at && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-teal-500 shrink-0 mt-1" />
-                        )}
                       </div>
-                      <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">
-                        {notification.message}
-                      </span>
-                    </button>
+                      <button
+                        type="button"
+                        title="Delete notification"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await deleteNotification(notification.id);
+                          } catch (err) {
+                            setNotificationError(err?.data?.message || err.message || 'Unable to delete notification.');
+                          }
+                        }}
+                        className="shrink-0 p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))
                 ) : (
                   <div className="py-8 text-center">
