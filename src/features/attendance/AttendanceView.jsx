@@ -95,8 +95,8 @@ export default function AttendanceView() {
   const handleOpenRegularizeForRecord = (record) => {
     setRegDate(record.date);
     setRegIn(record.punch_in || '09:15 AM');
-    setRegOut('06:30 PM');
-    setRegReason(`Missed punch-out on ${record.date}. Requested standard exit time.`);
+    setRegOut(record.punch_out || '06:30 PM');
+    setRegReason(record.punch_out ? `Correction for punch times on ${record.date}` : `Missed punch-out on ${record.date}. Requested standard exit time.`);
     setRegModalError('');
     setShowRegModal(true);
   };
@@ -411,22 +411,18 @@ export default function AttendanceView() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {isMissingPunchOut ? (
-                          regReq?.status === 'pending' ? (
-                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
-                              <Clock className="w-3 h-3" /> Reg Pending
-                            </span>
-                          ) : (isCurrentEmployee || canManageAttendance) ? (
-                            <button
-                              type="button"
-                              onClick={() => handleOpenRegularizeForRecord(att)}
-                              className="inline-flex items-center gap-1 rounded bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700 hover:bg-teal-100 border border-teal-200 transition"
-                            >
-                              <Clock className="w-3 h-3 text-teal-600" /> Regularize
-                            </button>
-                          ) : (
-                            <span className="text-slate-300 text-xs">—</span>
-                          )
+                        {regReq?.status === 'pending' ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+                            <Clock className="w-3 h-3" /> Reg Pending
+                          </span>
+                        ) : (isCurrentEmployee || canManageAttendance) ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenRegularizeForRecord(att)}
+                            className="inline-flex items-center gap-1 rounded bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700 hover:bg-teal-100 border border-teal-200 transition"
+                          >
+                            <Clock className="w-3 h-3 text-teal-600" /> Regularize
+                          </button>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}
