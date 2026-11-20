@@ -268,17 +268,19 @@ export default function DeveloperDashboard({ onNavigate }) {
               {isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={FileText}
-            disabled={!isViewingOwnWorkspace}
-            title={!isViewingOwnWorkspace ? 'Payslips are available only for your signed-in account.' : undefined}
-            onClick={() => onNavigate('payslips')}
-            className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
-          >
-            {isViewingOwnWorkspace ? 'My Payslips' : 'Payslips'}
-          </Button>
+          {!isWorkspaceExecutive && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={FileText}
+              disabled={!isViewingOwnWorkspace}
+              title={!isViewingOwnWorkspace ? 'Payslips are available only for your signed-in account.' : undefined}
+              onClick={() => onNavigate('payslips')}
+              className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              {isViewingOwnWorkspace ? 'My Payslips' : 'Payslips'}
+            </Button>
+          )}
           {!isWorkspaceExecutive && (
             <Button
               variant="secondary"
@@ -716,27 +718,29 @@ export default function DeveloperDashboard({ onNavigate }) {
             </Card>
           )}
 
-          {/* India Statutory & Tax Summary for Employee */}
-          <Card title="Statutory & Tax Info" subtitle="Masked statutory details">
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">PAN Number</span>
-                <span className="font-mono font-semibold text-slate-800">{workspaceUser.pan || '—'}</span>
+          {/* India Statutory & Tax Summary for Regular Employees (Hidden for Founder) */}
+          {!isWorkspaceExecutive && (
+            <Card title="Statutory & Tax Info" subtitle="Masked statutory details">
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">PAN Number</span>
+                  <span className="font-mono font-semibold text-slate-800">{workspaceUser.pan || '—'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">EPF UAN</span>
+                  <span className="font-mono font-semibold text-slate-800">{workspaceUser.uan || '—'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Tax Regime</span>
+                  <span className="font-semibold text-teal-600">{workspaceUser.tax_regime ? `${workspaceUser.tax_regime} Regime` : '—'}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-500">Salary Bank</span>
+                  <span className="font-semibold text-slate-800">{workspaceUser.bank_name || '—'}</span>
+                </div>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">EPF UAN</span>
-                <span className="font-mono font-semibold text-slate-800">{workspaceUser.uan || '—'}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Tax Regime</span>
-                <span className="font-semibold text-teal-600">{workspaceUser.tax_regime ? `${workspaceUser.tax_regime} Regime` : '—'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500">Salary Bank</span>
-                <span className="font-semibold text-slate-800">{workspaceUser.bank_name || '—'}</span>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          )}
         </div>
       </div>
 
