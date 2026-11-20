@@ -597,6 +597,30 @@ export function HRMSProvider({ children }) {
     })));
   };
 
+  const clearAllNotifications = async () => {
+    await api.clearAllNotifications();
+    setNotifications([]);
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Periodic lightweight background sync for real-time notification badge updates
+    const interval = setInterval(() => {
+      refreshNotifications().catch(() => {});
+    }, 25000);
+
+    const handleFocus = () => {
+      refreshNotifications().catch(() => {});
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isAuthenticated, refreshNotifications]);
+
   const runPayroll = async (monthName, year, scopeKey = 'company') => {
     const monthNumber = new Date(`${monthName} 1, ${year}`).getMonth() + 1;
     const response = await api.generatePayrollRun(year, monthNumber, scopeKey, `${monthName} ${year}`);
@@ -901,6 +925,7 @@ export function HRMSProvider({ children }) {
       refreshNotifications,
       markNotificationRead,
       markAllNotificationsRead,
+      clearAllNotifications,
       createAnnouncement,
       markAnnouncementRead,
       auditLogs,

@@ -91,6 +91,8 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       navigateTo('attendance');
     } else if (eventKey.startsWith('payroll.')) {
       navigateTo('payslips');
+    } else if (eventKey.startsWith('lead.')) {
+      navigateTo('leads');
     } else {
       setNotificationsOpen(false);
     }
