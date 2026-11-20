@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { initialBranches } from '../../data/mockData';
 import {
   Bell,
   Clock,
@@ -98,57 +99,58 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 w-full items-center justify-between gap-2 border-b border-slate-200/90 bg-white/95 px-3 backdrop-blur sm:px-6">
-      {/* Left: Mobile hamburger & Brand */}
-      <div className={`flex min-w-0 items-center gap-2 sm:gap-4 ${isAdminWorkspace ? 'flex-1' : ''}`}>
-        <button
-          onClick={onMenuToggle}
-          className="rounded-lg p-2 text-slate-500 hover:bg-teal-50 hover:text-teal-700 lg:hidden"
-        >
-          <SlidersHorizontal className="h-5 w-5" />
-        </button>
-
-        {/* Branch Selector */}
-        <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
-          <Building2 className="h-3.5 w-3.5 text-teal-600" />
-          <span className="font-semibold text-slate-500">Branch:</span>
-          <select
-            value={activeBranch}
-            onChange={(e) => setActiveBranch(e.target.value)}
-            className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200/90 bg-white/95 backdrop-blur">
+      <div className="flex h-16 w-full items-center justify-between gap-2 px-3 sm:px-6">
+        {/* Left: Mobile hamburger & Brand */}
+        <div className={`flex min-w-0 items-center gap-1.5 sm:gap-4 ${isAdminWorkspace ? 'flex-1' : ''}`}>
+          <button
+            onClick={onMenuToggle}
+            className="rounded-lg p-2 text-slate-500 hover:bg-teal-50 hover:text-teal-700 lg:hidden shrink-0"
           >
-            <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
-            ))}
-          </select>
-        </div>
-        {isAdminWorkspace && (
-          <label className="flex min-w-0 max-w-[128px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 sm:max-w-none sm:px-2.5">
-            <span className="hidden md:inline font-semibold">Workspace</span>
-            <span className="sr-only">View workspace as employee</span>
-            <select
-              value={selectedPersonaId || ''}
-              onChange={(event) => {
-                setSelectedPersonaId(event.target.value ? Number(event.target.value) : null);
-                onNavigate?.('developer_space');
-              }}
-              className="min-w-0 max-w-[100px] bg-transparent font-medium text-slate-800 focus:outline-none max-[380px]:max-w-[76px] sm:max-w-36"
-            >
-              <option value="">My Workspace</option>
-              {employees
-                .filter((employee) => employee.status === 'active')
-                .map((employee) => (
-                  <option key={employee.id} value={employee.id}>
-                    {employee.first_name} {employee.last_name} · {employee.employee_code}
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
+            <SlidersHorizontal className="h-5 w-5" />
+          </button>
 
-        {/* Backend API Connection Status Pill */}
-      </div>
+          {/* Desktop Branch Selector (Super Admin Only) */}
+          {currentUser?.role === 'super_admin' && (
+            <div className="hidden sm:flex items-center gap-2 border border-slate-200 bg-slate-50/80 rounded-lg px-3 py-1.5 text-xs text-slate-700">
+              <Building2 className="h-3.5 w-3.5 text-teal-600" />
+              <span className="font-semibold text-slate-500">Branch:</span>
+              <select
+                value={activeBranch}
+                onChange={(e) => setActiveBranch(e.target.value)}
+                className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
+              >
+                <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+                {availableBranches.map(b => (
+                  <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {isAdminWorkspace && (
+            <label className="flex min-w-0 max-w-[128px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 sm:max-w-none sm:px-2.5">
+              <span className="hidden md:inline font-semibold">Workspace</span>
+              <span className="sr-only">View workspace as employee</span>
+              <select
+                value={selectedPersonaId || ''}
+                onChange={(event) => {
+                  setSelectedPersonaId(event.target.value ? Number(event.target.value) : null);
+                  onNavigate?.('developer_space');
+                }}
+                className="min-w-0 max-w-[100px] bg-transparent font-medium text-slate-800 focus:outline-none max-[380px]:max-w-[76px] sm:max-w-36"
+              >
+                <option value="">My Workspace</option>
+                {employees
+                  .filter((employee) => employee.status === 'active')
+                  .map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.first_name} {employee.last_name} · {employee.employee_code}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
+        </div>
 
       {/* Right Controls */}
       <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
@@ -290,6 +292,27 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
           )}
         </div>
       </div>
+      </div>
+
+      {/* Dedicated Mobile Branch Strip (Super Admin Only) */}
+      {currentUser?.role === 'super_admin' && (
+        <div className="flex sm:hidden items-center justify-between border-t border-slate-200/80 bg-slate-50/95 px-3 py-1.5 text-xs">
+          <div className="flex items-center gap-1.5 font-semibold text-slate-700">
+            <Building2 className="h-3.5 w-3.5 text-teal-600 shrink-0" />
+            <span>Branch:</span>
+          </div>
+          <select
+            value={activeBranch}
+            onChange={(e) => setActiveBranch(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-xs focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 max-w-[210px] truncate cursor-pointer"
+          >
+            <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+            {availableBranches.map((b) => (
+              <option key={b.id} value={b.name}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
     </header>
   );
 }

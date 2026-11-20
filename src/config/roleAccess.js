@@ -43,7 +43,7 @@ const modulesByRole = {
   ],
   recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'account'],
   payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'reports', 'account'],
-  auditor: ['dashboard', 'developer_space', 'employees', 'payroll', 'payslips', 'reports', 'platform', 'account'],
+  auditor: ['dashboard', 'developer_space', 'employees', 'organization', 'payroll', 'payslips', 'reports', 'platform', 'account'],
   super_admin: allModules,
 };
 

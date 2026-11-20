@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
@@ -19,11 +19,12 @@ import {
   FileSpreadsheet,
   MapPin,
   Laptop,
-  Download
+  Download,
+  Building2
 } from 'lucide-react';
 
 export default function AttendanceView() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     attendance,
     punchAttendance,
@@ -33,6 +34,36 @@ export default function AttendanceView() {
     refreshAttendance,
     employees
   } = useHRMS();
+
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
+
+  const filteredAttendance = useMemo(() => {
+    if (!isBranchScoped) return attendance;
+    return attendance.filter((att) => {
+      const emp = employees.find((e) => Number(e.id) === Number(att.employee_id));
+      const branchName = emp?.branch_name || att.location;
+      if (!branchName) return false;
+      return (
+        branchName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+      );
+    });
+  }, [attendance, employees, activeBranch, isBranchScoped]);
+
+  const filteredRegularization = useMemo(() => {
+    if (!isBranchScoped) return regularizationRequests;
+    return regularizationRequests.filter((req) => {
+      const emp = employees.find((e) => Number(e.id) === Number(req.employee_id));
+      const branchName = emp?.branch_name;
+      if (!branchName) return false;
+      return (
+        branchName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+      );
+    });
+  }, [regularizationRequests, employees, activeBranch, isBranchScoped]);
 
   const [activeTab, setActiveTab] = useState('punches'); // 'punches' | 'regularization' | 'import'
   const [showRegModal, setShowRegModal] = useState(false);
@@ -285,14 +316,14 @@ export default function AttendanceView() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
+      <div className="border-b border-slate-200 flex flex-wrap items-center gap-4 text-xs">
         <button
           onClick={() => setActiveTab('punches')}
           className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
             activeTab === 'punches' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Clock className="w-4 h-4" /> Daily Punch Ledger ({attendance.length})
+          <Clock className="w-4 h-4" /> Daily Punch Ledger ({filteredAttendance.length})
         </button>
 
         <button
@@ -301,7 +332,7 @@ export default function AttendanceView() {
             activeTab === 'regularization' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <UserCheck className="w-4 h-4" /> Regularization Requests ({regularizationRequests.length})
+          <UserCheck className="w-4 h-4" /> Regularization Requests ({filteredRegularization.length})
         </button>
 
         {canViewCsvImports && (
@@ -313,6 +344,13 @@ export default function AttendanceView() {
           >
             <Upload className="w-4 h-4" /> CSV Biometric Punch Import
           </button>
+        )}
+
+        {isBranchScoped && (
+          <div className="ml-auto pb-2 flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Branch: {activeBranch}</span>
+          </div>
         )}
       </div>
 
@@ -438,13 +476,18 @@ export default function AttendanceView() {
 
       {/* TAB 2: REGULARIZATION */}
       {activeTab === 'regularization' && (
-        <Card title="Attendance Regularization Requests" subtitle="Workflow for missed punches, client visits, and network issues">
+        <Card
+          title="Attendance Regularization Requests"
+          subtitle={`Workflow for missed punches, client visits, and network issues${isBranchScoped ? ` · Filtered: ${activeBranch}` : ''}`}
+        >
           <div className="space-y-3">
-            {regularizationRequests.length === 0 ? (
+            {filteredRegularization.length === 0 ? (
               <p role="status" className="rounded-xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500">
-                No attendance regularization requests have been submitted.
+                {isBranchScoped
+                  ? `No attendance regularization requests found for ${activeBranch}.`
+                  : 'No attendance regularization requests have been submitted.'}
               </p>
-            ) : regularizationRequests.map(req => (
+            ) : filteredRegularization.map(req => (
               <div key={req.id} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div>
                   <div className="flex items-center gap-2">
@@ -469,6 +512,11 @@ export default function AttendanceView() {
                       Approve Regularization
                     </Button>
                   </div>
+                )}
+                {req.status === 'pending' && Number(req.employee_id) === Number(currentUser?.employee_id) && (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
+                    Your request · Awaiting approval
+                  </span>
                 )}
               </div>
             ))}

@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   Bell,
   Building2,
@@ -17,10 +18,23 @@ import { canReviewLeave } from '../../utils/leaveApproval';
 const dateKey = (date) => String(date || '').slice(0, 10);
 
 const formatDate = (date) => {
-  const parsedDate = new Date(`${dateKey(date)}T00:00:00`);
+  const key = dateKey(date);
+  if (!key) return 'Date not set';
+  const parsedDate = new Date(`${key}T00:00:00`);
   return Number.isNaN(parsedDate.getTime())
     ? 'Date not set'
     : parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const formatBadgeDate = (date) => {
+  const key = dateKey(date);
+  if (!key) return { day: '—', month: '—' };
+  const d = new Date(`${key}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return { day: '—', month: '—' };
+  return {
+    day: d.toLocaleDateString('en-IN', { day: 'numeric' }),
+    month: d.toLocaleDateString('en-IN', { month: 'short' }),
+  };
 };
 
 function ManagerStatCard({ title, value, note, badge, icon: Icon, tone, module, onNavigate }) {
@@ -78,14 +92,22 @@ function PanelHeader({ icon: Icon, title, action, onAction }) {
 }
 
 export default function ManagerDashboard({ onNavigate }) {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const { employees, projects, attendance, leaveRequests, announcements } = useHRMS();
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const firstName = currentUser.first_name || currentUser.name?.split(' ')[0] || 'Manager';
-  const teamMembers = employees.filter(
-    (employee) => String(employee.status || '').toLowerCase() === 'active'
-  );
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
+
+  const teamMembers = employees.filter((employee) => {
+    if (String(employee.status || '').toLowerCase() !== 'active') return false;
+    if (!isBranchScoped) return true;
+    return (
+      employee.branch_name === activeBranch
+      || (activeBranch.includes('Prayagraj') && employee.branch_name?.includes('Prayagraj'))
+      || (activeBranch.includes('Kaushambi') && employee.branch_name?.includes('Kaushambi'))
+    );
+  });
   const teamMemberIds = new Set(teamMembers.map((employee) => Number(employee.id)));
   const teamProjects = projects.filter(
     (project) => teamMemberIds.has(Number(project.assigned_employee_id))
@@ -93,19 +115,29 @@ export default function ManagerDashboard({ onNavigate }) {
   const activeTeamProjects = teamProjects.filter(
     (project) => !['completed', 'cancelled'].includes(String(project.status || '').toLowerCase())
   );
-  const pendingTeamLeaves = leaveRequests.filter((leave) => canReviewLeave(leave, currentUser));
+  const pendingTeamLeaves = leaveRequests.filter((leave) => (
+    canReviewLeave(leave, currentUser)
+    && (!isBranchScoped || teamMemberIds.has(Number(leave.employee_id)))
+  ));
   const presentToday = attendance.filter(
     (record) => teamMemberIds.has(Number(record.employee_id))
       && dateKey(record.date) === todayKey
       && String(record.status || '').toLowerCase() === 'present'
   ).length;
   const latestAnnouncements = announcements.slice(0, 4);
-  const upcomingDeadlines = activeTeamProjects
+  const activeTeamProjectsWithDeadlines = activeTeamProjects
     .map((project) => ({
       ...project,
       deadline: dateKey(project.active_due_date || project.planned_end_date),
     }))
-    .filter((project) => project.deadline && project.deadline >= todayKey)
+    .filter((project) => Boolean(project.deadline));
+
+  const overdueTeamProjects = activeTeamProjectsWithDeadlines
+    .filter((project) => project.deadline < todayKey)
+    .sort((a, b) => a.deadline.localeCompare(b.deadline));
+
+  const upcomingDeadlines = activeTeamProjectsWithDeadlines
+    .filter((project) => project.deadline >= todayKey)
     .sort((a, b) => a.deadline.localeCompare(b.deadline))
     .slice(0, 4);
 
@@ -113,8 +145,8 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Team Members',
       value: teamMembers.length,
-      note: 'Active direct reports',
-      badge: 'Team',
+      note: isBranchScoped ? `${activeBranch} active staff` : 'Active direct reports',
+      badge: isBranchScoped ? activeBranch.replace(' Branch', '') : 'Team',
       icon: UsersRound,
       tone: 'teal',
       module: 'employees',
@@ -122,7 +154,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Team Projects',
       value: activeTeamProjects.length,
-      note: 'Assigned active projects',
+      note: isBranchScoped ? `${activeBranch} projects` : 'Assigned active projects',
       badge: 'Projects',
       icon: FolderKanban,
       tone: 'blue',
@@ -131,7 +163,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Pending Leave Requests',
       value: pendingTeamLeaves.length,
-      note: 'Awaiting your review',
+      note: isBranchScoped ? `${activeBranch} requests` : 'Awaiting your review',
       badge: 'Review',
       icon: FileText,
       tone: 'amber',
@@ -140,7 +172,7 @@ export default function ManagerDashboard({ onNavigate }) {
     {
       title: 'Present Today',
       value: presentToday,
-      note: 'Team attendance records',
+      note: isBranchScoped ? `${activeBranch} attendance` : 'Team attendance records',
       badge: 'Today',
       icon: Clock3,
       tone: 'rose',
@@ -154,7 +186,15 @@ export default function ManagerDashboard({ onNavigate }) {
         <div aria-hidden="true" className="absolute -right-10 -top-20 -z-10 h-64 w-64 rounded-full border border-white/10" />
         <div aria-hidden="true" className="absolute -right-2 -bottom-36 -z-10 h-72 w-72 rounded-full bg-white/5" />
         <div className="relative z-10 max-w-2xl">
-          <p className="text-xs font-medium text-teal-50">Manager workspace</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-medium text-teal-50">Manager workspace</p>
+            {isBranchScoped && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur">
+                <Building2 className="h-3 w-3" />
+                {activeBranch}
+              </span>
+            )}
+          </div>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-[30px]">
             Welcome, {firstName}! <span aria-hidden="true">👋</span>
           </h1>
@@ -206,33 +246,65 @@ export default function ManagerDashboard({ onNavigate }) {
         <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <PanelHeader
             icon={CalendarDays}
-            title="Upcoming Team Deadlines"
+            title="Team Project Deadlines"
             action="View Projects"
             onAction={() => onNavigate('projects')}
           />
-          <p className="mt-1 text-xs text-slate-500">Due dates from active projects assigned to your direct reports</p>
+          <p className="mt-1 text-xs text-slate-500">Active project milestones and delivery dates for your direct reports</p>
+
+          {overdueTeamProjects.length > 0 && (
+            <div className="mt-4 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-900 space-y-2">
+              <div className="flex items-center justify-between font-bold text-rose-800">
+                <span className="flex items-center gap-1.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  {overdueTeamProjects.length} Overdue Project{overdueTeamProjects.length > 1 ? 's' : ''} Need Review
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('projects')}
+                  className="text-xs font-semibold text-rose-700 underline hover:text-rose-900"
+                >
+                  Manage
+                </button>
+              </div>
+              <div className="divide-y divide-rose-100">
+                {overdueTeamProjects.slice(0, 3).map((project) => (
+                  <div key={`overdue-${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="py-1.5 flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-rose-950 truncate max-w-[220px]">
+                      {project.name} <span className="font-normal text-rose-700">({project.assigned_employee_name || 'Staff'})</span>
+                    </span>
+                    <span className="text-rose-700 font-semibold shrink-0">Due {formatDate(project.deadline)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {upcomingDeadlines.length ? (
             <div className="mt-4 divide-y divide-slate-100">
-              {upcomingDeadlines.map((project) => (
-                <div key={`${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
-                  <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-teal-50 text-[9px] font-bold leading-tight text-teal-800">
-                    <span>{formatDate(project.deadline).split(' ')[0]}</span>
-                    <span>{formatDate(project.deadline).split(' ')[1]}</span>
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-slate-800">{project.name || 'Team project'}</p>
-                    <p className="mt-1 truncate text-xs text-slate-500">
-                      {project.assigned_employee_name || 'Team member'} · Due {formatDate(project.deadline)}
-                    </p>
+              {upcomingDeadlines.map((project) => {
+                const badge = formatBadgeDate(project.deadline);
+                return (
+                  <div key={`${project.id}-${project.assignment_id || project.assigned_employee_id}`} className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
+                    <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-teal-50 text-[9px] font-bold leading-tight text-teal-800">
+                      <span>{badge.day}</span>
+                      <span>{badge.month}</span>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">{project.name || 'Team project'}</p>
+                      <p className="mt-1 truncate text-xs text-slate-500">
+                        {project.assigned_employee_name || 'Team member'} · Due {formatDate(project.deadline)}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold capitalize text-teal-800">
+                      {String(project.status || 'Active').replaceAll('_', ' ')}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-teal-50 px-2.5 py-1 text-[10px] font-semibold capitalize text-teal-800">
-                    {String(project.status || 'Active').replaceAll('_', ' ')}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
-            <p role="status" className="mt-4 rounded-xl bg-slate-50 px-4 py-10 text-center text-xs text-slate-500">
+            <p role="status" className="mt-4 rounded-xl bg-slate-50 px-4 py-8 text-center text-xs text-slate-500">
               No upcoming deadlines found for active team projects.
             </p>
           )}

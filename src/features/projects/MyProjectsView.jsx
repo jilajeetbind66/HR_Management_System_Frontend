@@ -231,18 +231,25 @@ export default function MyProjectsView() {
               </p>
               {(currentUser.role === 'super_admin'
                 || Number(project.assigned_employee_id) === Number(currentUser.employee_id))
-                && project.status !== 'completed' && (
-                  <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                    <Button size="sm" variant="secondary" icon={Sliders} onClick={() => openAction(project, 'progress')}>
-                      Update Progress
-                    </Button>
-                    <Button size="sm" variant="secondary" icon={Calendar} disabled={hasPendingExtension} onClick={() => openAction(project, 'extension')}>
-                      Request Extension
-                    </Button>
-                    {project.status === 'in_progress' && (
-                      <Button size="sm" variant="primary" icon={Send} onClick={() => openAction(project, 'completion')}>
-                        Submit Completion
-                      </Button>
+                && !['completed', 'cancelled'].includes(project.status) && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+                    {['in_progress', 'overdue'].includes(project.status) && (
+                      <>
+                        <Button size="sm" variant="secondary" icon={Sliders} onClick={() => openAction(project, 'progress')}>
+                          Update Progress
+                        </Button>
+                        <Button size="sm" variant="secondary" icon={Calendar} disabled={hasPendingExtension} onClick={() => openAction(project, 'extension')}>
+                          Request Extension
+                        </Button>
+                        <Button size="sm" variant="primary" icon={Send} onClick={() => openAction(project, 'completion')}>
+                          Submit Completion
+                        </Button>
+                      </>
+                    )}
+                    {project.status === 'under_review' && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                        Deliverable Submitted — Awaiting Review
+                      </span>
                     )}
                   </div>
                 )}

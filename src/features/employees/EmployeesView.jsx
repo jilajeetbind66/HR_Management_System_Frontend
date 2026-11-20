@@ -12,6 +12,7 @@ import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import PhoneInput from '../../components/common/PhoneInput';
 import EmployeeCsvImport from './EmployeeCsvImport';
 import EmployeeStaffingRequests from './EmployeeStaffingRequests';
+import { initialBranches } from '../../data/mockData';
 import { getAssignableUserRoles, roleLoginCategory, userRoleLabels } from '../../config/userRoles';
 import {
   Users,
@@ -32,12 +33,13 @@ import {
   XCircle,
   UserRound,
   TrendingUp,
+  Pencil,
 } from 'lucide-react';
 
 export default function EmployeesView() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, activeBranch, setActiveBranch } = useAuth();
   const {
     employees,
     branches,
@@ -54,7 +56,13 @@ export default function EmployeesView() {
   } = useHRMS();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    if (currentUser?.role !== 'super_admin' && currentUser?.branch_name) {
+      return currentUser.branch_name;
+    }
+    return activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all';
+  });
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -159,7 +167,7 @@ export default function EmployeesView() {
       || Number(employee.id) === Number(selectedEmployee?.reporting_manager_id)
     )
   ));
-  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive', 'auditor'].includes(currentUser?.role);
   const canViewCompensation = ['super_admin', 'hr_admin'].includes(currentUser?.role);
   const departmentOptions = currentUser?.role === 'manager'
     ? [...new Set(employees.map((employee) => employee.department).filter(Boolean))]
@@ -187,6 +195,28 @@ export default function EmployeesView() {
   }, [searchTerm, selectedBranch, selectedDept, selectedStatus]);
 
   useEffect(() => {
+    if (currentUser?.role === 'super_admin') {
+      if (activeBranch && activeBranch !== 'All Branches') {
+        setSelectedBranch(activeBranch);
+      } else if (activeBranch === 'All Branches') {
+        setSelectedBranch('all');
+      }
+    } else {
+      if (currentUser?.branch_name) {
+        setSelectedBranch(currentUser.branch_name);
+      }
+    }
+  }, [activeBranch, currentUser]);
+
+  const handleBranchFilterChange = (value) => {
+    if (currentUser?.role !== 'super_admin') return;
+    setSelectedBranch(value);
+    if (setActiveBranch) {
+      setActiveBranch(value === 'all' ? 'All Branches' : value);
+    }
+  };
+
+  useEffect(() => {
     const params = new URLSearchParams(search);
     const employeeId = Number(params.get('employee_id'));
     if (!employeeId || params.get('profile_tab') !== 'salary') return;
@@ -205,7 +235,10 @@ export default function EmployeesView() {
     const nameMatch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       emp.employee_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       (currentUser?.role !== 'manager' && emp.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const branchMatch = selectedBranch === 'all' || emp.branch_name === selectedBranch;
+    const branchMatch = selectedBranch === 'all'
+      || emp.branch_name === selectedBranch
+      || String(emp.branch_id) === String(selectedBranch)
+      || (selectedBranch && emp.branch_name && emp.branch_name.toLowerCase().includes(selectedBranch.toLowerCase()));
     const deptMatch = selectedDept === 'all' || emp.department === selectedDept;
     const statusMatch = selectedStatus === 'all' || emp.status === selectedStatus;
     return nameMatch && branchMatch && deptMatch && statusMatch;
@@ -615,16 +648,18 @@ export default function EmployeesView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <select
-            value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
-            className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
-          >
-            <option value="all">All Branches</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
-            ))}
-          </select>
+          {currentUser?.role === 'super_admin' && (
+            <select
+              value={selectedBranch}
+              onChange={(e) => handleBranchFilterChange(e.target.value)}
+              className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
+            >
+              <option value="all">All Branches</option>
+              {availableBranches.map(b => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          )}
 
           <select
             value={selectedDept}
@@ -1217,6 +1252,18 @@ export default function EmployeesView() {
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Professional Tax (PT) State</span>
                     <span className="font-semibold text-slate-700">{selectedEmployee.pt_state || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Name</span>
+                    <span className="font-semibold text-slate-700">{selectedEmployee.bank_name || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Account Number</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.account_number || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank IFSC Code</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.ifsc_code || '—'}</span>
                   </div>
                 </div>
                 {currentUser?.role === 'super_admin' && (

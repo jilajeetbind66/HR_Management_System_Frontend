@@ -36,6 +36,7 @@ export default function DeveloperDashboard({ onNavigate }) {
     leaveBalances,
     applyLeave,
     selectedPersonaId,
+    setSelectedPersonaId,
   } = useHRMS();
 
   const selectedPersona = currentUser.role === 'super_admin' && selectedPersonaId
@@ -50,6 +51,11 @@ export default function DeveloperDashboard({ onNavigate }) {
   const myProjects = projectSource.filter(
     (project) => Number(project.assigned_employee_id) === workspaceEmployeeId
   );
+  // Sort projects: active/overdue first, completed last
+  const sortedProjects = [...myProjects].sort((a, b) => {
+    const statusOrder = { overdue: 1, in_progress: 2, under_review: 3, completed: 4 };
+    return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+  });
   const myLeaveRequests = leaveRequests.filter(
     (leave) => Number(leave.employee_id) === workspaceEmployeeId
   );
@@ -60,6 +66,7 @@ export default function DeveloperDashboard({ onNavigate }) {
   const today = getIndiaDateString();
   const myPunch = attendance.find(a => Number(a.employee_id) === workspaceEmployeeId && a.date === today);
   const isPunchComplete = Boolean(myPunch?.punch_out);
+  const hasPunchedIn = Boolean(myPunch && !myPunch?.punch_out);
 
   // Balances
   const myBalance = { cl: 0, sl: 0, pl: 0, comp_off: 0, ...leaveBalances[workspaceEmployeeId] };
@@ -186,6 +193,36 @@ export default function DeveloperDashboard({ onNavigate }) {
           {leaveWarning}
         </div>
       )}
+      {/* Read-Only Persona Inspection Banner */}
+      {!isViewingOwnWorkspace && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white font-bold text-sm shadow">
+              👁️
+            </span>
+            <div>
+              <p className="font-semibold text-sky-950">
+                Viewing Workspace as <span className="font-bold underline">{workspaceUser.first_name} {workspaceUser.last_name} ({workspaceUser.employee_code})</span>
+                <span className="ml-2 inline-flex items-center rounded-full bg-sky-200 text-sky-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+                  Read-Only Inspection Mode
+                </span>
+              </p>
+              <p className="text-sky-700 text-[11px] mt-0.5">
+                Attendance punch clock and leave application are disabled while inspecting employee workspaces.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setSelectedPersonaId && setSelectedPersonaId(null)}
+            className="shrink-0 bg-white border-sky-300 text-sky-800 hover:bg-sky-100 font-semibold"
+          >
+            ← Return to My Workspace
+          </Button>
+        </div>
+      )}
+
       {/* Developer Hero */}
       <div className="hrms-dashboard-hero rounded-2xl p-6 text-white shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
@@ -202,22 +239,30 @@ export default function DeveloperDashboard({ onNavigate }) {
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-teal-50">My Workspace</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-teal-50">
+                {isViewingOwnWorkspace ? 'My Workspace' : `Employee Workspace • ${workspaceUser.first_name}`}
+              </span>
               <span className="text-xs bg-white/15 text-teal-50 px-2 py-0.5 rounded-full">{workspaceUser.employee_code}</span>
+              {!isViewingOwnWorkspace && (
+                <span className="text-[10px] bg-sky-400/30 text-sky-100 border border-sky-200/40 px-2 py-0.5 rounded-full font-bold">
+                  Read-Only
+                </span>
+              )}
             </div>
             <h1 className="text-2xl font-bold mt-0.5 text-white">{workspaceUser.first_name} {workspaceUser.last_name}</h1>
             <p className="text-xs text-teal-50">{workspaceUser.designation} • {workspaceUser.branch_name}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2.5">
           <Button
             variant="secondary"
             size="sm"
             icon={CalendarCheck}
             onClick={openMyLeave}
+            className="w-full justify-center sm:w-auto"
           >
-            My Leave
+            {isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
           </Button>
           <Button
             variant="secondary"
@@ -226,15 +271,18 @@ export default function DeveloperDashboard({ onNavigate }) {
             disabled={!isViewingOwnWorkspace}
             title={!isViewingOwnWorkspace ? 'Payslips are available only for your signed-in account.' : undefined}
             onClick={() => onNavigate('payslips')}
+            className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
-            My Payslips
+            {isViewingOwnWorkspace ? 'My Payslips' : 'Payslips'}
           </Button>
           <Button
             variant="secondary"
             size="sm"
             icon={CalendarPlus}
             disabled={!isViewingOwnWorkspace}
+            title={!isViewingOwnWorkspace ? 'Leave application can only be submitted by the employee.' : undefined}
             onClick={() => setShowLeaveModal(true)}
+            className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
           >
             Apply Leave
           </Button>
@@ -243,11 +291,27 @@ export default function DeveloperDashboard({ onNavigate }) {
             size="sm"
             icon={Clock}
             disabled={!isViewingOwnWorkspace || isPunchComplete}
-            title={!isViewingOwnWorkspace ? 'Punch actions are available only for your signed-in account.' : undefined}
+            title={!isViewingOwnWorkspace ? 'Punch actions can only be performed by the employee.' : undefined}
             onClick={handleDeveloperPunch}
-            className={isPunchComplete ? '' : 'bg-teal-600 hover:bg-teal-500 shadow'}
+            className={`w-full justify-center sm:w-auto ${
+              !isViewingOwnWorkspace
+                ? 'opacity-60 cursor-not-allowed bg-slate-800/60 border border-slate-600'
+                : isPunchComplete
+                  ? ''
+                  : 'bg-teal-600 hover:bg-teal-500 shadow'
+            }`}
           >
-            {isPunchComplete ? "Punch Completed" : myPunch ? "Punch Out" : "Punch In"}
+            {!isViewingOwnWorkspace
+              ? isPunchComplete
+                ? "Punch Completed"
+                : myPunch
+                  ? "Shift Active (Read-Only)"
+                  : "Not Punched (Read-Only)"
+              : isPunchComplete
+                ? "Punch Completed"
+                : myPunch
+                  ? "Punch Out"
+                  : "Punch In"}
           </Button>
         </div>
       </div>
@@ -257,15 +321,16 @@ export default function DeveloperDashboard({ onNavigate }) {
         {/* Left Column: My Assigned Projects */}
         <div className="lg:col-span-2 space-y-6">
           <Card
-            title="My Assigned Projects & Deliverables"
+            title={isViewingOwnWorkspace ? "My Assigned Projects & Deliverables" : `${workspaceUser.first_name}'s Assigned Projects & Deliverables`}
             subtitle="Real-time progress reporting, deadline adherence, and extension requests"
           >
-            {myProjects.length > 0 ? (
+            {sortedProjects.length > 0 ? (
               <div className="space-y-4">
-                {myProjects.map(project => {
+                {sortedProjects.map(project => {
                   const isOverdue = project.status === 'overdue';
                   const isComplete = project.status === 'completed';
                   const isUnderReview = project.status === 'under_review';
+                  const hasPendingExtension = (project.extensions || []).some(ext => ext.status === 'pending');
 
                   return (
                     <div key={project.id} className="p-5 rounded-xl border border-slate-200 bg-white shadow-sm space-y-4">
@@ -317,6 +382,25 @@ export default function DeveloperDashboard({ onNavigate }) {
                         </div>
                       </div>
 
+                      {/* Review Feedback Note (Placed Prominently) */}
+                      {project.review_note && (
+                        <div className={`p-3 rounded-lg border text-xs ${
+                          project.returned_by
+                            ? 'bg-amber-50 border-amber-200 text-amber-900'
+                            : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        }`}>
+                          <div className="flex items-center gap-1.5 font-bold mb-1">
+                            <CheckCircle2 className={`w-3.5 h-3.5 ${project.returned_by ? 'text-amber-600' : 'text-emerald-600'}`} />
+                            <span>
+                              {project.returned_by
+                                ? `Revision Instructions (${project.returned_by})`
+                                : `Reviewer Feedback (${project.accepted_by || 'Management'})`}
+                            </span>
+                          </div>
+                          <p className="pl-5 font-medium text-slate-800">"{project.review_note}"</p>
+                        </div>
+                      )}
+
                       {/* Timeline Dates */}
                       <div className="flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-slate-200/60">
                         <div>
@@ -339,20 +423,8 @@ export default function DeveloperDashboard({ onNavigate }) {
                         </div>
                       </div>
 
-                      {/* Review Feedback Note */}
-                      {project.review_note && (
-                        <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
-                          <strong className="font-semibold">
-                            {project.returned_by
-                              ? `Revision Instructions${project.returned_by ? ` (${project.returned_by})` : ''}`
-                              : `Reviewer Feedback${project.accepted_by ? ` (${project.accepted_by})` : ''}`}:{' '}
-                          </strong>
-                          {project.review_note}
-                        </div>
-                      )}
-
                       {/* Developer Actions (Buttons) */}
-                      {!isComplete && canUpdateMyProjects && (
+                      {!isComplete && canUpdateMyProjects && isViewingOwnWorkspace && (
                         <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
                           {isUnderReview ? (
                             <span className="inline-flex items-center gap-1.5 rounded-md bg-blue-50 border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700">
@@ -402,6 +474,14 @@ export default function DeveloperDashboard({ onNavigate }) {
                           )}
                         </div>
                       )}
+                      {!isComplete && !isViewingOwnWorkspace && (
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-100">
+                          <span className="italic">Viewing Mode: Project actions can be taken by {workspaceUser.first_name}.</span>
+                          {isUnderReview && (
+                            <Badge variant="warning" size="sm">Submitted — Awaiting Your Review</Badge>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -409,7 +489,7 @@ export default function DeveloperDashboard({ onNavigate }) {
             ) : (
               <div className="text-center py-10 text-slate-400 text-xs">
                 <FolderGit2 className="w-12 h-12 mx-auto mb-2 text-slate-300" />
-                No projects are currently assigned to you.
+                No projects are currently assigned to {isViewingOwnWorkspace ? 'you' : workspaceUser.first_name}.
               </div>
             )}
           </Card>
@@ -426,24 +506,51 @@ export default function DeveloperDashboard({ onNavigate }) {
                   {myPunch ? (
                     <span className="text-lg font-bold text-emerald-600 flex items-center justify-center gap-1.5">
                       <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                      {myPunch.status} ({myPunch.punch_in})
+                      {myPunch.punch_out ? 'Completed Shift' : 'Present (Working)'} ({myPunch.punch_in})
                     </span>
                   ) : (
                     <span className="text-lg font-bold text-slate-400">Not Punched In</span>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500">
-                  {myPunch?.punch_out ? `Punched out at ${myPunch.punch_out}` : myPunch ? `Punched in via ${myPunch.location}` : "Click below to clock in for today's work shift"}
+                  {myPunch?.punch_out 
+                    ? `Punched out at ${myPunch.punch_out} • Work Hours: ${myPunch.work_hours || '0.00'} hrs` 
+                    : myPunch 
+                      ? `Punched in via ${myPunch.location || 'Branch'} • Shift in progress` 
+                      : "Click below to clock in for today's work shift"}
                 </p>
               </div>
 
               <Button
-                variant={isPunchComplete ? "secondary" : hasPunchedIn ? "danger" : "primary"}
-                className="w-full"
+                variant={
+                  isPunchComplete
+                    ? "secondary"
+                    : !isViewingOwnWorkspace
+                      ? "secondary"
+                      : hasPunchedIn
+                        ? "danger"
+                        : "primary"
+                }
+                className={`w-full ${
+                  !isViewingOwnWorkspace
+                    ? 'opacity-70 cursor-not-allowed bg-slate-100 text-slate-600 border border-slate-200'
+                    : ''
+                }`}
                 disabled={!isViewingOwnWorkspace || !workspaceEmployeeId || isPunchComplete}
                 onClick={handleDeveloperPunch}
+                title={!isViewingOwnWorkspace ? 'Attendance punch can only be recorded by the employee.' : undefined}
               >
-                {isPunchComplete ? "Punch Completed" : hasPunchedIn ? "Punch Out Now" : "Punch In Now"}
+                {!isViewingOwnWorkspace
+                  ? isPunchComplete
+                    ? "Punch Completed"
+                    : hasPunchedIn
+                      ? "Shift Active (Viewing Mode)"
+                      : "Not Punched In (Viewing Mode)"
+                  : isPunchComplete
+                    ? "Punch Completed"
+                    : hasPunchedIn
+                      ? "Punch Out Now"
+                      : "Punch In Now"}
               </Button>
             </div>
           </Card>
@@ -459,7 +566,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   onClick={openMyLeave}
                   className="text-xs text-teal-600 font-semibold hover:underline"
                 >
-                  {myLeaveRequests.length ? `${myLeaveRequests.length} leave request(s)` : 'My Leave'}
+                  {myLeaveRequests.length ? `${myLeaveRequests.length} leave request(s)` : isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
                 </button>
                 <button
                   type="button"

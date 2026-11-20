@@ -21,6 +21,7 @@ export default function EmployeeCsvImport() {
   const [setupLinkExpiresInMinutes, setSetupLinkExpiresInMinutes] = useState(60);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
 
   const downloadTemplate = () => {
     const blob = new Blob([`${CSV_HEADERS.join(',')}\r\n`], { type: 'text/csv;charset=utf-8' });

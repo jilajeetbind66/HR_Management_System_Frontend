@@ -16,19 +16,22 @@ import {
   XCircle,
   FileText,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  Building2
 } from 'lucide-react';
 
 export default function LeavesView() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     leaveBalances,
     leaveRequests,
     applyLeave,
     reviewLeave,
-    cancelLeave
+    cancelLeave,
+    employees
   } = useHRMS();
 
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
   const [activeTab, setActiveTab] = useState('my');
   const [statusFilter, setStatusFilter] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('');
@@ -70,13 +73,41 @@ export default function LeavesView() {
     : activeTab === 'all'
       ? leaveRequests
       : myLeaves;
-  const displayedLeaves = baseLeaves.filter((request) => (
-    (!statusFilter || request.status === statusFilter)
-    && (!employeeFilter || String(request.employee_id) === employeeFilter)
-    && (!dateFromFilter || request.to_date >= dateFromFilter)
-    && (!dateToFilter || request.from_date <= dateToFilter)
-  ));
-  const employeeOptions = [...new Map(leaveRequests.map((request) => [
+
+  const displayedLeaves = baseLeaves.filter((request) => {
+    const matchesStatus = !statusFilter || request.status === statusFilter;
+    const matchesEmp = !employeeFilter || String(request.employee_id) === employeeFilter;
+    const matchesFrom = !dateFromFilter || request.to_date >= dateFromFilter;
+    const matchesTo = !dateToFilter || request.from_date <= dateToFilter;
+    if (!matchesStatus || !matchesEmp || !matchesFrom || !matchesTo) return false;
+
+    if (isBranchScoped && activeTab !== 'my') {
+      const emp = employees.find((e) => Number(e.id) === Number(request.employee_id));
+      const branchName = emp?.branch_name || request.branch_name;
+      if (!branchName) return false;
+      return (
+        branchName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+      );
+    }
+    return true;
+  });
+
+  const branchScopedRequests = isBranchScoped
+    ? leaveRequests.filter((r) => {
+        const emp = employees.find((e) => Number(e.id) === Number(r.employee_id));
+        const branchName = emp?.branch_name || r.branch_name;
+        if (!branchName) return false;
+        return (
+          branchName === activeBranch ||
+          (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+          (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+        );
+      })
+    : leaveRequests;
+
+  const employeeOptions = [...new Map(branchScopedRequests.map((request) => [
     String(request.employee_id),
     { id: String(request.employee_id), name: request.employee_name || request.employee_code || 'Employee' },
   ])).values()].sort((first, second) => first.name.localeCompare(second.name));
@@ -274,6 +305,13 @@ export default function LeavesView() {
         >
           <FileText className="w-4 h-4" /> Leave Policies & Sandwich Rules
         </button>
+
+        {isBranchScoped && activeTab !== 'my' && (
+          <div className="ml-auto pb-2 flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Branch: {activeBranch}</span>
+          </div>
+        )}
       </div>
 
       {/* TAB 1: REQUESTS */}

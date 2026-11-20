@@ -26,7 +26,8 @@ import {
   FileText,
   History,
   Info,
-  CalendarClock
+  CalendarClock,
+  Building2
 } from 'lucide-react';
 
 const PROJECT_PRIORITY_PRESENTATION = {
@@ -65,7 +66,7 @@ const validateProjectDates = ({ start_date, planned_end_date }, showRequiredErro
 };
 
 export default function ProjectsView() {
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, activeBranch } = useAuth();
   const {
     projects,
     employees,
@@ -79,6 +80,22 @@ export default function ProjectsView() {
     assessPenalty,
     waivePenalty
   } = useHRMS();
+
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
+
+  const branchProjects = React.useMemo(() => {
+    if (!isBranchScoped) return projects;
+    return projects.filter((p) => {
+      const emp = employees.find((e) => Number(e.id) === Number(p.assigned_employee_id));
+      const branchName = emp?.branch_name || p.assigned_employee_branch_name;
+      if (!branchName) return false;
+      return (
+        branchName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+      );
+    });
+  }, [projects, employees, activeBranch, isBranchScoped]);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -157,6 +174,7 @@ export default function ProjectsView() {
     )
   );
   const canRecordPenaltyReview = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canWaivePenaltyReview = ['super_admin', 'manager'].includes(currentUser?.role);
 
   useEffect(() => {
     if (!selectedProject?.assignment_id) {
@@ -181,7 +199,7 @@ export default function ProjectsView() {
   };
 
   // Filter projects
-  const filteredProjects = projects.filter(p => {
+  const filteredProjects = branchProjects.filter(p => {
     const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           p.project_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.assigned_employee_name || '')?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -191,13 +209,13 @@ export default function ProjectsView() {
   });
 
   // Calculate high-level stats
-  const totalProjects = projects.length;
-  const inProgressCount = projects.filter(p => p.status === 'in_progress').length;
-  const underReviewCount = projects.filter(p => p.status === 'under_review').length;
-  const overdueCount = projects.filter(p => p.is_overdue || p.status === 'overdue').length;
-  const completedCount = projects.filter(p => p.status === 'completed').length;
+  const totalProjects = branchProjects.length;
+  const inProgressCount = branchProjects.filter(p => p.status === 'in_progress').length;
+  const underReviewCount = branchProjects.filter(p => p.status === 'under_review').length;
+  const overdueCount = branchProjects.filter(p => p.is_overdue || p.status === 'overdue').length;
+  const completedCount = branchProjects.filter(p => p.status === 'completed').length;
 
-  const allExtensionRequests = projects.flatMap(p =>
+  const allExtensionRequests = branchProjects.flatMap(p =>
     (p.extensions || [])
       .map(e => ({
         ...e,
@@ -422,14 +440,14 @@ export default function ProjectsView() {
 
       {/* Sub-Tabs: List View vs Extension History vs Policy Safeguards */}
       <div className="border-b border-slate-200 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab('list')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition ${
               activeTab === 'list' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            All Assigned Projects ({projects.length})
+            All Assigned Projects ({branchProjects.length})
           </button>
           <button
             onClick={() => setActiveTab('extensions')}
@@ -454,6 +472,13 @@ export default function ProjectsView() {
             Penalty Policy & India Legal Safeguards
           </button>
         </div>
+
+        {isBranchScoped && (
+          <div className="pb-2 hidden sm:flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Branch: {activeBranch}</span>
+          </div>
+        )}
       </div>
 
       {/* TAB 1: ALL PROJECTS LIST */}
@@ -741,7 +766,7 @@ export default function ProjectsView() {
                           <AlertTriangle className="w-4 h-4 text-rose-600" />
                           Assessed Penalty Record (Non-Monetary Baseline)
                         </span>
-                        {canRecordPenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && (
+                        {canWaivePenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && Number(project.assigned_employee_id) !== Number(currentUser?.employee_id) && (
                           <button
                             onClick={() => {
                               setSelectedProject(project);
@@ -1434,7 +1459,7 @@ export default function ProjectsView() {
                     <li key={file.id}>
                       <button
                         type="button"
-                        onClick={() => openPrivateDeliverable(file)}
+                        onClick={() => openProjectFile(file.id)}
                         className="text-teal-600 underline hover:text-teal-800"
                       >
                         {file.original_filename} ({Math.round(file.file_size / 1024)} KB)
