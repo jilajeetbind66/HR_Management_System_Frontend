@@ -483,10 +483,20 @@ export default function AttendanceView() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {regReq?.status === 'pending' ? (
-                          <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
-                            <Clock className="w-3 h-3" /> Reg Pending
-                          </span>
-                        ) : isMissingPunchOut && (isCurrentEmployee || canManageAttendance) ? (
+                          canApprove && !isCurrentEmployee ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveTab('regularization')}
+                              className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 hover:bg-blue-100 border border-blue-200 transition"
+                            >
+                              <Clock className="w-3 h-3 text-blue-600" /> Review
+                            </button>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
+                              <Clock className="w-3 h-3" /> Reg Pending
+                            </span>
+                          )
+                        ) : isMissingPunchOut && isCurrentEmployee ? (
                           <button
                             type="button"
                             onClick={() => handleOpenRegularizeForRecord(att)}
