@@ -38,7 +38,7 @@ const DASHBOARD_DATA_BY_ROLE = {
   super_admin: ['employees', 'projects', 'attendance', 'leaves', 'payrollRuns', 'branches', 'announcements'],
   hr_admin: ['employees', 'projects', 'attendance', 'leaves', 'branches', 'announcements'],
   hr_executive: ['employees', 'projects', 'attendance', 'leaves', 'branches', 'announcements'],
-  recruiter: ['announcements'],
+  recruiter: ['announcements', 'recruitment', 'branches'],
   payroll_admin: ['payrollRuns'],
   auditor: ['auditLogs', 'payrollRuns', 'branches'],
 };
@@ -124,7 +124,7 @@ export function HRMSProvider({ children }) {
 
   const syncWithBackend = useCallback(async (tab = activeTab) => {
     const role = currentUser?.role;
-    const canViewOrganization = ['super_admin', 'hr_admin', 'hr_executive', 'manager', 'auditor'].includes(role);
+    const canViewOrganization = ['super_admin', 'hr_admin', 'hr_executive', 'recruiter', 'manager', 'auditor'].includes(role);
     const canViewEmployees = ['super_admin', 'hr_admin', 'hr_executive', 'manager', 'auditor'].includes(role);
     const canViewProjects = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
     const canReviewLeaves = ['manager', 'hr_admin', 'hr_executive', 'super_admin'].includes(role);
@@ -756,10 +756,18 @@ export function HRMSProvider({ children }) {
     return response?.data;
   };
 
+  const createBranch = async (branchData) => {
+    const response = await api.createBranch(branchData);
+    const branchesResponse = await api.getBranches();
+    setBranches(responseDataArray(branchesResponse));
+    return response?.data;
+  };
+
   return (
     <HRMSContext.Provider value={{
       company,
       branches,
+      createBranch,
       departments,
       designations,
       holidays,

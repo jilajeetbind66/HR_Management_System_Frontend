@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import PhoneInput from '../../components/common/PhoneInput';
@@ -22,6 +22,7 @@ export default function RecruitmentView() {
   const {
     recruitment,
     branches,
+    syncWithBackend,
     updateCandidateStage,
     updateRecruitmentJobStatus,
     convertCandidate,
@@ -59,6 +60,12 @@ export default function RecruitmentView() {
   const jobs = recruitment.jobs || [];
   const openJobs = jobs.filter((job) => job.status === 'Open');
   const canManageRecruitment = ['super_admin', 'hr_admin', 'recruiter'].includes(currentUser?.role);
+
+  useEffect(() => {
+    if (!branches || branches.length === 0) {
+      syncWithBackend?.('recruitment');
+    }
+  }, [branches, syncWithBackend]);
 
   const stages = ["Applied", "Screening", "Interview", "Offered", "Hired"];
 
@@ -393,7 +400,11 @@ export default function RecruitmentView() {
               className="mt-1 w-full rounded-lg border border-slate-200 bg-white p-2.5 font-normal"
             >
               <option value="">Select a branch</option>
-              {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name} {branch.city ? `(${branch.city})` : ''}
+                </option>
+              ))}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-3">

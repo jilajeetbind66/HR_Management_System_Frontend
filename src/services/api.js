@@ -191,6 +191,10 @@ export const api = {
   // M02 Organization
   getCompany: () => request('/organization/company'),
   getBranches: () => request('/organization/branches'),
+  createBranch: (branchData) => request('/organization/branches', {
+    method: 'POST',
+    body: JSON.stringify(branchData),
+  }),
   getDepartments: () => request('/organization/departments'),
   getDesignations: () => request('/organization/designations'),
   getHolidays: () => request('/organization/holidays'),

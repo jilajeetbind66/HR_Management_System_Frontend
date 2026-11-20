@@ -21,11 +21,39 @@ import {
 
 export default function OrganizationView() {
   const { currentUser } = useAuth();
-  const { company, branches, departments, designations, holidays, syncWithBackend } = useHRMS();
+  const { company, branches, createBranch, departments, designations, holidays, syncWithBackend } = useHRMS();
   const [activeTab, setActiveTab] = useState('company'); // 'company' | 'branches' | 'departments' | 'holidays'
   const [selectedHolidayBranch, setSelectedHolidayBranch] = useState('all');
   const [updatingPtBranchId, setUpdatingPtBranchId] = useState(null);
   const [branchError, setBranchError] = useState('');
+  const [branchSuccess, setBranchSuccess] = useState('');
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false);
+  const [savingBranch, setSavingBranch] = useState(false);
+  const [newBranchForm, setNewBranchForm] = useState({
+    name: '',
+    code: '',
+    city: '',
+    state: '',
+    pt_applicable: false,
+  });
+
+  const handleAddBranch = async (e) => {
+    e.preventDefault();
+    setBranchError('');
+    setBranchSuccess('');
+    setSavingBranch(true);
+    try {
+      await createBranch(newBranchForm);
+      setBranchSuccess(`Branch "${newBranchForm.name}" registered successfully! It is now active across all HRMS dropdowns.`);
+      setShowAddBranchModal(false);
+      setNewBranchForm({ name: '', code: '', city: '', state: '', pt_applicable: false });
+      setTimeout(() => setBranchSuccess(''), 6000);
+    } catch (err) {
+      setBranchError(err?.data?.message || err.message || 'Unable to create branch.');
+    } finally {
+      setSavingBranch(false);
+    }
+  };
   const visibleHolidays = holidays.filter(
     holiday => selectedHolidayBranch === 'all' || holiday.branches?.includes(Number(selectedHolidayBranch))
   );
@@ -160,7 +188,35 @@ export default function OrganizationView() {
 
       {/* TAB 2: BRANCHES */}
       {activeTab === 'branches' && (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">Regional Branch Offices ({branches.length})</h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                All branch offices registered here are immediately available across Recruitment, Employees Directory, and Payroll.
+              </p>
+            </div>
+            {['super_admin', 'hr_admin'].includes(currentUser?.role) && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={Plus}
+                onClick={() => {
+                  setBranchError('');
+                  setShowAddBranchModal(true);
+                }}
+              >
+                Add New Branch
+              </Button>
+            )}
+          </div>
+
+          {branchSuccess && (
+            <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              {branchSuccess}
+            </p>
+          )}
+
           {branchError && (
             <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
               {branchError}
@@ -303,6 +359,108 @@ export default function OrganizationView() {
             )}
           </div>
         </Card>
+      )}
+
+      {showAddBranchModal && (
+        <Modal
+          isOpen={showAddBranchModal}
+          onClose={() => setShowAddBranchModal(false)}
+          title="Add New Regional Branch"
+        >
+          <form onSubmit={handleAddBranch} className="space-y-4 text-xs">
+            {branchError && (
+              <p className="rounded-lg bg-rose-50 border border-rose-200 p-2 text-rose-700">
+                {branchError}
+              </p>
+            )}
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Branch Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Noida Tech Hub or Delhi Branch"
+                value={newBranchForm.name}
+                onChange={(e) => setNewBranchForm({ ...newBranchForm, name: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 p-2.5 font-normal focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Branch Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. NOI-01 (Auto if blank)"
+                  value={newBranchForm.code}
+                  onChange={(e) => setNewBranchForm({ ...newBranchForm, code: e.target.value.toUpperCase() })}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-normal focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  City <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  placeholder="e.g. Noida"
+                  value={newBranchForm.city}
+                  onChange={(e) => setNewBranchForm({ ...newBranchForm, city: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 p-2.5 font-normal focus:ring-2 focus:ring-teal-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                State <span className="text-rose-500">*</span>
+              </label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Uttar Pradesh, Karnataka, Maharashtra"
+                value={newBranchForm.state}
+                onChange={(e) => setNewBranchForm({ ...newBranchForm, state: e.target.value })}
+                className="w-full rounded-lg border border-slate-200 p-2.5 font-normal focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="pt_applicable"
+                checked={newBranchForm.pt_applicable}
+                onChange={(e) => setNewBranchForm({ ...newBranchForm, pt_applicable: e.target.checked })}
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              <label htmlFor="pt_applicable" className="text-slate-700 font-medium cursor-pointer">
+                Professional Tax (PT) applicable in this state
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowAddBranchModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={savingBranch}
+              >
+                {savingBranch ? 'Creating Branch…' : 'Save & Register Branch'}
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

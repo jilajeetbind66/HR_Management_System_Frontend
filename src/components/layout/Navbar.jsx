@@ -88,7 +88,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             onChange={(e) => setActiveBranch(e.target.value)}
             className="bg-transparent font-medium text-slate-800 focus:outline-none cursor-pointer"
           >
-            <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+            <option value="All Branches">All Branches</option>
             {branches.map(b => (
               <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
             ))}

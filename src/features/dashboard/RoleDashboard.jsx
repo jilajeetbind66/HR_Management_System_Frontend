@@ -5,6 +5,7 @@ import StatCard from '../../components/common/StatCard';
 import Button from '../../components/common/Button';
 import EmployeeDashboard from './EmployeeDashboard';
 import ManagerDashboard from './ManagerDashboard';
+import RecruiterDashboard from './RecruiterDashboard';
 import { canAccessModule, getPanelName } from '../../config/roleAccess';
 import { canReviewLeave } from '../../utils/leaveApproval';
 import {
@@ -78,6 +79,9 @@ export default function RoleDashboard({ onNavigate }) {
   if (role === 'manager') {
     return <ManagerDashboard onNavigate={onNavigate} />;
   }
+  if (role === 'recruiter') {
+    return <RecruiterDashboard onNavigate={onNavigate} />;
+  }
 
   const panel = panelCopy[role] || panelCopy.employee;
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
@@ -86,7 +90,7 @@ export default function RoleDashboard({ onNavigate }) {
   const employeeCount = employees.filter(employee => employee.status === 'active').length;
   const today = new Date().toISOString().slice(0, 10);
   const presentToday = attendance.filter(record => record.date === today && record.status === 'Present').length;
-  const isHrRole = ['hr_admin', 'hr_executive', 'recruiter'].includes(role);
+  const isHrRole = ['hr_admin', 'hr_executive'].includes(role);
   const absentToday = attendance.filter(
     record => record.date === today && String(record.status || '').toLowerCase() === 'absent'
   ).length;
