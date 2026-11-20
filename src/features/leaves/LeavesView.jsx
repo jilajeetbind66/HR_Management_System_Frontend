@@ -32,7 +32,8 @@ export default function LeavesView() {
   } = useHRMS();
 
   const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
-  const [activeTab, setActiveTab] = useState('my');
+  const isSuperAdmin = currentUser.role === 'super_admin';
+  const [activeTab, setActiveTab] = useState(isSuperAdmin ? 'approvals' : 'my');
   const [statusFilter, setStatusFilter] = useState('');
   const [employeeFilter, setEmployeeFilter] = useState('');
   const [dateFromFilter, setDateFromFilter] = useState('');
@@ -220,15 +221,23 @@ export default function LeavesView() {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          icon={CalendarPlus}
-          disabled={!currentUser?.employee_id}
-          title={!currentUser?.employee_id ? 'Account is not linked to an employee record' : undefined}
-          onClick={() => setShowApplyModal(true)}
-        >
-          Apply for Leave
-        </Button>
+        {!isSuperAdmin && (
+          <Button
+            variant="primary"
+            icon={CalendarPlus}
+            disabled={!currentUser?.employee_id}
+            title={!currentUser?.employee_id ? 'Account is not linked to an employee record' : undefined}
+            onClick={() => setShowApplyModal(true)}
+          >
+            Apply for Leave
+          </Button>
+        )}
+        {isSuperAdmin && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500">Approver Role:</span>
+            <Badge variant="primary" size="md">👑 Executive Leave Approver</Badge>
+          </div>
+        )}
       </div>
       {leaveWarnings.length > 0 && (
         <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -236,75 +245,135 @@ export default function LeavesView() {
         </div>
       )}
 
-      {/* Leave Balances Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard
-          title="Casual Leave (CL)"
-          value={`${formatDays(myBalance.cl_available ?? myBalance.cl)} Available`}
-          subvalue={`Used ${formatDays(myBalance.cl_used)} · Pending ${formatDays(myBalance.cl_pending)}`}
-          color="indigo"
-        />
-        <StatCard
-          title="Sick Leave (SL)"
-          value={`${formatDays(myBalance.sl_available ?? myBalance.sl)} Available`}
-          subvalue={`Used ${formatDays(myBalance.sl_used)} · Pending ${formatDays(myBalance.sl_pending)}`}
-          color="blue"
-        />
-        <StatCard
-          title="Privilege Leave (PL)"
-          value={`${formatDays(myBalance.pl_available ?? myBalance.pl)} Available`}
-          subvalue={`Used ${formatDays(myBalance.pl_used)} · Pending ${formatDays(myBalance.pl_pending)}`}
-          color="emerald"
-        />
-        <StatCard
-          title="Compensatory Off"
-          value={`${formatDays(myBalance.comp_off_available ?? myBalance.comp_off)} Available`}
-          subvalue={`Used ${formatDays(myBalance.comp_off_used)} · Pending ${formatDays(myBalance.comp_off_pending)}`}
-          color="purple"
-        />
-      </div>
+      {/* Leave Balances Grid (For Regular Staff) OR Executive Analytics (For Super Admin) */}
+      {isSuperAdmin ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard
+            title="Pending Approvals"
+            value={`${pendingApprovals.length} Requests`}
+            subvalue="Awaiting your decision"
+            color="amber"
+          />
+          <StatCard
+            title="Approved Leaves"
+            value={`${leaveRequests.filter(r => r.status === 'approved').length} Sanctioned`}
+            subvalue="Current cycle approved"
+            color="emerald"
+          />
+          <StatCard
+            title="Total Applications"
+            value={`${leaveRequests.length} Total`}
+            subvalue="Company-wide records"
+            color="blue"
+          />
+          <StatCard
+            title="Loss of Pay (LOP)"
+            value={`${leaveRequests.filter(r => r.leave_type?.includes('LOP')).length} Unpaid`}
+            subvalue="Leaves impacting payroll"
+            color="rose"
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <StatCard
+            title="Casual Leave (CL)"
+            value={`${formatDays(myBalance.cl_available ?? myBalance.cl)} Available`}
+            subvalue={`Used ${formatDays(myBalance.cl_used)} · Pending ${formatDays(myBalance.cl_pending)}`}
+            color="indigo"
+          />
+          <StatCard
+            title="Sick Leave (SL)"
+            value={`${formatDays(myBalance.sl_available ?? myBalance.sl)} Available`}
+            subvalue={`Used ${formatDays(myBalance.sl_used)} · Pending ${formatDays(myBalance.sl_pending)}`}
+            color="blue"
+          />
+          <StatCard
+            title="Privilege Leave (PL)"
+            value={`${formatDays(myBalance.pl_available ?? myBalance.pl)} Available`}
+            subvalue={`Used ${formatDays(myBalance.pl_used)} · Pending ${formatDays(myBalance.pl_pending)}`}
+            color="emerald"
+          />
+          <StatCard
+            title="Compensatory Off"
+            value={`${formatDays(myBalance.comp_off_available ?? myBalance.comp_off)} Available`}
+            subvalue={`Used ${formatDays(myBalance.comp_off_used)} · Pending ${formatDays(myBalance.comp_off_pending)}`}
+            color="purple"
+          />
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-slate-200 flex items-center gap-4 text-xs">
-        <button
-          onClick={() => setActiveTab('my')}
-          className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'my' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <CalendarCheck2 className="w-4 h-4" /> My Leaves ({myLeaves.length})
-        </button>
+        {isSuperAdmin ? (
+          <>
+            <button
+              onClick={() => setActiveTab('approvals')}
+              className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'approvals' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <UserCheck className="w-4 h-4" /> Pending Approvals ({pendingApprovals.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'all' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <CheckCircle2 className="w-4 h-4" /> All / Team Leaves ({leaveRequests.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('policy')}
+              className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'policy' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileText className="w-4 h-4" /> Leave Policies & Rules
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => setActiveTab('my')}
+              className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'my' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <CalendarCheck2 className="w-4 h-4" /> My Leaves ({myLeaves.length})
+            </button>
 
-        {canApprove && (
-          <button
-            onClick={() => setActiveTab('approvals')}
-            className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'approvals' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <UserCheck className="w-4 h-4" /> Pending Approvals ({pendingApprovals.length})
-          </button>
+            {canApprove && (
+              <button
+                onClick={() => setActiveTab('approvals')}
+                className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                  activeTab === 'approvals' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <UserCheck className="w-4 h-4" /> Pending Approvals ({pendingApprovals.length})
+              </button>
+            )}
+
+            {canApprove && (
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                  activeTab === 'all' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" /> All / Team Leaves ({leaveRequests.length})
+              </button>
+            )}
+
+            <button
+              onClick={() => setActiveTab('policy')}
+              className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
+                activeTab === 'policy' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileText className="w-4 h-4" /> Leave Policies & Sandwich Rules
+            </button>
+          </>
         )}
-
-        {canApprove && (
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-              activeTab === 'all' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CheckCircle2 className="w-4 h-4" /> All / Team Leaves ({leaveRequests.length})
-          </button>
-        )}
-
-        <button
-          onClick={() => setActiveTab('policy')}
-          className={`pb-3 font-semibold border-b-2 transition flex items-center gap-1.5 ${
-            activeTab === 'policy' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
-          }`}
-        >
-          <FileText className="w-4 h-4" /> Leave Policies & Sandwich Rules
-        </button>
 
         {isBranchScoped && activeTab !== 'my' && (
           <div className="ml-auto pb-2 flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">

@@ -32,6 +32,7 @@ export default function DeveloperDashboard({ onNavigate }) {
     submitProjectCompletion,
     attendance,
     punchAttendance,
+    regularizationRequests,
     leaveRequests,
     leaveBalances,
     applyLeave,
@@ -256,15 +257,17 @@ export default function DeveloperDashboard({ onNavigate }) {
         </div>
 
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:gap-2.5">
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={CalendarCheck}
-            onClick={openMyLeave}
-            className="w-full justify-center sm:w-auto"
-          >
-            {isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
-          </Button>
+          {!isWorkspaceExecutive && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={CalendarCheck}
+              onClick={openMyLeave}
+              className="w-full justify-center sm:w-auto"
+            >
+              {isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
+            </Button>
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -276,17 +279,30 @@ export default function DeveloperDashboard({ onNavigate }) {
           >
             {isViewingOwnWorkspace ? 'My Payslips' : 'Payslips'}
           </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            icon={CalendarPlus}
-            disabled={!isViewingOwnWorkspace}
-            title={!isViewingOwnWorkspace ? 'Leave application can only be submitted by the employee.' : undefined}
-            onClick={() => setShowLeaveModal(true)}
-            className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
-          >
-            Apply Leave
-          </Button>
+          {!isWorkspaceExecutive && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={CalendarPlus}
+              disabled={!isViewingOwnWorkspace}
+              title={!isViewingOwnWorkspace ? 'Leave application can only be submitted by the employee.' : undefined}
+              onClick={() => setShowLeaveModal(true)}
+              className={`w-full justify-center sm:w-auto ${!isViewingOwnWorkspace ? 'opacity-60 cursor-not-allowed' : ''}`}
+            >
+              Apply Leave
+            </Button>
+          )}
+          {isWorkspaceExecutive && (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={CalendarCheck}
+              onClick={() => onNavigate('leaves')}
+              className="w-full justify-center sm:w-auto bg-white/10 hover:bg-white/20 text-white border-white/20"
+            >
+              Review Leaves
+            </Button>
+          )}
           {!isWorkspaceExecutive && (
             <Button
               variant={isPunchComplete ? "secondary" : "primary"}
@@ -494,6 +510,21 @@ export default function DeveloperDashboard({ onNavigate }) {
                   );
                 })}
               </div>
+            ) : isWorkspaceExecutive ? (
+              <div className="text-center py-8 px-4 text-xs">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-teal-600 mb-3 border border-teal-100 shadow-sm">
+                  <FolderGit2 className="w-6 h-6" />
+                </div>
+                <h4 className="font-bold text-slate-800 text-sm">No Personal Tasks Assigned</h4>
+                <p className="text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+                  As Founder & Super Admin, project deliverables are executed by assigned team members. You can assign deliverables, set deadlines, and review submissions in the Project Management console.
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <Button size="sm" variant="primary" onClick={() => onNavigate('projects')}>
+                    Open Projects & Deadlines →
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="text-center py-10 text-slate-400 text-xs">
                 <FolderGit2 className="w-12 h-12 mx-auto mb-2 text-slate-300" />
@@ -584,49 +615,106 @@ export default function DeveloperDashboard({ onNavigate }) {
             </Card>
           )}
 
-          {/* Leave Balances */}
-          <Card
-            title="Leave Balances"
-            subtitle="Accrued Leave Balance"
-            action={
-              <div className="flex items-center gap-3">
+          {/* Executive Overview & Quick Approvals (For Super Admin) OR Leave Balances (For Regular Employees) */}
+          {isWorkspaceExecutive ? (
+            <Card
+              title="Management Approvals"
+              subtitle="Pending Company Actions"
+              action={
                 <button
                   type="button"
-                  onClick={openMyLeave}
+                  onClick={() => onNavigate('dashboard')}
                   className="text-xs text-teal-600 font-semibold hover:underline"
                 >
-                  {myLeaveRequests.length ? `${myLeaveRequests.length} leave request(s)` : isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
+                  Admin Center →
                 </button>
-                <button
-                  type="button"
-                  disabled={!isViewingOwnWorkspace || !workspaceEmployeeId}
-                  onClick={() => setShowLeaveModal(true)}
-                  className="text-xs text-teal-600 font-semibold hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+              }
+            >
+              <div className="space-y-3 text-xs">
+                <div
+                  onClick={() => onNavigate('leaves')}
+                  className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-teal-50/50 hover:border-teal-200 cursor-pointer transition flex items-center justify-between"
                 >
-                  + Apply
-                </button>
+                  <div>
+                    <span className="text-slate-500 font-medium">Pending Leave Requests</span>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {leaveRequests.filter(l => l.status === 'pending').length} Awaiting Decision
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-teal-700 bg-teal-100/80 px-2 py-1 rounded">Review →</span>
+                </div>
+
+                <div
+                  onClick={() => onNavigate('projects')}
+                  className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-rose-50/50 hover:border-rose-200 cursor-pointer transition flex items-center justify-between"
+                >
+                  <div>
+                    <span className="text-slate-500 font-medium">Overdue Project Deadlines</span>
+                    <p className="text-base font-bold text-rose-700 mt-0.5">
+                      {projects.filter(p => p.status === 'overdue').length} Overdue
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-rose-700 bg-rose-100/80 px-2 py-1 rounded">Review →</span>
+                </div>
+
+                <div
+                  onClick={() => onNavigate('attendance')}
+                  className="p-3 rounded-lg border border-slate-100 bg-slate-50 hover:bg-sky-50/50 hover:border-sky-200 cursor-pointer transition flex items-center justify-between"
+                >
+                  <div>
+                    <span className="text-slate-500 font-medium">Regularization Requests</span>
+                    <p className="text-base font-bold text-slate-800 mt-0.5">
+                      {(regularizationRequests || []).filter(r => r.status === 'pending').length} Pending
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold text-sky-700 bg-sky-100/80 px-2 py-1 rounded">Inspect →</span>
+                </div>
               </div>
-            }
-          >
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="text-slate-500 font-medium">Casual Leave (CL)</span>
-                <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.cl} Days</p>
+            </Card>
+          ) : (
+            <Card
+              title="Leave Balances"
+              subtitle="Accrued Leave Balance"
+              action={
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={openMyLeave}
+                    className="text-xs text-teal-600 font-semibold hover:underline"
+                  >
+                    {myLeaveRequests.length ? `${myLeaveRequests.length} leave request(s)` : isViewingOwnWorkspace ? 'My Leave' : 'Leave Records'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isViewingOwnWorkspace || !workspaceEmployeeId}
+                    onClick={() => setShowLeaveModal(true)}
+                    className="text-xs text-teal-600 font-semibold hover:underline disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    + Apply
+                  </button>
+                </div>
+              }
+            >
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
+                  <span className="text-slate-500 font-medium">Casual Leave (CL)</span>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.cl} Days</p>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
+                  <span className="text-slate-500 font-medium">Sick Leave (SL)</span>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.sl} Days</p>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
+                  <span className="text-slate-500 font-medium">Privilege Leave (PL)</span>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.pl} Days</p>
+                </div>
+                <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
+                  <span className="text-slate-500 font-medium">Comp-Off</span>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.comp_off} Days</p>
+                </div>
               </div>
-              <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="text-slate-500 font-medium">Sick Leave (SL)</span>
-                <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.sl} Days</p>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="text-slate-500 font-medium">Privilege Leave (PL)</span>
-                <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.pl} Days</p>
-              </div>
-              <div className="p-3 rounded-lg border border-slate-100 bg-slate-50">
-                <span className="text-slate-500 font-medium">Comp-Off</span>
-                <p className="text-xl font-bold text-slate-800 mt-1">{myBalance.comp_off} Days</p>
-              </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           {/* India Statutory & Tax Summary for Employee */}
           <Card title="Statutory & Tax Info" subtitle="Masked statutory details">
