@@ -144,6 +144,11 @@ export default function AttendanceView() {
   // Muster Roll Period State
   const [selectedMonth, setSelectedMonth] = useState(11); // November
   const [selectedYear, setSelectedYear] = useState(2026);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => {
+    return currentUser?.role === 'employee' && currentUser?.employee_id
+      ? String(currentUser.employee_id)
+      : 'all';
+  });
 
   useEffect(() => {
     let active = true;
@@ -374,6 +379,32 @@ export default function AttendanceView() {
     });
   }, [employees, attendance, leaveRequests, isBranchScoped, activeBranch, selectedYear, selectedMonth, totalDaysInMonth, shiftSettings]);
 
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  // Filtered muster roll rows based on selected employee
+  const displayedMusterRollData = useMemo(() => {
+    if (selectedEmployeeId === 'all') return musterRollData;
+    return musterRollData.filter((r) => String(r.employee.id) === String(selectedEmployeeId));
+  }, [musterRollData, selectedEmployeeId]);
+
+  const selectedEmployeeObj = useMemo(() => {
+    if (selectedEmployeeId === 'all') return null;
+    return musterRollData.find((r) => String(r.employee.id) === String(selectedEmployeeId))?.employee || null;
+  }, [musterRollData, selectedEmployeeId]);
+
+  // Keep selectedEmployeeId valid if branch changes
+  useEffect(() => {
+    if (selectedEmployeeId !== 'all') {
+      const exists = musterRollData.some((r) => String(r.employee.id) === String(selectedEmployeeId));
+      if (!exists && currentUser?.role !== 'employee') {
+        setSelectedEmployeeId('all');
+      }
+    }
+  }, [musterRollData, selectedEmployeeId, currentUser?.role]);
+
   // Late Comers Summary for Shift Automation
   const lateComersSummary = useMemo(() => {
     const monthStr = String(selectedMonth).padStart(2, '0');
@@ -407,13 +438,12 @@ export default function AttendanceView() {
     return lateList.sort((a, b) => b.lateCount - a.lateCount);
   }, [musterRollData, selectedMonth, selectedYear, totalDaysInMonth, attendance, shiftSettings]);
 
-  // 1-Click Muster Roll CSV Export
+  // 1-Click Muster Roll & Employee Report CSV Export
   const handleExportMusterRoll = () => {
-    const monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
     const monthName = monthNames[selectedMonth - 1] || `Month-${selectedMonth}`;
+    const isSingleEmployee = selectedEmployeeId !== 'all';
+    const targetRows = isSingleEmployee ? displayedMusterRollData : musterRollData;
+    const singleEmp = isSingleEmployee ? targetRows[0]?.employee : null;
 
     const headers = [
       'Employee Code',
@@ -431,7 +461,7 @@ export default function AttendanceView() {
       'Total Payable Days',
     ];
 
-    const rows = musterRollData.map((row) => [
+    const rows = targetRows.map((row) => [
       `"${row.employee.employee_code || ''}"`,
       `"${row.employee.first_name || ''} ${row.employee.last_name || ''}"`,
       `"${row.employee.designation || ''}"`,
@@ -447,12 +477,53 @@ export default function AttendanceView() {
       row.payableDays,
     ]);
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    let csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+
+    // If single employee report, append a detailed day-by-day attendance log breakdown
+    if (isSingleEmployee && targetRows.length > 0) {
+      const row = targetRows[0];
+      const monthStr = String(selectedMonth).padStart(2, '0');
+      const dailyHeaders = ['Day', 'Date', 'Day of Week', 'Status', 'Punch In', 'Work Hours', 'Arrival Status'];
+      const dailyData = daysArray.map((d) => {
+        const dayStr = String(d).padStart(2, '0');
+        const dateKey = `${selectedYear}-${monthStr}-${dayStr}`;
+        const dayOfWeekName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(selectedYear, selectedMonth - 1, d).getDay()];
+        const cell = row.dailyRecords[d];
+        const attRec = attendance.find((a) => Number(a.employee_id) === Number(row.employee.id) && a.date === dateKey);
+        const statusMap = {
+          P: 'Present',
+          HD: 'Half Day (<4.5 hrs)',
+          L: 'Approved Leave',
+          WO: 'Week Off (Sunday)',
+          A: 'Absent',
+          '—': 'Future / Unrecorded'
+        };
+        const statusLabel = statusMap[cell.status] || cell.status;
+        const arrivalStatus = cell.isLate ? 'Late Arrival' : (attRec?.punch_in ? 'On Time' : '—');
+
+        return [
+          d,
+          dateKey,
+          dayOfWeekName,
+          `"${statusLabel}"`,
+          `"${attRec?.punch_in || '—'}"`,
+          `"${cell.hours ? cell.hours + ' hrs' : '0.00 hrs'}"`,
+          `"${arrivalStatus}"`
+        ].join(',');
+      });
+
+      csvContent += '\n\nDetailed Day-by-Day Attendance Breakdown\n' + dailyHeaders.join(',') + '\n' + dailyData.join('\n');
+    }
+
+    const filename = isSingleEmployee && singleEmp
+      ? `Pinweb_Attendance_Report_${singleEmp.employee_code || singleEmp.id}_${singleEmp.first_name}_${singleEmp.last_name}_${monthName}_${selectedYear}.csv`.replace(/\s+/g, '_')
+      : `Pinweb_Muster_Roll_${monthName}_${selectedYear}.csv`;
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Pinweb_Muster_Roll_${monthName}_${selectedYear}.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -853,11 +924,44 @@ export default function AttendanceView() {
       {activeTab === 'muster_roll' && (
         <div className="space-y-6">
           {/* Controls Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Employee Filter */}
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-teal-600" />
-                <span className="text-xs font-bold text-slate-700">Month:</span>
+                <UserCheck className="w-4 h-4 text-teal-600 shrink-0" />
+                <span className="text-xs font-bold text-slate-700 shrink-0">Staff Member:</span>
+                <select
+                  value={selectedEmployeeId}
+                  disabled={currentUser.role === 'employee'}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 max-w-[210px] truncate"
+                >
+                  {currentUser.role !== 'employee' && (
+                    <option value="all">👥 All Employees ({musterRollData.length})</option>
+                  )}
+                  {musterRollData.map((row) => (
+                    <option key={row.employee.id} value={String(row.employee.id)}>
+                      {row.employee.first_name} {row.employee.last_name} ({row.employee.employee_code || `EMP-${row.employee.id}`})
+                    </option>
+                  ))}
+                </select>
+                {selectedEmployeeId !== 'all' && currentUser.role !== 'employee' && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedEmployeeId('all')}
+                    className="text-[11px] font-semibold text-teal-600 hover:text-teal-800 underline ml-1 shrink-0"
+                  >
+                    View All
+                  </button>
+                )}
+              </div>
+
+              <div className="h-4 w-px bg-slate-200 hidden sm:block" />
+
+              {/* Month Picker */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-teal-600 shrink-0" />
+                <span className="text-xs font-bold text-slate-700 shrink-0">Month:</span>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -878,8 +982,9 @@ export default function AttendanceView() {
                 </select>
               </div>
 
+              {/* Year Picker */}
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-700">Year:</span>
+                <span className="text-xs font-bold text-slate-700 shrink-0">Year:</span>
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
@@ -891,8 +996,8 @@ export default function AttendanceView() {
                 </select>
               </div>
 
-              <span className="text-xs text-slate-400">
-                ({totalDaysInMonth} Days in Month · {isBranchScoped ? activeBranch : 'All Branches'})
+              <span className="text-xs text-slate-400 hidden xl:inline">
+                ({totalDaysInMonth} Days · {isBranchScoped ? activeBranch : 'All Branches'})
               </span>
             </div>
 
@@ -901,42 +1006,84 @@ export default function AttendanceView() {
               size="sm"
               icon={Download}
               onClick={handleExportMusterRoll}
-              className="shadow-sm"
+              className="shadow-sm shrink-0"
             >
-              📥 Download Muster Roll (Excel/CSV)
+              {selectedEmployeeId === 'all'
+                ? '📥 Download Muster Roll (Excel/CSV)'
+                : `📥 Download ${selectedEmployeeObj?.first_name || 'Staff'} Report (Excel/CSV)`}
             </Button>
           </div>
 
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Active Staff Tracked</span>
-              <span className="text-xl font-bold text-slate-900 mt-1 block">{musterRollData.length} Employees</span>
-            </div>
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Working Days</span>
-              <span className="text-xl font-bold text-teal-700 mt-1 block">
-                {totalDaysInMonth - daysArray.filter(d => new Date(selectedYear, selectedMonth - 1, d).getDay() === 0).length} Days
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                {selectedEmployeeId === 'all' ? 'Active Staff Tracked' : 'Staff Member'}
               </span>
+              <span className="text-xl font-bold text-slate-900 mt-1 block truncate">
+                {selectedEmployeeId === 'all'
+                  ? `${displayedMusterRollData.length} Employees`
+                  : `${selectedEmployeeObj ? `${selectedEmployeeObj.first_name} ${selectedEmployeeObj.last_name}` : '1 Employee'}`}
+              </span>
+              {selectedEmployeeId !== 'all' && selectedEmployeeObj && (
+                <span className="text-[10px] text-slate-400 font-mono mt-0.5 block truncate">
+                  {selectedEmployeeObj.employee_code} · {selectedEmployeeObj.designation || 'Staff'}
+                </span>
+              )}
             </div>
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                {selectedEmployeeId === 'all' ? 'Total Working Days' : 'Present & Half Days'}
+              </span>
+              <span className="text-xl font-bold text-teal-700 mt-1 block">
+                {selectedEmployeeId === 'all'
+                  ? `${totalDaysInMonth - daysArray.filter(d => new Date(selectedYear, selectedMonth - 1, d).getDay() === 0).length} Days`
+                  : `${displayedMusterRollData[0]?.presentCount || 0} P · ${displayedMusterRollData[0]?.halfDayCount || 0} HD`}
+              </span>
+              {selectedEmployeeId !== 'all' && (
+                <span className="text-[10px] text-slate-400 mt-0.5 block">
+                  Leaves: {displayedMusterRollData[0]?.leaveCount || 0} · Absent: {displayedMusterRollData[0]?.absentCount || 0}
+                </span>
+              )}
+            </div>
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
               <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Late Marks</span>
               <span className="text-xl font-bold text-amber-600 mt-1 block">
-                {musterRollData.reduce((acc, row) => acc + row.lateCount, 0)} Recorded
+                {displayedMusterRollData.reduce((acc, row) => acc + row.lateCount, 0)} Recorded
               </span>
+              {selectedEmployeeId !== 'all' && (
+                <span className="text-[10px] text-amber-700 mt-0.5 block font-medium">
+                  {displayedMusterRollData[0]?.penaltyCount > 0
+                    ? `Penalty applied: -${displayedMusterRollData[0]?.penaltyCount} day`
+                    : 'Within grace policy'}
+                </span>
+              )}
             </div>
-            <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Penalties Triggered</span>
-              <span className="text-xl font-bold text-rose-600 mt-1 block">
-                {musterRollData.filter(r => r.penaltyCount > 0).length} Staff (3+ Late)
+            <div className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+                {selectedEmployeeId === 'all' ? 'Penalties Triggered' : 'Total Payable Days'}
               </span>
+              <span className="text-xl font-bold text-rose-600 mt-1 block">
+                {selectedEmployeeId === 'all'
+                  ? `${displayedMusterRollData.filter(r => r.penaltyCount > 0).length} Staff (3+ Late)`
+                  : `${displayedMusterRollData[0]?.payableDays != null ? displayedMusterRollData[0].payableDays.toFixed(1) : '0.0'} Days`}
+              </span>
+              {selectedEmployeeId !== 'all' && (
+                <span className="text-[10px] text-teal-700 mt-0.5 block font-semibold">
+                  Net Salary Payable for Month
+                </span>
+              )}
             </div>
           </div>
 
           {/* Muster Roll Matrix Card */}
           <Card
-            title={`Muster Roll Ledger — ${selectedMonth === 11 ? 'November' : selectedMonth} ${selectedYear}`}
-            subtitle="P = Present · HD = Half Day (<4.5 hrs) · L = Approved Leave · WO = Week Off (Sunday) · A = Absent"
+            title={selectedEmployeeId === 'all'
+              ? `Muster Roll Ledger — ${monthNames[selectedMonth - 1] || selectedMonth} ${selectedYear}`
+              : `Employee Attendance Matrix — ${selectedEmployeeObj?.first_name} ${selectedEmployeeObj?.last_name} (${monthNames[selectedMonth - 1] || selectedMonth} ${selectedYear})`}
+            subtitle={selectedEmployeeId === 'all'
+              ? "P = Present · HD = Half Day (<4.5 hrs) · L = Approved Leave · WO = Week Off (Sunday) · A = Absent"
+              : `${selectedEmployeeObj?.employee_code || ''} · ${selectedEmployeeObj?.designation || ''} · ${selectedEmployeeObj?.branch_name || ''} · 1 to ${totalDaysInMonth} Day Attendance Grid`}
             bodyClassName="p-0 overflow-hidden"
           >
             <div className="overflow-x-auto max-w-full">
@@ -970,14 +1117,16 @@ export default function AttendanceView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-[11px]">
-                  {musterRollData.length === 0 ? (
+                  {displayedMusterRollData.length === 0 ? (
                     <tr>
                       <td colSpan={daysArray.length + 7} className="px-5 py-8 text-center text-slate-500">
-                        No employees found for this muster period.
+                        {selectedEmployeeId === 'all'
+                          ? 'No employees found for this muster period.'
+                          : 'Selected employee has no attendance record in this period.'}
                       </td>
                     </tr>
                   ) : (
-                    musterRollData.map((row) => (
+                    displayedMusterRollData.map((row) => (
                       <tr key={row.employee.id} className="hover:bg-slate-50/70 transition">
                         <td className="sticky left-0 z-10 bg-white px-3 py-2 border-r border-slate-200 shadow-sm text-left">
                           <div className="font-bold text-slate-900 leading-tight">
