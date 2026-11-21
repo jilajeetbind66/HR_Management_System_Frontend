@@ -223,14 +223,14 @@ export default function EmployeePayslipsView() {
                 ['Basic salary', payslip.basic_salary],
                 ['House rent allowance', payslip.hra],
                 ['Special allowance', payslip.special_allowance],
-                payslip.custom_bonus > 0 ? [`Custom Bonus (${payslip.custom_bonus_label || 'Incentive'})`, payslip.custom_bonus] : null,
+                Number(payslip.custom_bonus || 0) > 0 ? [`Custom Bonus (${payslip.custom_bonus_label || 'Incentive'})`, payslip.custom_bonus] : null,
                 ['Employee PF', payslip.pf_employee],
                 ['Employee ESI', payslip.esi_employee],
                 ['Professional tax', payslip.professional_tax],
                 ['TDS', payslip.tds],
                 [`LOP deduction (${Number(payslip.lop_days || 0)} days)`, payslip.lop_deduction],
-                payslip.late_penalty_amount > 0 ? [`Late arrival penalty (${payslip.late_count_summary || `${payslip.late_penalty_days || 0} half-days`})`, payslip.late_penalty_amount] : null,
-                payslip.other_penalty_amount > 0 ? [`Other penalty (${payslip.other_penalty_reason || 'Disciplinary'})`, payslip.other_penalty_amount] : null,
+                Number(payslip.late_penalty_amount || 0) > 0 ? [`Late arrival penalty (${payslip.late_count_summary || `${payslip.late_penalty_days || 0} half-days`})`, payslip.late_penalty_amount] : null,
+                Number(payslip.other_penalty_amount || 0) > 0 ? [`Other penalty (${payslip.other_penalty_reason || 'Disciplinary'})`, payslip.other_penalty_amount] : null,
                 ['Total deductions', payslip.total_deductions],
               ].filter(Boolean).map(([label, amount]) => (
                 <div key={label} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
