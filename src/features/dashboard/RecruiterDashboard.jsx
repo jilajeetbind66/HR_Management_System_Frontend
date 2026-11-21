@@ -31,6 +31,7 @@ export default function RecruiterDashboard({ onNavigate }) {
   const interviewCount = candidates.filter((c) => c.stage === 'Interview').length;
   const offeredCount = candidates.filter((c) => c.stage === 'Offered').length;
   const hiredCount = candidates.filter((c) => c.stage === 'Hired').length;
+  const rejectedCount = candidates.filter((c) => c.stage === 'Rejected').length;
   const activeCandidatesCount = appliedCount + screeningCount + interviewCount + offeredCount;
 
   const actionableCandidates = candidates
@@ -187,7 +188,7 @@ export default function RecruiterDashboard({ onNavigate }) {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 sm:gap-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 sm:gap-3">
           <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 sm:p-3.5 text-center transition hover:border-slate-200">
             <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">1. Applied</p>
             <p className="mt-1 text-2xl font-bold text-slate-800">{appliedCount}</p>
@@ -208,10 +209,15 @@ export default function RecruiterDashboard({ onNavigate }) {
             <p className="mt-1 text-2xl font-bold text-indigo-900">{offeredCount}</p>
             <p className="text-[10px] text-indigo-500 mt-0.5">Offer Extended</p>
           </div>
-          <div className="col-span-2 sm:col-span-1 lg:col-span-1 rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 sm:p-3.5 text-center transition hover:border-emerald-200">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-3 sm:p-3.5 text-center transition hover:border-emerald-200">
             <p className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wide">5. Hired</p>
             <p className="mt-1 text-2xl font-bold text-emerald-900">{hiredCount}</p>
             <p className="text-[10px] text-emerald-500 mt-0.5">Converted to Staff</p>
+          </div>
+          <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3 sm:p-3.5 text-center transition hover:border-rose-200">
+            <p className="text-[11px] font-semibold text-rose-700 uppercase tracking-wide">6. Rejected</p>
+            <p className="mt-1 text-2xl font-bold text-rose-900">{rejectedCount}</p>
+            <p className="text-[10px] text-rose-500 mt-0.5">Not Selected</p>
           </div>
         </div>
       </section>

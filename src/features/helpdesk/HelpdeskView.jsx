@@ -7,12 +7,12 @@ import Modal from '../../components/common/Modal';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 
-const emptyTicket = {
+const getEmptyTicket = (userRole) => ({
   title: '',
   description: '',
-  category: 'IT Support',
+  category: ['hr_admin', 'hr_executive'].includes(userRole) ? 'HR Query' : 'IT Support',
   priority: 'Medium',
-};
+});
 
 function errorText(error) {
   const validationMessages = Object.values(error?.data?.errors || {}).flat();
@@ -59,8 +59,10 @@ export default function HelpdeskView() {
     api,
   } = useHRMS();
   const { currentUser } = useAuth();
+  const role = currentUser?.role;
+  const hrOnly = ['hr_admin', 'hr_executive'].includes(role);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [ticketForm, setTicketForm] = useState(emptyTicket);
+  const [ticketForm, setTicketForm] = useState(() => getEmptyTicket(role));
   const [formError, setFormError] = useState('');
   const [feedback, setFeedback] = useState(null);
   const [busy, setBusy] = useState('');
@@ -70,8 +72,6 @@ export default function HelpdeskView() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [reply, setReply] = useState('');
   const [statusDraft, setStatusDraft] = useState('');
-  const role = currentUser?.role;
-  const hrOnly = ['hr_admin', 'hr_executive'].includes(role);
 
   const openTicket = async (ticketId) => {
     setDetailsOpen(true);
@@ -94,9 +94,13 @@ export default function HelpdeskView() {
     setFormError('');
     setBusy('create');
     try {
-      await createTicket(ticketForm);
+      const payload = {
+        ...ticketForm,
+        category: hrOnly ? 'HR Query' : ticketForm.category,
+      };
+      await createTicket(payload);
       setShowCreateModal(false);
-      setTicketForm(emptyTicket);
+      setTicketForm(getEmptyTicket(role));
       setFeedback({ type: 'success', text: 'Support ticket created.' });
     } catch (error) {
       setFormError(errorText(error));
@@ -158,7 +162,15 @@ export default function HelpdeskView() {
             Track support requests, communicate in a ticket thread, and monitor priority response deadlines.
           </p>
         </div>
-        <Button variant="primary" icon={Plus} onClick={() => setShowCreateModal(true)}>
+        <Button
+          variant="primary"
+          icon={Plus}
+          onClick={() => {
+            setTicketForm(getEmptyTicket(role));
+            setFormError('');
+            setShowCreateModal(true);
+          }}
+        >
           Raise New Ticket
         </Button>
       </div>

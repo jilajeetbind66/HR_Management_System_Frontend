@@ -14,7 +14,9 @@ import {
   ArrowRight,
   Star,
   Users,
-  Building
+  Building,
+  XCircle,
+  RotateCcw
 } from 'lucide-react';
 
 export default function RecruitmentView() {
@@ -67,7 +69,7 @@ export default function RecruitmentView() {
     }
   }, [branches, syncWithBackend]);
 
-  const stages = ["Applied", "Screening", "Interview", "Offered", "Hired"];
+  const stages = ["Applied", "Screening", "Interview", "Offered", "Hired", "Rejected"];
 
   const handleStageMove = async (candidateId, newStage) => {
     setWorkflowError('');
@@ -75,6 +77,16 @@ export default function RecruitmentView() {
       await updateCandidateStage(candidateId, newStage);
     } catch (error) {
       setWorkflowError(error?.data?.message || error.message || 'Unable to save the candidate stage.');
+    }
+  };
+
+  const handleRejectCandidate = async (candidate) => {
+    if (!window.confirm(`Are you sure you want to reject candidate ${candidate.name}?`)) return;
+    setWorkflowError('');
+    try {
+      await updateCandidateStage(candidate.id, 'Rejected');
+    } catch (error) {
+      setWorkflowError(error?.data?.message || error.message || 'Unable to reject candidate.');
     }
   };
 
@@ -250,29 +262,48 @@ export default function RecruitmentView() {
 
       {/* TAB 1: KANBAN BOARD */}
       {activeTab === 'kanban' && (
-        <div className="flex lg:grid lg:grid-cols-5 gap-4 overflow-x-auto pb-4 snap-x">
+        <div className="flex lg:grid lg:grid-cols-6 gap-4 overflow-x-auto pb-4 snap-x">
           {stages.map(stage => {
             const stageCandidates = candidates.filter(c => c.stage === stage);
+            const isRejectedCol = stage === 'Rejected';
 
             return (
-              <div key={stage} className="min-w-[270px] lg:min-w-0 flex-1 snap-start bg-slate-100/80 rounded-xl p-3 border border-slate-200 flex flex-col justify-between">
+              <div
+                key={stage}
+                className={`min-w-[270px] lg:min-w-0 flex-1 snap-start rounded-xl p-3 border flex flex-col justify-between ${
+                  isRejectedCol ? 'bg-rose-50/50 border-rose-200' : 'bg-slate-100/80 border-slate-200'
+                }`}
+              >
                 <div>
                   <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-200">
-                    <h3 className="font-bold text-slate-800 text-xs">{stage}</h3>
-                    <span className="font-mono text-xs bg-white px-2 py-0.5 rounded text-slate-600 font-bold">
+                    <h3 className={`font-bold text-xs ${isRejectedCol ? 'text-rose-700' : 'text-slate-800'}`}>
+                      {stage}
+                    </h3>
+                    <span className={`font-mono text-xs px-2 py-0.5 rounded font-bold ${
+                      isRejectedCol ? 'bg-rose-100 text-rose-700' : 'bg-white text-slate-600'
+                    }`}>
                       {stageCandidates.length}
                     </span>
                   </div>
 
                   <div className="space-y-3">
                     {stageCandidates.map(cand => (
-                      <div key={cand.id} className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm space-y-2 text-xs min-w-0">
+                      <div
+                        key={cand.id}
+                        className={`bg-white rounded-lg p-3 border shadow-sm space-y-2 text-xs min-w-0 ${
+                          isRejectedCol ? 'border-rose-200/80' : 'border-slate-200'
+                        }`}
+                      >
                         <div className="flex justify-between items-start gap-1.5 min-w-0">
                           <h4 className="font-bold text-slate-900 truncate" title={cand.name}>{cand.name}</h4>
-                          <span className="flex items-center gap-0.5 text-amber-500 font-bold text-[11px] shrink-0">
-                            <Star className="h-3 w-3 fill-amber-400" />
-                            {Number(cand.rating) > 0 ? `${Number(cand.rating).toFixed(1)}/5` : 'Not rated'}
-                          </span>
+                          {isRejectedCol ? (
+                            <Badge variant="danger" size="sm">Rejected</Badge>
+                          ) : (
+                            <span className="flex items-center gap-0.5 text-amber-500 font-bold text-[11px] shrink-0">
+                              <Star className="h-3 w-3 fill-amber-400" />
+                              {Number(cand.rating) > 0 ? `${Number(cand.rating).toFixed(1)}/5` : 'Not rated'}
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500 truncate" title={cand.email}>
                           {cand.email}
@@ -286,20 +317,22 @@ export default function RecruitmentView() {
                         </div>
 
                         {/* Stage actions */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1 flex-wrap">
                           {stage === 'Offered' && canManageRecruitment && (
                             <button
                               onClick={() => handleConvertToEmployee(cand)}
-                              className="w-full text-center py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px] transition"
+                              className="w-full text-center py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded text-[11px] transition mb-1"
                             >
                               + Convert to Employee
                             </button>
                           )}
-                          {stage !== 'Offered' && stage !== 'Hired' && canManageRecruitment && (
+                          {stage !== 'Offered' && stage !== 'Hired' && stage !== 'Rejected' && canManageRecruitment && (
                             <button
                               onClick={() => {
                                 const nextStageIndex = stages.indexOf(stage) + 1;
-                                if (nextStageIndex < stages.length) handleStageMove(cand.id, stages[nextStageIndex]);
+                                if (nextStageIndex < stages.length && stages[nextStageIndex] !== 'Rejected') {
+                                  handleStageMove(cand.id, stages[nextStageIndex]);
+                                }
                               }}
                               className="text-teal-600 font-semibold hover:underline text-[11px] inline-flex items-center gap-1"
                             >
@@ -312,6 +345,24 @@ export default function RecruitmentView() {
                               className="text-teal-600 font-semibold hover:underline text-[11px]"
                             >
                               {Number(cand.rating) > 0 ? 'Update Evaluation' : 'Evaluate'}
+                            </button>
+                          )}
+                          {stage !== 'Hired' && stage !== 'Rejected' && canManageRecruitment && (
+                            <button
+                              onClick={() => handleRejectCandidate(cand)}
+                              className="text-rose-600 font-semibold hover:text-rose-800 hover:underline text-[11px] inline-flex items-center gap-1 ml-auto"
+                              title="Reject candidate"
+                            >
+                              <XCircle className="w-3 h-3 text-rose-500" /> Reject
+                            </button>
+                          )}
+                          {stage === 'Rejected' && canManageRecruitment && (
+                            <button
+                              onClick={() => handleStageMove(cand.id, 'Applied')}
+                              className="text-teal-600 font-semibold hover:underline text-[11px] inline-flex items-center gap-1"
+                              title="Reopen candidate back to Applied"
+                            >
+                              <RotateCcw className="w-3 h-3 text-teal-600" /> Reopen to Applied
                             </button>
                           )}
                         </div>
