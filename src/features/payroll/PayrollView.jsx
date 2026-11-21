@@ -523,12 +523,16 @@ export default function PayrollView() {
     const draft = deductionDrafts[payslip.id];
     setPayslipError('');
     setSavingPayslipId(payslip.id);
+    const ptReason = (draft?.professional_tax_override_reason || '').trim() ||
+      (Number(draft?.professional_tax || 0) === 0 ? 'Nil Professional Tax / State non-applicable' : `Manual verified PT: ₹${draft?.professional_tax}`);
+    const tdsReason = (draft?.tds_override_reason || '').trim() ||
+      (Number(draft?.tds || 0) === 0 ? 'Nil TDS / Income below taxable threshold' : `Manual verified TDS: ₹${draft?.tds}`);
     try {
       const response = await api.reviewPayrollPayslip(selectedRun.id, payslip.id, {
-        professional_tax: draft?.professional_tax,
-        tds: draft?.tds,
-        professional_tax_override_reason: draft?.professional_tax_override_reason,
-        tds_override_reason: draft?.tds_override_reason,
+        professional_tax: draft?.professional_tax ?? '0',
+        tds: draft?.tds ?? '0',
+        professional_tax_override_reason: ptReason,
+        tds_override_reason: tdsReason,
       });
       setRunPayslips(current => current.map(item => item.id === payslip.id ? response.data : item));
       try {
@@ -538,6 +542,41 @@ export default function PayrollView() {
       }
     } catch (error) {
       setPayslipError(error?.data?.message || error.message || 'Unable to save reviewed deductions.');
+    } finally {
+      setSavingPayslipId(null);
+    }
+  };
+
+  const handleConfirmAllDeductions = async () => {
+    if (!selectedRun) return;
+    const unconfirmed = runPayslips.filter(p => !p.deductions_confirmed);
+    if (unconfirmed.length === 0) return;
+    setSavingPayslipId('all');
+    setPayslipError('');
+    try {
+      for (const slip of unconfirmed) {
+        const draft = deductionDrafts[slip.id] || { professional_tax: String(slip.professional_tax ?? 0), tds: String(slip.tds ?? 0) };
+        const ptReason = (draft?.professional_tax_override_reason || '').trim() ||
+          (Number(draft?.professional_tax || 0) === 0 ? 'Nil Professional Tax / State non-applicable' : `Manual verified PT: ₹${draft?.professional_tax}`);
+        const tdsReason = (draft?.tds_override_reason || '').trim() ||
+          (Number(draft?.tds || 0) === 0 ? 'Nil TDS / Income below taxable threshold' : `Manual verified TDS: ₹${draft?.tds}`);
+        const res = await api.reviewPayrollPayslip(selectedRun.id, slip.id, {
+          professional_tax: draft?.professional_tax ?? '0',
+          tds: draft?.tds ?? '0',
+          professional_tax_override_reason: ptReason,
+          tds_override_reason: tdsReason,
+        });
+        if (res?.data) {
+          setRunPayslips(current => current.map(item => item.id === slip.id ? res.data : item));
+        }
+      }
+      try {
+        await refreshPayrollRuns();
+      } catch {
+        // Totals refresh failure shouldn't block
+      }
+    } catch (error) {
+      setPayslipError(error?.data?.message || error.message || 'Unable to confirm all deductions.');
     } finally {
       setSavingPayslipId(null);
     }
@@ -1780,15 +1819,27 @@ export default function PayrollView() {
                   ? `${pendingPayslips} payslip${pendingPayslips === 1 ? '' : 's'} still need deduction confirmation.`
                   : 'All employee deductions are confirmed and ready for verification.'}
               </p>
-              <Button
-                type="button"
-                variant="primary"
-                icon={ShieldCheck}
-                disabled={pendingPayslips > 0}
-                onClick={() => handleVerifyRun(selectedRun.id)}
-              >
-                Verify Payroll Run
-              </Button>
+              <div className="flex items-center gap-2">
+                {pendingPayslips > 0 && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={savingPayslipId === 'all'}
+                    onClick={handleConfirmAllDeductions}
+                  >
+                    {savingPayslipId === 'all' ? 'Confirming all…' : `Confirm All Deductions (${pendingPayslips})`}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="primary"
+                  icon={ShieldCheck}
+                  disabled={pendingPayslips > 0 || savingPayslipId === 'all'}
+                  onClick={() => handleVerifyRun(selectedRun.id)}
+                >
+                  Verify Payroll Run
+                </Button>
+              </div>
             </div>
           )}
           {canManagePayroll && selectedRun?.status === 'verified' && (
