@@ -19,7 +19,14 @@ import {
   Edit3,
   AlertTriangle,
   CheckCircle2,
-  Clock
+  Clock,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Filter
 } from 'lucide-react';
 
 const PAYROLL_MONTHS = [
@@ -76,6 +83,14 @@ export default function PayrollView() {
   const [adjustingPayslipId, setAdjustingPayslipId] = useState(null);
   const [adjustmentDrafts, setAdjustmentDrafts] = useState({});
   const [savingAdjustmentId, setSavingAdjustmentId] = useState(null);
+
+  // Table Search, Filter & Pagination states
+  const [searchTerm, setSearchTerm] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [confirmationFilter, setConfirmationFilter] = useState('all');
+  const [expandedRowId, setExpandedRowId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(15);
   const [showRunWizard, setShowRunWizard] = useState(false);
   const [wizardMonth, setWizardMonth] = useState('January');
   const [wizardYear, setWizardYear] = useState(new Date().getFullYear());
@@ -428,6 +443,11 @@ export default function PayrollView() {
     setAdjustmentDrafts({});
     setPayingPayslip(null);
     setAdjustingPayslipId(null);
+    setSearchTerm('');
+    setPaymentFilter('all');
+    setConfirmationFilter('all');
+    setExpandedRowId(null);
+    setCurrentPage(1);
     setPayslipError('');
     setLoadingPayslips(true);
     try {
@@ -583,6 +603,35 @@ export default function PayrollView() {
   };
 
   const pendingPayslips = runPayslips.filter(payslip => !payslip.deductions_confirmed).length;
+  const paidPayslipsCount = runPayslips.filter(payslip => payslip.payment_status === 'paid').length;
+  const unpaidPayslipsCount = runPayslips.length - paidPayslipsCount;
+  const confirmedPayslipsCount = runPayslips.length - pendingPayslips;
+
+  // Filtered payslips based on search and filters
+  const filteredPayslips = runPayslips.filter(slip => {
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      const name = `${slip.first_name || ''} ${slip.last_name || ''}`.toLowerCase();
+      const code = (slip.employee_code || '').toLowerCase();
+      const desig = (slip.designation || '').toLowerCase();
+      if (!name.includes(term) && !code.includes(term) && !desig.includes(term)) {
+        return false;
+      }
+    }
+    if (paymentFilter === 'paid' && slip.payment_status !== 'paid') return false;
+    if (paymentFilter === 'unpaid' && slip.payment_status === 'paid') return false;
+    if (confirmationFilter === 'confirmed' && !slip.deductions_confirmed) return false;
+    if (confirmationFilter === 'unconfirmed' && slip.deductions_confirmed) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayslips.length / pageSize));
+  const currentPageSafe = Math.min(currentPage, totalPages);
+  const paginatedPayslips = filteredPayslips.slice((currentPageSafe - 1) * pageSize, currentPageSafe * pageSize);
+
+  const toggleRowExpand = (id) => {
+    setExpandedRowId(curr => curr === id ? null : id);
+  };
 
   return (
     <div className="space-y-6">
@@ -1363,7 +1412,7 @@ export default function PayrollView() {
         onClose={() => setSelectedRun(null)}
         title={`${selectedRun?.month_name || 'Payroll'} Payslips`}
         subtitle="Review employee-level amounts. Employee payslips are available only after publication."
-        maxWidth="max-w-5xl"
+        maxWidth="max-w-7xl"
       >
         <div className="space-y-4">
           {payslipError && (
@@ -1375,442 +1424,689 @@ export default function PayrollView() {
           {!loadingPayslips && runPayslips.length === 0 && !payslipError && (
             <p role="status" className="text-sm text-slate-500">No payslip records exist for this run.</p>
           )}
-          {runPayslips.map(payslip => {
-            const draft = deductionDrafts[payslip.id] || {
-              professional_tax: '0',
-              tds: '0',
-              professional_tax_override_reason: '',
-              tds_override_reason: '',
-            };
-            const requiresPtReason = needsOverrideReason(draft.professional_tax, payslip.professional_tax_computed);
-            const requiresTdsReason = needsOverrideReason(draft.tds, payslip.tds_computed);
-            const componentBreakdown = payslip.component_breakdown || {};
-            const componentEarnings = Array.isArray(componentBreakdown.earnings) ? componentBreakdown.earnings : [];
-            const employerCosts = Array.isArray(componentBreakdown.employer_costs) ? componentBreakdown.employer_costs : [];
-            const estimatedDeductions = Number(payslip.pf_employee)
-              + Number(payslip.esi_employee)
-              + Number(payslip.lop_deduction || 0)
-              + Number(draft.professional_tax || 0)
-              + Number(draft.tds || 0);
 
-            return (
-              <article key={payslip.id} className="rounded-xl border border-slate-200 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold text-slate-900">{payslip.first_name} {payslip.last_name}</h4>
-                      {payslip.payment_status === 'paid' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                          <CheckCircle2 className="h-3 w-3" /> Paid via {payslip.payment_mode || 'Bank Transfer'}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
-                          <Clock className="h-3 w-3" /> Unpaid / Processing
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-500">{payslip.employee_code} · {payslip.designation}</p>
-                    {payslip.payment_status === 'paid' && (
-                      <p className="mt-0.5 text-[11px] text-emerald-700">
-                        Paid on <strong>{payslip.paid_at ? payslip.paid_at.slice(0, 10) : 'N/A'}</strong>
-                        {payslip.payment_reference ? ` · Ref/UTR: ${payslip.payment_reference}` : ''}
-                        {payslip.paid_by ? ` (by ${payslip.paid_by})` : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {isSuperAdmin && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={payslip.payment_status === 'paid' ? 'secondary' : 'primary'}
-                        icon={CreditCard}
-                        onClick={() => openPaymentModal(payslip)}
-                      >
-                        {payslip.payment_status === 'paid' ? 'Update Payment' : 'Pay Salary'}
-                      </Button>
-                    )}
-                    {isSuperAdmin && selectedRun?.status !== 'locked' && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        icon={Edit3}
-                        onClick={() => setAdjustingPayslipId(current => current === payslip.id ? null : payslip.id)}
-                      >
-                        {adjustingPayslipId === payslip.id ? 'Close Adjustments' : 'Custom Salary & Penalties'}
-                      </Button>
-                    )}
-                    <Badge variant={payslip.deductions_confirmed ? 'success' : 'warning'} size="sm">
-                      {payslip.deductions_confirmed ? 'Deductions reviewed' : 'Review required'}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                  {[
-                    ['Gross', payslip.gross_salary],
-                    ['Basic', payslip.basic_salary],
-                    ['HRA', payslip.hra],
-                    ['Special allowance', payslip.special_allowance],
-                    Number(payslip.custom_bonus || 0) > 0 ? [`Custom Bonus (${payslip.custom_bonus_label || 'Incentive'})`, payslip.custom_bonus] : null,
-                    ['Employee PF', payslip.pf_employee],
-                    ['Employee ESI', payslip.esi_employee],
-                    ['LOP deduction', payslip.lop_deduction],
-                    Number(payslip.late_penalty_amount || 0) > 0 ? ['Late Penalty', payslip.late_penalty_amount] : null,
-                    Number(payslip.other_penalty_amount || 0) > 0 ? ['Other Penalty', payslip.other_penalty_amount] : null,
-                    ['Total deductions', payslip.total_deductions],
-                    ['Net salary', payslip.net_salary],
-                  ].filter(Boolean).map(([label, amount]) => (
-                    <div key={label} className={`rounded-lg p-2 ${label === 'Net salary' ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50'}`}>
-                      <span className={`block ${label === 'Net salary' ? 'text-emerald-700 font-semibold' : 'text-slate-500'}`}>{label}</span>
-                      <strong className={`mt-0.5 block ${label === 'Net salary' ? 'text-emerald-800 text-sm' : 'text-slate-900'}`}>
-                        ₹{Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
-                      </strong>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Transparent Itemized Penalty Breakdown */}
-                {(Number(payslip.late_penalty_amount || 0) > 0 || Number(payslip.lop_deduction || 0) > 0 || Number(payslip.other_penalty_amount || 0) > 0) && (
-                  <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold text-rose-900">
-                      <AlertTriangle className="h-4 w-4 text-rose-600" />
-                      <span>Itemized Penalty & Deduction Breakdown:</span>
-                    </div>
-                    <div className="mt-2 divide-y divide-rose-200/60 space-y-1.5">
-                      {Number(payslip.late_penalty_amount || 0) > 0 && (
-                        <div className="flex items-center justify-between pt-1 text-rose-800">
-                          <div>
-                            <span className="font-semibold">Late Arrival Penalty</span>
-                            <span className="ml-1 text-[11px] text-rose-600">({payslip.late_count_summary || `${payslip.late_penalty_days || 0} half-day(s)`})</span>
-                          </div>
-                          <span className="font-bold">-₹{Number(payslip.late_penalty_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
-                      {Number(payslip.lop_deduction || 0) > 0 && (
-                        <div className="flex items-center justify-between pt-1 text-rose-800">
-                          <div>
-                            <span className="font-semibold">Loss of Pay (Unpaid Leave)</span>
-                            <span className="ml-1 text-[11px] text-rose-600">({Number(payslip.lop_days || 0)} day(s) calculated from month days)</span>
-                          </div>
-                          <span className="font-bold">-₹{Number(payslip.lop_deduction).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
-                      {Number(payslip.other_penalty_amount || 0) > 0 && (
-                        <div className="flex items-center justify-between pt-1 text-rose-800">
-                          <div>
-                            <span className="font-semibold">Disciplinary / Other Penalty</span>
-                            <span className="ml-1 text-[11px] text-rose-600">({payslip.other_penalty_reason || 'Policy deduction'})</span>
-                          </div>
-                          <span className="font-bold">-₹{Number(payslip.other_penalty_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between pt-1.5 font-bold text-rose-900">
-                        <span>Total Penalties Deducted</span>
-                        <span>-₹{(Number(payslip.late_penalty_amount || 0) + Number(payslip.lop_deduction || 0) + Number(payslip.other_penalty_amount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    </div>
-                  </div>
+          {!loadingPayslips && runPayslips.length > 0 && (
+            <>
+              {/* Metric Summary Chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                  Total Employees: <strong>{runPayslips.length}</strong>
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  Paid: <strong>{paidPayslipsCount}</strong>
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  <Clock className="h-3.5 w-3.5 text-amber-600" />
+                  Unpaid: <strong>{unpaidPayslipsCount}</strong>
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-800">
+                  <ShieldCheck className="h-3.5 w-3.5 text-teal-600" />
+                  Deductions Confirmed: <strong>{confirmedPayslipsCount}</strong>
+                </span>
+                {pendingPayslips > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-800">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-600" />
+                    Review Required: <strong>{pendingPayslips}</strong>
+                  </span>
                 )}
+              </div>
 
-                {/* Super Admin Inline Custom Salary & Penalty Editor */}
-                {isSuperAdmin && adjustingPayslipId === payslip.id && selectedRun?.status !== 'locked' && (
-                  <div className="mt-3 rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-4 text-xs">
-                    <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
-                      <div className="flex items-center gap-1.5 font-bold text-indigo-950">
-                        <Edit3 className="h-4 w-4 text-indigo-600" />
-                        <span>Super Admin Adjustment: Custom Salary, Bonus & Penalty Editor</span>
-                      </div>
-                      <span className="rounded bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
-                        Access: Super Admin Only
-                      </span>
-                    </div>
-
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      {/* Custom Bonus */}
-                      <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3">
-                        <h6 className="font-bold text-indigo-900">Custom Bonus / Incentive / Overtime</h6>
-                        <label className="block text-slate-700">
-                          Bonus Amount (₹):
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={adjustmentDrafts[payslip.id]?.custom_bonus ?? '0'}
-                            onChange={e => setAdjustmentDrafts(current => ({
-                              ...current,
-                              [payslip.id]: { ...current[payslip.id], custom_bonus: e.target.value }
-                            }))}
-                            className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                          />
-                        </label>
-                        <label className="block text-slate-700">
-                          Bonus Label / Reason:
-                          <input
-                            type="text"
-                            maxLength={150}
-                            placeholder="e.g. Performance Incentive, Diwali Bonus, Overtime"
-                            value={adjustmentDrafts[payslip.id]?.custom_bonus_label ?? ''}
-                            onChange={e => setAdjustmentDrafts(current => ({
-                              ...current,
-                              [payslip.id]: { ...current[payslip.id], custom_bonus_label: e.target.value }
-                            }))}
-                            className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                          />
-                        </label>
-                      </div>
-
-                      {/* Late Arrival Penalty */}
-                      <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3">
-                        <h6 className="font-bold text-rose-900">Late Arrival Penalty</h6>
-                        <div className="grid grid-cols-2 gap-2">
-                          <label className="block text-slate-700">
-                            Penalty Amount (₹):
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={adjustmentDrafts[payslip.id]?.late_penalty_amount ?? '0'}
-                              onChange={e => setAdjustmentDrafts(current => ({
-                                ...current,
-                                [payslip.id]: { ...current[payslip.id], late_penalty_amount: e.target.value }
-                              }))}
-                              className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                            />
-                          </label>
-                          <label className="block text-slate-700">
-                            Penalty Days (Half-days):
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.5"
-                              value={adjustmentDrafts[payslip.id]?.late_penalty_days ?? '0'}
-                              onChange={e => setAdjustmentDrafts(current => ({
-                                ...current,
-                                [payslip.id]: { ...current[payslip.id], late_penalty_days: e.target.value }
-                              }))}
-                              className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                            />
-                          </label>
-                        </div>
-                        <label className="block text-slate-700">
-                          Late Summary / Remarks:
-                          <input
-                            type="text"
-                            maxLength={255}
-                            placeholder="e.g. 3 Late Marks (1.5 days penalty)"
-                            value={adjustmentDrafts[payslip.id]?.late_count_summary ?? ''}
-                            onChange={e => setAdjustmentDrafts(current => ({
-                              ...current,
-                              [payslip.id]: { ...current[payslip.id], late_count_summary: e.target.value }
-                            }))}
-                            className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                          />
-                        </label>
-                      </div>
-
-                      {/* Other Disciplinary / Policy Penalty */}
-                      <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3 sm:col-span-2">
-                        <h6 className="font-bold text-rose-900">Other Disciplinary / Equipment / Policy Penalty</h6>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          <label className="block text-slate-700">
-                            Penalty Amount (₹):
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={adjustmentDrafts[payslip.id]?.other_penalty_amount ?? '0'}
-                              onChange={e => setAdjustmentDrafts(current => ({
-                                ...current,
-                                [payslip.id]: { ...current[payslip.id], other_penalty_amount: e.target.value }
-                              }))}
-                              className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                            />
-                          </label>
-                          <label className="block text-slate-700">
-                            Penalty Reason / Explanation:
-                            <input
-                              type="text"
-                              maxLength={255}
-                              placeholder="e.g. Asset damage deduction, Disciplinary fine"
-                              value={adjustmentDrafts[payslip.id]?.other_penalty_reason ?? ''}
-                              onChange={e => setAdjustmentDrafts(current => ({
-                                ...current,
-                                [payslip.id]: { ...current[payslip.id], other_penalty_reason: e.target.value }
-                              }))}
-                              className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
-                            />
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-end gap-2 border-t border-indigo-200 pt-3">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setAdjustingPayslipId(null)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="primary"
-                        disabled={savingAdjustmentId === payslip.id}
-                        onClick={() => handleSaveAdjustments(payslip)}
-                      >
-                        {savingAdjustmentId === payslip.id ? 'Recalculating & Saving…' : 'Save Adjustments & Recalculate Net'}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {(componentEarnings.length > 0 || employerCosts.length > 0) && (
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <section className="rounded-lg border border-slate-200 p-3">
-                      <h5 className="font-semibold text-slate-800">Gross salary components</h5>
-                      <ul className="mt-2 space-y-1">
-                        {componentEarnings.map(component => (
-                          <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
-                            <span>{component.name}</span>
-                            <span>₹{Number(component.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                    <section className="rounded-lg border border-teal-200 bg-teal-50/50 p-3">
-                      <h5 className="font-semibold text-slate-800">Employer cost (not deducted from employee pay)</h5>
-                      <ul className="mt-2 space-y-1">
-                        {employerCosts.map(component => (
-                          <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
-                            <span>{component.name}</span>
-                            <span>₹{Number(component.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <div className="mt-2 space-y-1 border-t border-teal-100 pt-2 font-semibold text-slate-800">
-                        <p className="flex justify-between gap-3">
-                          <span>Total employer cost</span>
-                          <span>₹{Number(payslip.employer_cost_total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                        </p>
-                        <p className="flex justify-between gap-3">
-                          <span>Monthly CTC</span>
-                          <span>₹{Number(payslip.total_ctc_monthly || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                        </p>
-                        <p className="flex justify-between gap-3">
-                          <span>Annual CTC</span>
-                          <span>₹{Number(payslip.ctc_annual || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
-                        </p>
-                      </div>
-                    </section>
-                  </div>
-                )}
-                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  <p>
-                    Professional Tax estimate:{' '}
-                    <strong>
-                      {payslip.professional_tax_computed == null
-                        ? 'No matching state rule'
-                        : `₹${Number(payslip.professional_tax_computed).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
-                    </strong>
-                  </p>
-                  <p className="mt-1">
-                    TDS estimate for {payslip.tax_financial_year || 'this financial year'}:{' '}
-                    <strong>
-                      {payslip.tds_computed == null
-                        ? 'No reviewed declaration or matching tax slab'
-                        : `₹${Number(payslip.tds_computed).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
-                    </strong>
-                    {payslip.tds_taxable_annual_income != null
-                      ? ` · projected taxable income ₹${Number(payslip.tds_taxable_annual_income).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-                      : ''}
-                  </p>
-                  {(payslip.professional_tax_override_reason || payslip.tds_override_reason) && (
-                    <p className="mt-2 border-t border-slate-200 pt-2">
-                      Override reason: {[payslip.professional_tax_override_reason, payslip.tds_override_reason].filter(Boolean).join(' · ')}
-                    </p>
+              {/* Search Bar & Filters Toolbar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by employee name, code (e.g. EMP-021), or designation..."
+                    value={searchTerm}
+                    onChange={e => {
+                      setSearchTerm(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full rounded-lg border border-slate-300 bg-white pl-9 pr-8 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                  />
+                  {searchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchTerm('');
+                        setCurrentPage(1);
+                      }}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-slate-600">
-                  Approved unpaid leave: <strong>{Number(payslip.lop_days || 0)} day(s)</strong>.
-                  LOP is calculated from monthly gross divided by calendar days in the payroll month.
-                </p>
 
-                {canManagePayroll && ['draft', 'review'].includes(selectedRun?.status) && (
-                  <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
-                    <label className="flex-1 text-xs font-medium text-slate-700">
-                      Verified Professional Tax (₹)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        value={draft.professional_tax}
-                        onChange={event => setDeductionDrafts(current => ({
-                          ...current,
-                          [payslip.id]: { ...draft, professional_tax: event.target.value },
-                        }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                      />
-                    </label>
-                    <label className="flex-1 text-xs font-medium text-slate-700">
-                      Verified TDS (₹)
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        required
-                        value={draft.tds}
-                        onChange={event => setDeductionDrafts(current => ({
-                          ...current,
-                          [payslip.id]: { ...draft, tds: event.target.value },
-                        }))}
-                        className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                      />
-                    </label>
-                    {requiresPtReason && (
-                      <label className="text-xs font-medium text-slate-700">
-                        PT override reason (required)
-                        <textarea required rows="2" maxLength="1000"
-                          value={draft.professional_tax_override_reason}
-                          onChange={event => setDeductionDrafts(current => ({
-                            ...current,
-                            [payslip.id]: { ...draft, professional_tax_override_reason: event.target.value },
-                          }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
-                      </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={paymentFilter}
+                    onChange={e => {
+                      setPaymentFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value="all">Payment: All ({runPayslips.length})</option>
+                    <option value="paid">Paid ({paidPayslipsCount})</option>
+                    <option value="unpaid">Unpaid ({unpaidPayslipsCount})</option>
+                  </select>
+
+                  <select
+                    value={confirmationFilter}
+                    onChange={e => {
+                      setConfirmationFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value="all">Deductions: All</option>
+                    <option value="confirmed">Reviewed ({confirmedPayslipsCount})</option>
+                    <option value="unconfirmed">Required ({pendingPayslips})</option>
+                  </select>
+
+                  <select
+                    value={pageSize}
+                    onChange={e => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-medium text-slate-700 focus:border-teal-500 focus:outline-none"
+                  >
+                    <option value={10}>10 / page</option>
+                    <option value={15}>15 / page</option>
+                    <option value={25}>25 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Table Container */}
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-100/75 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      <th className="w-8 px-2 py-3 text-center"></th>
+                      <th className="px-3 py-3">Employee</th>
+                      <th className="px-3 py-3">Gross (₹)</th>
+                      <th className="px-3 py-3">Bonus / Adjust</th>
+                      <th className="px-3 py-3">Deductions (₹)</th>
+                      <th className="px-3 py-3">Net Salary (₹)</th>
+                      <th className="px-3 py-3">Deductions</th>
+                      <th className="px-3 py-3">Payment</th>
+                      <th className="px-3 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {paginatedPayslips.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-slate-500">
+                          {searchTerm || paymentFilter !== 'all' || confirmationFilter !== 'all' ? (
+                            <div>
+                              <p className="font-semibold text-slate-700">No employees match the active filters.</p>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSearchTerm('');
+                                  setPaymentFilter('all');
+                                  setConfirmationFilter('all');
+                                  setCurrentPage(1);
+                                }}
+                                className="mt-2 text-xs font-semibold text-teal-600 hover:underline"
+                              >
+                                Reset all filters
+                              </button>
+                            </div>
+                          ) : (
+                            'No payslip records exist for this run.'
+                          )}
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedPayslips.map(payslip => {
+                        const isExpanded = expandedRowId === payslip.id;
+                        const isAdjusting = isSuperAdmin && adjustingPayslipId === payslip.id && selectedRun?.status !== 'locked';
+                        const draft = deductionDrafts[payslip.id] || {
+                          professional_tax: '0',
+                          tds: '0',
+                          professional_tax_override_reason: '',
+                          tds_override_reason: '',
+                        };
+                        const componentBreakdown = payslip.component_breakdown || {};
+                        const componentEarnings = Array.isArray(componentBreakdown.earnings) ? componentBreakdown.earnings : [];
+                        const employerCosts = Array.isArray(componentBreakdown.employer_costs) ? componentBreakdown.employer_costs : [];
+
+                        return (
+                          <React.Fragment key={payslip.id}>
+                            <tr className={`transition hover:bg-slate-50/80 ${isExpanded ? 'bg-indigo-50/30 font-medium' : ''}`}>
+                              {/* Expand/Collapse Chevron Button */}
+                              <td className="w-8 px-2 py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRowExpand(payslip.id)}
+                                  className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700 transition"
+                                  title={isExpanded ? 'Collapse breakdown' : 'Expand full details'}
+                                >
+                                  {isExpanded ? <ChevronUp className="h-4 w-4 text-indigo-600" /> : <ChevronDown className="h-4 w-4" />}
+                                </button>
+                              </td>
+
+                              {/* Employee Details */}
+                              <td className="px-3 py-3">
+                                <div className="font-semibold text-slate-900">{payslip.first_name} {payslip.last_name}</div>
+                                <div className="text-[11px] text-slate-500">{payslip.employee_code} · {payslip.designation}</div>
+                              </td>
+
+                              {/* Gross Salary */}
+                              <td className="px-3 py-3 font-medium text-slate-800">
+                                ₹{Number(payslip.gross_salary || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </td>
+
+                              {/* Custom Bonus */}
+                              <td className="px-3 py-3">
+                                {Number(payslip.custom_bonus || 0) > 0 ? (
+                                  <span className="inline-block rounded bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                    +₹{Number(payslip.custom_bonus).toLocaleString('en-IN')} <span className="text-emerald-600">({payslip.custom_bonus_label || 'Bonus'})</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
+                              </td>
+
+                              {/* Total Deductions */}
+                              <td className="px-3 py-3 font-medium text-rose-700">
+                                ₹{Number(payslip.total_deductions || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              </td>
+
+                              {/* Net Salary */}
+                              <td className="px-3 py-3">
+                                <span className="inline-block rounded-md bg-emerald-100/80 border border-emerald-300/80 px-2 py-0.5 font-bold text-emerald-900">
+                                  ₹{Number(payslip.net_salary || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                </span>
+                              </td>
+
+                              {/* Deductions Confirmed Badge */}
+                              <td className="px-3 py-3">
+                                <Badge variant={payslip.deductions_confirmed ? 'success' : 'warning'} size="sm">
+                                  {payslip.deductions_confirmed ? 'Reviewed' : 'Required'}
+                                </Badge>
+                              </td>
+
+                              {/* Payment Status Badge */}
+                              <td className="px-3 py-3">
+                                {payslip.payment_status === 'paid' ? (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                      <CheckCircle2 className="h-3 w-3" /> Paid
+                                    </span>
+                                    <div className="mt-0.5 text-[10px] text-emerald-700 truncate max-w-[120px]" title={`Via ${payslip.payment_mode || 'Bank'} · Ref: ${payslip.payment_reference || 'N/A'}`}>
+                                      {payslip.payment_mode || 'Bank'} {payslip.payment_reference ? `(${payslip.payment_reference})` : ''}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">
+                                    <Clock className="h-3 w-3" /> Unpaid
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* Action Buttons */}
+                              <td className="px-3 py-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {isSuperAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openPaymentModal(payslip)}
+                                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                                        payslip.payment_status === 'paid'
+                                          ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                                          : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
+                                      }`}
+                                      title="Disburse or edit payment information"
+                                    >
+                                      <CreditCard className="h-3 w-3" />
+                                      <span>{payslip.payment_status === 'paid' ? 'Edit Pay' : 'Pay'}</span>
+                                    </button>
+                                  )}
+                                  {isSuperAdmin && selectedRun?.status !== 'locked' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setAdjustingPayslipId(cur => cur === payslip.id ? null : payslip.id);
+                                        if (!isExpanded) toggleRowExpand(payslip.id);
+                                      }}
+                                      className={`inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-[11px] font-semibold transition ${
+                                        isAdjusting ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                                      }`}
+                                      title="Add custom bonus, late penalty, or fines"
+                                    >
+                                      <Edit3 className="h-3 w-3" />
+                                      <span>Adjust</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleRowExpand(payslip.id)}
+                                    className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                                  >
+                                    {isExpanded ? 'Hide' : 'Details'}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Expandable Details Accordion Row */}
+                            {isExpanded && (
+                              <tr className="bg-slate-50/70 border-b-2 border-indigo-100">
+                                <td colSpan={9} className="p-4">
+                                  <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    {/* Header Info */}
+                                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                                      <div>
+                                        <h5 className="font-bold text-slate-900">{payslip.first_name} {payslip.last_name} — Detailed Breakdown</h5>
+                                        <p className="text-xs text-slate-500">
+                                          {payslip.employee_code} · {payslip.designation} · Period: {selectedRun?.month_name}
+                                        </p>
+                                      </div>
+                                      {payslip.payment_status === 'paid' && (
+                                        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs text-emerald-800">
+                                          Paid on: <strong>{payslip.paid_at ? payslip.paid_at.slice(0, 10) : 'N/A'}</strong> via <strong>{payslip.payment_mode || 'Bank Transfer'}</strong>
+                                          {payslip.payment_reference ? ` (Ref: ${payslip.payment_reference})` : ''}
+                                          {payslip.paid_by ? ` by ${payslip.paid_by}` : ''}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    {/* Salary Numbers Grid */}
+                                    <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                                      {[
+                                        ['Gross', payslip.gross_salary],
+                                        ['Basic', payslip.basic_salary],
+                                        ['HRA', payslip.hra],
+                                        ['Special allowance', payslip.special_allowance],
+                                        Number(payslip.custom_bonus || 0) > 0 ? [`Custom Bonus (${payslip.custom_bonus_label || 'Incentive'})`, payslip.custom_bonus] : null,
+                                        ['Employee PF', payslip.pf_employee],
+                                        ['Employee ESI', payslip.esi_employee],
+                                        ['LOP deduction', payslip.lop_deduction],
+                                        Number(payslip.late_penalty_amount || 0) > 0 ? ['Late Penalty', payslip.late_penalty_amount] : null,
+                                        Number(payslip.other_penalty_amount || 0) > 0 ? ['Other Penalty', payslip.other_penalty_amount] : null,
+                                        ['Total deductions', payslip.total_deductions],
+                                        ['Net salary', payslip.net_salary],
+                                      ].filter(Boolean).map(([label, amount]) => (
+                                        <div key={label} className={`rounded-lg p-2 ${label === 'Net salary' ? 'bg-emerald-50 border border-emerald-200' : 'bg-slate-50'}`}>
+                                          <span className={`block ${label === 'Net salary' ? 'text-emerald-700 font-semibold' : 'text-slate-500'}`}>{label}</span>
+                                          <strong className={`mt-0.5 block ${label === 'Net salary' ? 'text-emerald-800 text-sm' : 'text-slate-900'}`}>
+                                            ₹{Number(amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                                          </strong>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Itemized Penalty Breakdown */}
+                                    {(Number(payslip.late_penalty_amount || 0) > 0 || Number(payslip.lop_deduction || 0) > 0 || Number(payslip.other_penalty_amount || 0) > 0) && (
+                                      <div className="rounded-lg border border-rose-200 bg-rose-50/70 p-3 text-xs">
+                                        <div className="flex items-center gap-1.5 font-bold text-rose-900">
+                                          <AlertTriangle className="h-4 w-4 text-rose-600" />
+                                          <span>Itemized Penalty & Deduction Breakdown:</span>
+                                        </div>
+                                        <div className="mt-2 divide-y divide-rose-200/60 space-y-1.5">
+                                          {Number(payslip.late_penalty_amount || 0) > 0 && (
+                                            <div className="flex items-center justify-between pt-1 text-rose-800">
+                                              <div>
+                                                <span className="font-semibold">Late Arrival Penalty</span>
+                                                <span className="ml-1 text-[11px] text-rose-600">({payslip.late_count_summary || `${payslip.late_penalty_days || 0} half-day(s)`})</span>
+                                              </div>
+                                              <span className="font-bold">-₹{Number(payslip.late_penalty_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                          )}
+                                          {Number(payslip.lop_deduction || 0) > 0 && (
+                                            <div className="flex items-center justify-between pt-1 text-rose-800">
+                                              <div>
+                                                <span className="font-semibold">Loss of Pay (Unpaid Leave)</span>
+                                                <span className="ml-1 text-[11px] text-rose-600">({Number(payslip.lop_days || 0)} day(s) calculated from month days)</span>
+                                              </div>
+                                              <span className="font-bold">-₹{Number(payslip.lop_deduction).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                          )}
+                                          {Number(payslip.other_penalty_amount || 0) > 0 && (
+                                            <div className="flex items-center justify-between pt-1 text-rose-800">
+                                              <div>
+                                                <span className="font-semibold">Disciplinary / Other Penalty</span>
+                                                <span className="ml-1 text-[11px] text-rose-600">({payslip.other_penalty_reason || 'Policy deduction'})</span>
+                                              </div>
+                                              <span className="font-bold">-₹{Number(payslip.other_penalty_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                          )}
+                                          <div className="flex items-center justify-between pt-1.5 font-bold text-rose-900">
+                                            <span>Total Penalties Deducted</span>
+                                            <span>-₹{(Number(payslip.late_penalty_amount || 0) + Number(payslip.lop_deduction || 0) + Number(payslip.other_penalty_amount || 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Super Admin Inline Custom Salary & Penalty Editor */}
+                                    {isAdjusting && (
+                                      <div className="rounded-xl border-2 border-indigo-200 bg-indigo-50/50 p-4 text-xs">
+                                        <div className="flex items-center justify-between border-b border-indigo-200 pb-2">
+                                          <div className="flex items-center gap-1.5 font-bold text-indigo-950">
+                                            <Edit3 className="h-4 w-4 text-indigo-600" />
+                                            <span>Super Admin Adjustment: Custom Salary, Bonus & Penalty Editor</span>
+                                          </div>
+                                          <span className="rounded bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                                            Access: Super Admin Only
+                                          </span>
+                                        </div>
+
+                                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                          {/* Custom Bonus */}
+                                          <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3">
+                                            <h6 className="font-bold text-indigo-900">Custom Bonus / Incentive / Overtime</h6>
+                                            <label className="block text-slate-700">
+                                              Bonus Amount (₹):
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={adjustmentDrafts[payslip.id]?.custom_bonus ?? '0'}
+                                                onChange={e => setAdjustmentDrafts(current => ({
+                                                  ...current,
+                                                  [payslip.id]: { ...current[payslip.id], custom_bonus: e.target.value }
+                                                }))}
+                                                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                              />
+                                            </label>
+                                            <label className="block text-slate-700">
+                                              Bonus Label / Reason:
+                                              <input
+                                                type="text"
+                                                maxLength={150}
+                                                placeholder="e.g. Performance Incentive, Diwali Bonus, Overtime"
+                                                value={adjustmentDrafts[payslip.id]?.custom_bonus_label ?? ''}
+                                                onChange={e => setAdjustmentDrafts(current => ({
+                                                  ...current,
+                                                  [payslip.id]: { ...current[payslip.id], custom_bonus_label: e.target.value }
+                                                }))}
+                                                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                              />
+                                            </label>
+                                          </div>
+
+                                          {/* Late Arrival Penalty */}
+                                          <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3">
+                                            <h6 className="font-bold text-rose-900">Late Arrival Penalty</h6>
+                                            <div className="grid grid-cols-2 gap-2">
+                                              <label className="block text-slate-700">
+                                                Penalty Amount (₹):
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  step="0.01"
+                                                  value={adjustmentDrafts[payslip.id]?.late_penalty_amount ?? '0'}
+                                                  onChange={e => setAdjustmentDrafts(current => ({
+                                                    ...current,
+                                                    [payslip.id]: { ...current[payslip.id], late_penalty_amount: e.target.value }
+                                                  }))}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                                />
+                                              </label>
+                                              <label className="block text-slate-700">
+                                                Penalty Days (Half-days):
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  step="0.5"
+                                                  value={adjustmentDrafts[payslip.id]?.late_penalty_days ?? '0'}
+                                                  onChange={e => setAdjustmentDrafts(current => ({
+                                                    ...current,
+                                                    [payslip.id]: { ...current[payslip.id], late_penalty_days: e.target.value }
+                                                  }))}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                                />
+                                              </label>
+                                            </div>
+                                            <label className="block text-slate-700">
+                                              Late Summary / Remarks:
+                                              <input
+                                                type="text"
+                                                maxLength={255}
+                                                placeholder="e.g. 3 Late Marks (1.5 days penalty)"
+                                                value={adjustmentDrafts[payslip.id]?.late_count_summary ?? ''}
+                                                onChange={e => setAdjustmentDrafts(current => ({
+                                                  ...current,
+                                                  [payslip.id]: { ...current[payslip.id], late_count_summary: e.target.value }
+                                                }))}
+                                                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                              />
+                                            </label>
+                                          </div>
+
+                                          {/* Other Disciplinary / Policy Penalty */}
+                                          <div className="space-y-2 rounded-lg border border-indigo-100 bg-white p-3 sm:col-span-2">
+                                            <h6 className="font-bold text-rose-900">Other Disciplinary / Equipment / Policy Penalty</h6>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                              <label className="block text-slate-700">
+                                                Penalty Amount (₹):
+                                                <input
+                                                  type="number"
+                                                  min="0"
+                                                  step="0.01"
+                                                  value={adjustmentDrafts[payslip.id]?.other_penalty_amount ?? '0'}
+                                                  onChange={e => setAdjustmentDrafts(current => ({
+                                                    ...current,
+                                                    [payslip.id]: { ...current[payslip.id], other_penalty_amount: e.target.value }
+                                                  }))}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                                />
+                                              </label>
+                                              <label className="block text-slate-700">
+                                                Penalty Reason / Explanation:
+                                                <input
+                                                  type="text"
+                                                  maxLength={255}
+                                                  placeholder="e.g. Asset damage deduction, Disciplinary fine"
+                                                  value={adjustmentDrafts[payslip.id]?.other_penalty_reason ?? ''}
+                                                  onChange={e => setAdjustmentDrafts(current => ({
+                                                    ...current,
+                                                    [payslip.id]: { ...current[payslip.id], other_penalty_reason: e.target.value }
+                                                  }))}
+                                                  className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5"
+                                                />
+                                              </label>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="mt-3 flex items-center justify-end gap-2 border-t border-indigo-200 pt-3">
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => setAdjustingPayslipId(null)}
+                                          >
+                                            Cancel
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="primary"
+                                            disabled={savingAdjustmentId === payslip.id}
+                                            onClick={() => handleSaveAdjustments(payslip)}
+                                          >
+                                            {savingAdjustmentId === payslip.id ? 'Recalculating & Saving…' : 'Save Adjustments & Recalculate Net'}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Components & Employer Costs */}
+                                    {(componentEarnings.length > 0 || employerCosts.length > 0) && (
+                                      <div className="grid gap-3 md:grid-cols-2">
+                                        <section className="rounded-lg border border-slate-200 p-3">
+                                          <h5 className="font-semibold text-slate-800">Gross salary components</h5>
+                                          <ul className="mt-2 space-y-1">
+                                            {componentEarnings.map(component => (
+                                              <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
+                                                <span>{component.name}</span>
+                                                <span>₹{Number(component.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                        </section>
+                                        <section className="rounded-lg border border-teal-200 bg-teal-50/50 p-3">
+                                          <h5 className="font-semibold text-slate-800">Employer cost (not deducted from employee pay)</h5>
+                                          <ul className="mt-2 space-y-1">
+                                            {employerCosts.map(component => (
+                                              <li key={component.component_key} className="flex justify-between gap-3 text-slate-600">
+                                                <span>{component.name}</span>
+                                                <span>₹{Number(component.amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                              </li>
+                                            ))}
+                                          </ul>
+                                          <div className="mt-2 space-y-1 border-t border-teal-100 pt-2 font-semibold text-slate-800">
+                                            <p className="flex justify-between gap-3">
+                                              <span>Total employer cost</span>
+                                              <span>₹{Number(payslip.employer_cost_total || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                            </p>
+                                            <p className="flex justify-between gap-3">
+                                              <span>Monthly CTC</span>
+                                              <span>₹{Number(payslip.total_ctc_monthly || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                            </p>
+                                            <p className="flex justify-between gap-3">
+                                              <span>Annual CTC</span>
+                                              <span>₹{Number(payslip.ctc_annual || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                                            </p>
+                                          </div>
+                                        </section>
+                                      </div>
+                                    )}
+
+                                    {/* Statutory Estimate Info */}
+                                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                                      <p>
+                                        Professional Tax estimate:{' '}
+                                        <strong>
+                                          {payslip.professional_tax_computed == null
+                                            ? 'No matching state rule'
+                                            : `₹${Number(payslip.professional_tax_computed).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
+                                        </strong>
+                                      </p>
+                                      <p className="mt-1">
+                                        TDS estimate for {payslip.tax_financial_year || 'this financial year'}:{' '}
+                                        <strong>
+                                          {payslip.tds_computed == null
+                                            ? 'No reviewed declaration or matching tax slab'
+                                            : `₹${Number(payslip.tds_computed).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`}
+                                        </strong>
+                                      </p>
+                                      {(payslip.professional_tax_override_reason || payslip.tds_override_reason) && (
+                                        <p className="mt-2 border-t border-slate-200 pt-2">
+                                          Override reason: {[payslip.professional_tax_override_reason, payslip.tds_override_reason].filter(Boolean).join(' · ')}
+                                        </p>
+                                      )}
+                                    </div>
+
+                                    {/* Deductions Confirmation Input (Draft only) */}
+                                    {canManagePayroll && ['draft', 'review'].includes(selectedRun?.status) && (
+                                      <div className="grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
+                                        <label className="flex-1 text-xs font-medium text-slate-700">
+                                          Verified Professional Tax (₹)
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                            value={draft.professional_tax}
+                                            onChange={event => setDeductionDrafts(current => ({
+                                              ...current,
+                                              [payslip.id]: { ...draft, professional_tax: event.target.value },
+                                            }))}
+                                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                                          />
+                                        </label>
+                                        <label className="flex-1 text-xs font-medium text-slate-700">
+                                          Verified TDS (₹)
+                                          <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            required
+                                            value={draft.tds}
+                                            onChange={event => setDeductionDrafts(current => ({
+                                              ...current,
+                                              [payslip.id]: { ...draft, tds: event.target.value },
+                                            }))}
+                                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                                          />
+                                        </label>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="secondary"
+                                          className="sm:col-span-2 sm:justify-self-start"
+                                          disabled={savingPayslipId === payslip.id}
+                                          onClick={() => handleReviewPayslip(payslip)}
+                                        >
+                                          {savingPayslipId === payslip.id
+                                            ? 'Saving…'
+                                            : payslip.deductions_confirmed ? 'Update reviewed amounts' : 'Confirm deductions'}
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
                     )}
-                    {requiresTdsReason && (
-                      <label className="text-xs font-medium text-slate-700">
-                        TDS override reason (required)
-                        <textarea required rows="2" maxLength="1000"
-                          value={draft.tds_override_reason}
-                          onChange={event => setDeductionDrafts(current => ({
-                            ...current,
-                            [payslip.id]: { ...draft, tds_override_reason: event.target.value },
-                          }))}
-                          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
-                      </label>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Controls */}
+              {filteredPayslips.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                  <div>
+                    Showing <strong>{(currentPageSafe - 1) * pageSize + 1}</strong> to{' '}
+                    <strong>{Math.min(currentPageSafe * pageSize, filteredPayslips.length)}</strong> of{' '}
+                    <strong>{filteredPayslips.length}</strong> employees
+                    {filteredPayslips.length !== runPayslips.length && (
+                      <span className="text-slate-400 ml-1">(filtered from {runPayslips.length} total)</span>
                     )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
                     <Button
-                      type="button"
                       size="sm"
                       variant="secondary"
-                      className="sm:col-span-2 sm:justify-self-start"
-                      disabled={savingPayslipId === payslip.id}
-                      onClick={() => handleReviewPayslip(payslip)}
+                      disabled={currentPageSafe <= 1}
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      icon={ChevronLeft}
                     >
-                      {savingPayslipId === payslip.id
-                        ? 'Saving…'
-                        : payslip.deductions_confirmed ? 'Update reviewed amounts' : 'Confirm deductions'}
+                      Previous
+                    </Button>
+                    <span className="px-2 font-medium text-slate-700">
+                      Page {currentPageSafe} of {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={currentPageSafe >= totalPages}
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      icon={ChevronRight}
+                    >
+                      Next
                     </Button>
                   </div>
-                )}
-              </article>
-            );
-          })}
+                </div>
+              )}
+            </>
+          )}
 
           {canManagePayroll && ['draft', 'review'].includes(selectedRun?.status) && runPayslips.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4">
