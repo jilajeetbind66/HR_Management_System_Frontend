@@ -162,6 +162,7 @@ export default function LeadManagementView() {
 
   // Refetch leads when filters or debounced search changes
   useEffect(() => {
+    if (isEmployee && !currentUser?.has_lead_access) return;
     setCurrentPage(1);
     fetchLeads();
   }, [debouncedSearch, statusFilter, employeeFilter, dateFrom, dateTo, dueTodayOnly]);
@@ -410,6 +411,12 @@ export default function LeadManagementView() {
         >
           <CheckCircle2 className="h-4 w-4" />
           {toastMessage.message}
+        </div>
+      )}
+
+      {error && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs font-semibold text-rose-800">
+          {error}
         </div>
       )}
 
@@ -1074,6 +1081,7 @@ export default function LeadManagementView() {
               onChange={(e) => setFormData({ ...formData, lead_name: e.target.value })}
               className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
             />
+            {formErrors.lead_name && <p className="mt-1 text-[11px] font-semibold text-rose-600">{formErrors.lead_name}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1089,6 +1097,7 @@ export default function LeadManagementView() {
                 onChange={(e) => setFormData({ ...formData, lead_date: e.target.value })}
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-500"
               />
+              {formErrors.lead_date && <p className="mt-1 text-[11px] font-semibold text-rose-600">{formErrors.lead_date}</p>}
             </div>
 
             {/* Status */}
@@ -1143,6 +1152,9 @@ export default function LeadManagementView() {
                 );
               })}
             </div>
+            {formErrors.assigned_employee_ids && (
+              <p className="mt-1.5 text-[11px] font-semibold text-rose-600">{formErrors.assigned_employee_ids}</p>
+            )}
           </div>
 
           {/* Follow-up Required & Follow-up Date */}

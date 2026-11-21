@@ -150,6 +150,15 @@ export const api = {
   markNotificationRead: (notificationId) => request(`/notifications/${notificationId}/read`, {
     method: 'POST',
   }),
+  markAllNotificationsRead: () => request('/notifications/read-all', {
+    method: 'POST',
+  }),
+  clearAllNotifications: () => request('/notifications/clear-all', {
+    method: 'DELETE',
+  }),
+  deleteNotification: (notificationId) => request(`/notifications/${notificationId}`, {
+    method: 'DELETE',
+  }),
   changePassword: (currentPassword, password, passwordConfirmation) => request('/auth/change-password', {
     method: 'POST',
     body: JSON.stringify({
@@ -190,14 +199,55 @@ export const api = {
 
   // M02 Organization
   getCompany: () => request('/organization/company'),
+  updateCompany: (company) => request('/organization/company', {
+    method: 'PUT',
+    body: JSON.stringify(company),
+  }),
   getBranches: () => request('/organization/branches'),
-  createBranch: (branchData) => request('/organization/branches', {
+  createBranch: (branch) => request('/organization/branches', {
     method: 'POST',
-    body: JSON.stringify(branchData),
+    body: JSON.stringify(branch),
+  }),
+  updateBranch: (branchId, branch) => request(`/organization/branches/${branchId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(branch),
   }),
   getDepartments: () => request('/organization/departments'),
+  createDepartment: (dept) => request('/organization/departments', {
+    method: 'POST',
+    body: JSON.stringify(dept),
+  }),
+  updateDepartment: (deptId, dept) => request(`/organization/departments/${deptId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(dept),
+  }),
+  deleteDepartment: (deptId) => request(`/organization/departments/${deptId}`, {
+    method: 'DELETE',
+  }),
   getDesignations: () => request('/organization/designations'),
+  createDesignation: (desig) => request('/organization/designations', {
+    method: 'POST',
+    body: JSON.stringify(desig),
+  }),
+  updateDesignation: (desigId, desig) => request(`/organization/designations/${desigId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(desig),
+  }),
+  deleteDesignation: (desigId) => request(`/organization/designations/${desigId}`, {
+    method: 'DELETE',
+  }),
   getHolidays: () => request('/organization/holidays'),
+  createHoliday: (holiday) => request('/organization/holidays', {
+    method: 'POST',
+    body: JSON.stringify(holiday),
+  }),
+  updateHoliday: (holidayId, holiday) => request(`/organization/holidays/${holidayId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(holiday),
+  }),
+  deleteHoliday: (holidayId) => request(`/organization/holidays/${holidayId}`, {
+    method: 'DELETE',
+  }),
 
   // M03 Employees Directory
   getEmployees: () => request('/employees'),
@@ -237,6 +287,10 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(compensation),
   }),
+  updateEmployeeStatutory: (employeeId, statutory) => request(`/employees/${employeeId}/statutory`, {
+    method: 'PATCH',
+    body: JSON.stringify(statutory),
+  }),
   updateEmployeeLeadAccess: (employeeId, hasLeadAccess) => request(`/employees/${employeeId}/lead-access`, {
     method: 'PATCH',
     body: JSON.stringify({ has_lead_access: Boolean(hasLeadAccess) }),
@@ -249,9 +303,14 @@ export const api = {
     request(`/attendance/imports/${uploadId}/preview`, { method: 'POST' }),
   processAttendanceImport: (uploadId) =>
     request(`/attendance/imports/${uploadId}/process`, { method: 'POST' }),
-  punchAttendance: (employeeId, location) => request('/attendance/punch', {
+  punchAttendance: (employeeId, location, latitude, longitude) => request('/attendance/punch', {
     method: 'POST',
-    body: JSON.stringify({ employee_id: employeeId, location }),
+    body: JSON.stringify({
+      employee_id: employeeId,
+      location,
+      ...(latitude !== undefined && latitude !== null ? { latitude } : {}),
+      ...(longitude !== undefined && longitude !== null ? { longitude } : {}),
+    }),
   }),
   getRegularizations: () => request('/attendance/regularizations'),
   requestRegularization: (regularization) => request('/attendance/regularizations', {
@@ -261,6 +320,11 @@ export const api = {
   reviewRegularization: (requestId, status) => request(`/attendance/regularizations/${requestId}/review`, {
     method: 'POST',
     body: JSON.stringify({ status }),
+  }),
+  getAttendanceShiftSettings: () => request('/attendance/shift-settings'),
+  updateAttendanceShiftSettings: (settings) => request('/attendance/shift-settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
   }),
 
   // M06 Leave Management
@@ -364,6 +428,14 @@ export const api = {
   reviewPayrollPayslip: (runId, payslipId, deductions) => request(`/payroll/runs/${runId}/payslips/${payslipId}/deductions`, {
     method: 'PATCH',
     body: JSON.stringify(deductions),
+  }),
+  markIndividualPayslipPaid: (runId, payslipId, paymentData) => request(`/payroll/runs/${runId}/payslips/${payslipId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  }),
+  updatePayslipAdjustments: (runId, payslipId, adjustments) => request(`/payroll/runs/${runId}/payslips/${payslipId}/adjustments`, {
+    method: 'PATCH',
+    body: JSON.stringify(adjustments),
   }),
   generatePayrollRun: (year, month, scopeKey, monthName) => request('/payroll/runs', {
     method: 'POST',
@@ -510,6 +582,7 @@ export const api = {
     body: JSON.stringify({ decision, decision_note: decisionNote }),
   }),
   markExpenseClaimPaid: (claimId) => request(`/expense-claims/${claimId}/pay`, { method: 'POST' }),
+  cancelExpenseClaim: (claimId) => request(`/expense-claims/${claimId}/cancel`, { method: 'POST' }),
   createLoanRequest: (loanRequest) => request('/loan-requests', {
     method: 'POST',
     body: JSON.stringify(loanRequest),
@@ -518,6 +591,7 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ decision, decision_note: decisionNote }),
   }),
+  cancelLoanRequest: (loanId) => request(`/loan-requests/${loanId}/cancel`, { method: 'POST' }),
   getPolicies: () => request('/documents/policies'),
   createPolicy: (policy) => request('/documents/policies', {
     method: 'POST',
@@ -564,8 +638,16 @@ export const api = {
   }),
 
   // M00 Platform & Audit Logs
-  getAuditLogs: () => request('/platform/audit-logs'),
+  getAuditLogs: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.module) query.set('module', params.module);
+    if (params.limit) query.set('limit', String(params.limit));
+    const qs = query.toString();
+    return request(`/platform/audit-logs${qs ? `?${qs}` : ''}`);
+  },
   getSchedulerRuns: () => request('/platform/scheduler-runs'),
+  getSequences: () => request('/platform/sequences'),
   getAdminUsers: () => request('/admin/users'),
   resetUserPassword: (userId, password, passwordConfirmation) => request(`/admin/users/${userId}/password`, {
     method: 'PATCH',

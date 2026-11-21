@@ -12,6 +12,7 @@ import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import PhoneInput from '../../components/common/PhoneInput';
 import EmployeeCsvImport from './EmployeeCsvImport';
 import EmployeeStaffingRequests from './EmployeeStaffingRequests';
+import { initialBranches } from '../../data/mockData';
 import { getAssignableUserRoles, roleLoginCategory, userRoleLabels } from '../../config/userRoles';
 import {
   Users,
@@ -32,12 +33,13 @@ import {
   XCircle,
   UserRound,
   TrendingUp,
+  Pencil,
 } from 'lucide-react';
 
 export default function EmployeesView() {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, activeBranch, setActiveBranch } = useAuth();
   const {
     employees,
     branches,
@@ -47,12 +49,20 @@ export default function EmployeesView() {
     archiveEmployee,
     updateEmployeeHierarchy,
     updateEmployeeCompensation,
-    updateEmployeeAvatar,
+    updateEmployeeStatutory,
     updateEmployeeLeadAccess,
+    updateEmployeeAvatar,
+    refreshEmployees,
   } = useHRMS();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedBranch, setSelectedBranch] = useState('all');
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
+  const [selectedBranch, setSelectedBranch] = useState(() => {
+    if (currentUser?.role !== 'super_admin' && currentUser?.branch_name) {
+      return currentUser.branch_name;
+    }
+    return activeBranch && activeBranch !== 'All Branches' ? activeBranch : 'all';
+  });
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,6 +89,18 @@ export default function EmployeesView() {
     bank_name: '',
     account_number: '',
     ifsc_code: '',
+  });
+  const [isEditingStatutory, setIsEditingStatutory] = useState(false);
+  const [isSavingStatutory, setIsSavingStatutory] = useState(false);
+  const [statutoryError, setStatutoryError] = useState('');
+  const [statutoryForm, setStatutoryForm] = useState({
+    pan: '',
+    uan: '',
+    pf_account_no: '',
+    pf_applicable: true,
+    esi_applicable: false,
+    pt_state: 'Uttar Pradesh',
+    tax_regime: 'New',
   });
   const showAddModal = pathname.replace(/\/+$/, '') === '/employees/create';
   const [activeProfileTab, setActiveProfileTab] = useState('job'); // 'job' | 'statutory' | 'salary'
@@ -146,7 +168,7 @@ export default function EmployeesView() {
       || Number(employee.id) === Number(selectedEmployee?.reporting_manager_id)
     )
   ));
-  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canViewStatutoryDetails = ['super_admin', 'hr_admin', 'hr_executive', 'auditor'].includes(currentUser?.role);
   const canViewCompensation = ['super_admin', 'hr_admin'].includes(currentUser?.role);
   const departmentOptions = currentUser?.role === 'manager'
     ? [...new Set(employees.map((employee) => employee.department).filter(Boolean))]
@@ -174,6 +196,28 @@ export default function EmployeesView() {
   }, [searchTerm, selectedBranch, selectedDept, selectedStatus]);
 
   useEffect(() => {
+    if (currentUser?.role === 'super_admin') {
+      if (activeBranch && activeBranch !== 'All Branches') {
+        setSelectedBranch(activeBranch);
+      } else if (activeBranch === 'All Branches') {
+        setSelectedBranch('all');
+      }
+    } else {
+      if (currentUser?.branch_name) {
+        setSelectedBranch(currentUser.branch_name);
+      }
+    }
+  }, [activeBranch, currentUser]);
+
+  const handleBranchFilterChange = (value) => {
+    if (currentUser?.role !== 'super_admin') return;
+    setSelectedBranch(value);
+    if (setActiveBranch) {
+      setActiveBranch(value === 'all' ? 'All Branches' : value);
+    }
+  };
+
+  useEffect(() => {
     const params = new URLSearchParams(search);
     const employeeId = Number(params.get('employee_id'));
     if (!employeeId || params.get('profile_tab') !== 'salary') return;
@@ -192,7 +236,10 @@ export default function EmployeesView() {
     const nameMatch = `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       emp.employee_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       (currentUser?.role !== 'manager' && emp.email?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const branchMatch = selectedBranch === 'all' || emp.branch_name === selectedBranch;
+    const branchMatch = selectedBranch === 'all'
+      || emp.branch_name === selectedBranch
+      || String(emp.branch_id) === String(selectedBranch)
+      || (selectedBranch && emp.branch_name && emp.branch_name.toLowerCase().includes(selectedBranch.toLowerCase()));
     const deptMatch = selectedDept === 'all' || emp.department === selectedDept;
     const statusMatch = selectedStatus === 'all' || emp.status === selectedStatus;
     return nameMatch && branchMatch && deptMatch && statusMatch;
@@ -241,6 +288,17 @@ export default function EmployeesView() {
     setHierarchyError('');
     setIsEditingCompensation(false);
     setCompensationError('');
+    setIsEditingStatutory(false);
+    setStatutoryError('');
+    setStatutoryForm({
+      pan: employee.pan || '',
+      uan: employee.uan || '',
+      pf_account_no: employee.pf_account_no || '',
+      pf_applicable: employee.pf_applicable !== false,
+      esi_applicable: Boolean(employee.esi_applicable),
+      pt_state: employee.pt_state || 'Uttar Pradesh',
+      tax_regime: employee.tax_regime || 'New',
+    });
   };
 
   const beginHierarchyEdit = () => {
@@ -351,6 +409,36 @@ export default function EmployeesView() {
       );
     } finally {
       setIsSavingCompensation(false);
+    }
+  };
+
+  const saveStatutory = async (event) => {
+    event.preventDefault();
+    if (!selectedEmployee) return;
+
+    setIsSavingStatutory(true);
+    setStatutoryError('');
+    try {
+      const savedEmployee = await updateEmployeeStatutory(selectedEmployee.id, {
+        pan: statutoryForm.pan ? statutoryForm.pan.trim().toUpperCase() : null,
+        uan: statutoryForm.uan ? statutoryForm.uan.trim() : null,
+        pf_account_no: statutoryForm.pf_account_no ? statutoryForm.pf_account_no.trim() : null,
+        pf_applicable: Boolean(statutoryForm.pf_applicable),
+        esi_applicable: Boolean(statutoryForm.esi_applicable),
+        pt_state: statutoryForm.pt_state || 'Uttar Pradesh',
+        tax_regime: statutoryForm.tax_regime || 'New',
+      });
+      setSelectedEmployee(savedEmployee);
+      setIsEditingStatutory(false);
+    } catch (error) {
+      setStatutoryError(
+        Object.values(error?.data?.errors || {}).flat()[0]
+        || error?.data?.message
+        || error.message
+        || 'Could not save statutory compliance details.'
+      );
+    } finally {
+      setIsSavingStatutory(false);
     }
   };
 
@@ -567,16 +655,18 @@ export default function EmployeesView() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-          <select
-            value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
-            className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
-          >
-            <option value="all">All Branches</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.name}>{b.name}</option>
-            ))}
-          </select>
+          {currentUser?.role === 'super_admin' && (
+            <select
+              value={selectedBranch}
+              onChange={(e) => handleBranchFilterChange(e.target.value)}
+              className="text-xs rounded-lg border border-slate-200 py-1.5 px-2.5 bg-slate-50 focus:outline-none"
+            >
+              <option value="all">All Branches</option>
+              {availableBranches.map(b => (
+                <option key={b.id} value={b.name}>{b.name}</option>
+              ))}
+            </select>
+          )}
 
           <select
             value={selectedDept}
@@ -1087,19 +1177,105 @@ export default function EmployeesView() {
 
             {/* TAB CONTENT: STATUTORY (Architecture Section 7.4 & 8) */}
             {activeProfileTab === 'statutory' && canViewStatutoryDetails && (
+              isEditingStatutory ? (
+                <form onSubmit={saveStatutory} className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                  {statutoryError && (
+                    <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+                      {statutoryError}
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="block font-semibold text-slate-700">
+                      Income Tax PAN
+                      <input
+                        maxLength={10}
+                        value={statutoryForm.pan}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, pan: e.target.value.toUpperCase() })}
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono uppercase bg-white"
+                        placeholder="ABCDE1234F"
+                      />
+                    </label>
+                    <label className="block font-semibold text-slate-700">
+                      EPF UAN
+                      <input
+                        maxLength={12}
+                        value={statutoryForm.uan}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, uan: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono bg-white"
+                        placeholder="12 digits"
+                      />
+                    </label>
+                    <label className="block font-semibold text-slate-700">
+                      EPF Member ID
+                      <input
+                        maxLength={50}
+                        value={statutoryForm.pf_account_no}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, pf_account_no: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2 font-mono bg-white"
+                      />
+                    </label>
+                    <label className="block font-semibold text-slate-700">
+                      Tax Regime
+                      <select
+                        value={statutoryForm.tax_regime}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, tax_regime: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2 bg-white"
+                      >
+                        <option value="New">New Tax Regime</option>
+                        <option value="Old">Old Tax Regime</option>
+                      </select>
+                    </label>
+                    <label className="block font-semibold text-slate-700">
+                      Professional Tax (PT) State
+                      <input
+                        required
+                        value={statutoryForm.pt_state}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, pt_state: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-slate-300 p-2 bg-white"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-4 pt-1">
+                    <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={statutoryForm.pf_applicable}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, pf_applicable: e.target.checked })}
+                      />
+                      EPF Applicable
+                    </label>
+                    <label className="inline-flex items-center gap-2 font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={statutoryForm.esi_applicable}
+                        onChange={(e) => setStatutoryForm({ ...statutoryForm, esi_applicable: e.target.checked })}
+                      />
+                      ESI Applicable
+                    </label>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setIsEditingStatutory(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" variant="primary" size="sm" disabled={isSavingStatutory}>
+                      {isSavingStatutory ? 'Saving...' : 'Save Statutory Details'}
+                    </Button>
+                  </div>
+                </form>
+              ) : (
               <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Income Tax PAN</span>
-                    <span className="font-mono font-bold text-slate-900">{selectedEmployee.pan}</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEmployee.pan || '—'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Tax Regime</span>
-                    <span className="font-bold text-teal-600">{selectedEmployee.tax_regime} Tax Regime</span>
+                    <span className="font-bold text-teal-600">{selectedEmployee.tax_regime || 'New'} Tax Regime</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">EPF Universal Account No (UAN)</span>
-                    <span className="font-mono font-bold text-slate-900">{selectedEmployee.uan}</span>
+                    <span className="font-mono font-bold text-slate-900">{selectedEmployee.uan || '—'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">EPF Member ID</span>
@@ -1108,15 +1284,35 @@ export default function EmployeesView() {
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">ESI Applicability</span>
                     <span className="font-semibold text-slate-700">
-                      {selectedEmployee.esi_applicable ? 'Applicable (Gross <= ₹21,000)' : 'Exempt (Gross > ₹21,000/mo)'}
+                      {selectedEmployee.esi_applicable ? 'Applicable' : 'Exempt'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Professional Tax (PT) State</span>
-                    <span className="font-semibold text-slate-700">{selectedEmployee.pt_state}</span>
+                    <span className="font-semibold text-slate-700">{selectedEmployee.pt_state || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Name</span>
+                    <span className="font-semibold text-slate-700">{selectedEmployee.bank_name || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank Account Number</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.account_number || '—'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Bank IFSC Code</span>
+                    <span className="font-mono font-semibold text-slate-700">{selectedEmployee.ifsc_code || '—'}</span>
                   </div>
                 </div>
+                {currentUser?.role === 'super_admin' && (
+                  <div className="pt-2 flex justify-end">
+                    <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setIsEditingStatutory(true)}>
+                      Edit Statutory
+                    </Button>
+                  </div>
+                )}
               </div>
+              )
             )}
 
             {/* TAB CONTENT: SALARY & BANK */}
@@ -1297,6 +1493,15 @@ export default function EmployeesView() {
                 )}
               </div>
             </div>
+            {Array.isArray(archiveImpact.allocated_assets) && archiveImpact.allocated_assets.length > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-amber-950">
+                <p className="font-semibold text-xs">Allocated hardware assets ({archiveImpact.allocated_assets.length}):</p>
+                <p className="mt-0.5 text-[11px] text-amber-900">
+                  {archiveImpact.allocated_assets.map((a) => `${a.name} (${a.asset_code})`).join(', ')}.
+                  Remember to collect and return equipment in the Asset Register.
+                </p>
+              </div>
+            )}
             {(archiveImpact.pending_leave_requests > 0 || archiveImpact.pending_attendance_requests > 0) && (
               <label className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-950">
                 <input
@@ -1544,18 +1749,22 @@ export default function EmployeesView() {
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">PAN Number:</label>
                 <input
                   type="text"
+                  maxLength={10}
                   value={newEmp.pan}
-                  onChange={(e) => setNewEmp({ ...newEmp, pan: e.target.value })}
-                  className="w-full p-1.5 rounded-lg border border-slate-200 font-mono"
+                  onChange={(e) => setNewEmp({ ...newEmp, pan: e.target.value.toUpperCase() })}
+                  className="w-full p-1.5 rounded-lg border border-slate-200 font-mono uppercase"
+                  placeholder="ABCDE1234F"
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">UAN (EPF):</label>
                 <input
                   type="text"
+                  maxLength={12}
                   value={newEmp.uan}
                   onChange={(e) => setNewEmp({ ...newEmp, uan: e.target.value })}
                   className="w-full p-1.5 rounded-lg border border-slate-200 font-mono"
+                  placeholder="12 digits"
                 />
               </div>
               <div>

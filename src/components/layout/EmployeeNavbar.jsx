@@ -3,18 +3,21 @@ import {
   Bell,
   Building2,
   CheckCircle2,
+  AlertCircle,
   ChevronDown,
   Clock,
   LogOut,
   Search,
   UserRound,
   KeyRound,
+  Trash2,
   X,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import { getIndiaDateString } from '../../utils/date';
 import { getRoleMenuItems } from '../../config/roleAccess';
+import { getCurrentPositionAsync } from '../../utils/geolocation';
 
 const employeeLinks = getRoleMenuItems('employee');
 
@@ -40,6 +43,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     notifications,
     refreshNotifications,
     markNotificationRead,
+    markAllNotificationsRead,
+    clearAllNotifications,
+    deleteNotification,
   } = useHRMS();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -48,6 +54,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [punchFeedback, setPunchFeedback] = useState(null);
+  const [isPunching, setIsPunching] = useState(false);
   const matches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
@@ -75,6 +82,49 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     setProfileOpen(false);
   };
 
+  const handleNotificationClick = async (notification) => {
+    // 1. Delete notification from database and list on click
+    try {
+      await deleteNotification(notification.id);
+    } catch (err) {
+      console.warn('Unable to delete notification:', err);
+      try {
+        await markNotificationRead(notification.id);
+      } catch (_) {}
+    }
+
+    // 2. Redirect to exact module
+    const eventKey = notification.event_key || '';
+    if (eventKey.startsWith('attendance.')) {
+      if (eventKey.includes('regularization')) {
+        window.location.hash = 'regularization';
+      }
+      navigateTo('attendance');
+    } else if (eventKey.startsWith('leave.')) {
+      navigateTo('leaves');
+    } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
+      navigateTo('my_projects');
+    } else if (eventKey.startsWith('payroll.')) {
+      navigateTo('payslips');
+    } else if (eventKey.startsWith('training.')) {
+      navigateTo('training');
+    } else if (eventKey.startsWith('expense.')) {
+      navigateTo('expenses');
+    } else if (eventKey.startsWith('document.')) {
+      navigateTo('documents');
+    } else if (eventKey.startsWith('announcement.')) {
+      navigateTo('announcements');
+    } else if (eventKey.startsWith('performance.')) {
+      navigateTo('performance');
+    } else if (eventKey.startsWith('helpdesk.')) {
+      navigateTo('helpdesk');
+    } else if (eventKey.startsWith('lead.')) {
+      navigateTo('leads');
+    } else {
+      navigateTo('dashboard');
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -84,35 +134,50 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   };
 
   const handlePunch = async () => {
-    if (isPunchComplete || !currentUser?.employee_id) return;
+    if (isPunchComplete || !currentUser?.employee_id || isPunching) return;
+
+    setIsPunching(true);
+    setPunchFeedback({ text: 'Acquiring GPS location...', type: 'info' });
+
+    let coords = null;
+    try {
+      coords = await getCurrentPositionAsync();
+    } catch (geoErr) {
+      console.warn('Geolocation warning:', geoErr.message);
+    }
 
     try {
       const result = await punchAttendance(
         currentUser.employee_id,
         currentUser.branch_name || 'Web Portal',
+        coords
       );
       if (result?.type === 'in') {
-        setPunchFeedback(`Punched in at ${result.punch?.punch_in || 'now'}`);
+        const distStr = result.punch?.distance_meters != null ? ` (📍 ${Math.round(result.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched in at ${result.punch?.punch_in || 'now'}${distStr}`, type: 'success' });
       } else if (result?.type === 'out') {
-        setPunchFeedback(`Punched out at ${result.punch?.punch_out || 'now'}`);
+        const distStr = result.punch?.distance_meters != null ? ` (📍 ${Math.round(result.punch.distance_meters)}m)` : '';
+        setPunchFeedback({ text: `Punched out at ${result.punch?.punch_out || 'now'}${distStr}`, type: 'success' });
       } else {
-        setPunchFeedback('Attendance is already complete for today.');
+        setPunchFeedback({ text: 'Attendance is already complete for today.', type: 'info' });
       }
     } catch (error) {
-      setPunchFeedback(error?.data?.message || error.message || 'Punch action failed.');
+      setPunchFeedback({ text: error?.data?.message || error.message || 'Punch action failed.', type: 'error' });
+    } finally {
+      setIsPunching(false);
+      setTimeout(() => setPunchFeedback(null), 4500);
     }
-
-    setTimeout(() => setPunchFeedback(null), 3500);
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-[68px] w-full items-center justify-between gap-3 border-b border-slate-200/80 bg-white/95 px-3 backdrop-blur sm:px-5 lg:px-7">
-      <button
-        type="button"
-        onClick={onMenuToggle}
-        aria-label="Open navigation"
-        className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
-      >
+    <header className="sticky top-0 z-30 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      <div className="flex h-[68px] w-full items-center justify-between gap-3 px-3 sm:px-5 lg:px-7">
+        <button
+          type="button"
+          onClick={onMenuToggle}
+          aria-label="Open navigation"
+          className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
+        >
         <span className="block h-0.5 w-5 rounded bg-current before:block before:h-0.5 before:w-5 before:-translate-y-1.5 before:rounded before:bg-current after:block after:h-0.5 after:w-5 after:translate-y-1 after:rounded after:bg-current" />
       </button>
 
@@ -180,7 +245,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
         <div className="relative">
           <button
             type="button"
-            disabled={isPunchComplete || !currentUser?.employee_id}
+            disabled={isPunchComplete || !currentUser?.employee_id || isPunching}
             onClick={handlePunch}
             aria-label={isPunchComplete ? 'Punch completed for today' : todayPunch ? 'Punch out' : 'Punch in'}
             className={`flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[10px] font-bold transition focus:outline-none focus:ring-2 focus:ring-teal-200 disabled:cursor-not-allowed ${
@@ -191,13 +256,33 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                   : 'bg-teal-600 text-white hover:bg-teal-700'
             }`}
           >
-            {isPunchComplete ? <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" /> : <Clock aria-hidden="true" className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{isPunchComplete ? 'Completed' : todayPunch ? 'Punch Out' : 'Punch In'}</span>
+            {isPunchComplete ? (
+              <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+            ) : (
+              <Clock aria-hidden="true" className="h-3.5 w-3.5" />
+            )}
+            <span className="hidden sm:inline">
+              {isPunching ? 'Locating...' : isPunchComplete ? 'Completed' : todayPunch ? 'Punch Out' : 'Punch In'}
+            </span>
           </button>
           {punchFeedback && (
-            <p role="status" className="absolute right-0 top-full z-50 mt-2 whitespace-nowrap rounded-lg bg-slate-900 px-3 py-1.5 text-[10px] text-white shadow-xl">
-              {punchFeedback}
-            </p>
+            <div
+              role="status"
+              className={`absolute right-0 top-full z-50 mt-2 max-w-xs sm:max-w-sm whitespace-normal rounded-lg px-3 py-2 text-xs shadow-xl animate-fade-in flex items-center gap-1.5 ${
+                punchFeedback.type === 'error'
+                  ? 'bg-rose-950 text-rose-100 border border-rose-800'
+                  : punchFeedback.type === 'info'
+                  ? 'bg-slate-900 text-slate-100'
+                  : 'bg-emerald-950 text-emerald-100 border border-emerald-800'
+              }`}
+            >
+              {punchFeedback.type === 'error' ? (
+                <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              )}
+              <span>{punchFeedback.text}</span>
+            </div>
           )}
         </div>
         <div className="relative">
@@ -227,44 +312,94 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-[min(21rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                <h2 className="text-xs font-bold text-slate-900">Notifications & updates</h2>
-                <button
-                  type="button"
-                  onClick={() => navigateTo('announcements')}
-                  className="text-[10px] font-semibold text-teal-700 hover:text-teal-800"
-                >
-                  View all
-                </button>
+            <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-xs font-bold text-slate-900">Notifications</h2>
+                  {unreadNotifications > 0 && (
+                    <span className="rounded-full bg-teal-100 px-1.5 py-0.2 text-[10px] font-bold text-teal-700">
+                      {unreadNotifications} new
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5">
+                  {unreadNotifications > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        markAllNotificationsRead().catch((error) => {
+                          setNotificationError(error?.data?.message || error.message || 'Unable to mark all as read.');
+                        });
+                      }}
+                      className="text-[10px] font-semibold text-teal-700 hover:text-teal-800 hover:underline"
+                    >
+                      Mark read
+                    </button>
+                  )}
+                  {notifications.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await clearAllNotifications();
+                        } catch (error) {
+                          setNotificationError(error?.data?.message || error.message || 'Unable to clear notifications.');
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                    >
+                      Clear all
+                    </button>
+                  )}
+                </div>
               </div>
-              {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700">{notificationError}</p>}
+              {notificationError && <p role="alert" className="px-4 py-2 text-xs text-rose-700 bg-rose-50 border-b border-rose-100">{notificationError}</p>}
               <section aria-label="Notifications">
-                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  Notifications
-                </h3>
+                <div className="flex items-center justify-between px-4 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  <span>Messages ({notifications.length})</span>
+                  <span className="text-[9px] font-normal lowercase text-slate-400">Click to open & dismiss</span>
+                </div>
                 {notifications.length ? (
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                     {notifications.map((notification) => (
-                      <button
-                        type="button"
+                      <div
                         key={notification.id}
-                        onClick={() => {
-                          if (!notification.read_at) {
-                            markNotificationRead(notification.id).catch((error) => {
-                              setNotificationError(error?.data?.message || error.message || 'Unable to mark notification as read.');
-                            });
-                          }
-                        }}
-                        className={`block w-full px-4 py-3 text-left hover:bg-teal-50/60 ${notification.read_at ? '' : 'bg-teal-50/40'}`}
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`group flex items-start justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-teal-50/70 cursor-pointer ${
+                          notification.read_at ? '' : 'bg-teal-50/40 border-l-2 border-teal-500'
+                        }`}
                       >
-                        <span className="block text-xs font-semibold text-slate-800">{notification.title}</span>
-                        <span className="mt-1 block text-[11px] leading-relaxed text-slate-500">{notification.message}</span>
-                      </button>
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold text-slate-800 group-hover:text-teal-800">
+                            {notification.title}
+                          </span>
+                          <span className="mt-0.5 block text-[11px] leading-relaxed text-slate-500">
+                            {notification.message}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          title="Dismiss notification"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await deleteNotification(notification.id);
+                            } catch (err) {
+                              setNotificationError(err?.data?.message || err.message || 'Unable to delete notification.');
+                            }
+                          }}
+                          className="shrink-0 p-1 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition mt-0.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 ) : !notificationError ? (
-                  <p role="status" className="px-4 py-3 text-center text-xs text-slate-500">No notifications yet.</p>
+                  <div className="px-4 py-5 text-center text-xs text-slate-400">
+                    <p className="font-medium text-slate-600">No notifications</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">You're all caught up!</p>
+                  </div>
                 ) : null}
               </section>
               <section aria-label="Company updates" className="border-t border-slate-100">
@@ -364,6 +499,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             </div>
           )}
         </div>
+      </div>
       </div>
     </header>
   );

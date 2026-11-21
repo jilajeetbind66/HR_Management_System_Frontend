@@ -19,6 +19,15 @@ import {
   RotateCcw
 } from 'lucide-react';
 
+function extractRecruitmentError(error, fallback) {
+  const fieldErrors = error?.data?.errors;
+  if (fieldErrors && typeof fieldErrors === 'object') {
+    const first = Object.values(fieldErrors).flat()[0];
+    if (first) return first;
+  }
+  return error?.data?.message || error?.message || fallback;
+}
+
 export default function RecruitmentView() {
   const { currentUser } = useAuth();
   const {
@@ -73,10 +82,13 @@ export default function RecruitmentView() {
 
   const handleStageMove = async (candidateId, newStage) => {
     setWorkflowError('');
+    setSavingRecord(true);
     try {
       await updateCandidateStage(candidateId, newStage);
     } catch (error) {
-      setWorkflowError(error?.data?.message || error.message || 'Unable to save the candidate stage.');
+      setWorkflowError(extractRecruitmentError(error, 'Unable to save the candidate stage.'));
+    } finally {
+      setSavingRecord(false);
     }
   };
 
@@ -91,12 +103,15 @@ export default function RecruitmentView() {
   };
 
   const handleConvertToEmployee = async (candidate) => {
+    setWorkflowError('');
+    setSavingRecord(true);
     try {
-      setWorkflowError('');
       const newEmployee = await convertCandidate(candidate.id);
       setConvertFeedback(`Candidate ${candidate.name} converted to employee ${newEmployee.employee_code}.`);
     } catch (err) {
-      setWorkflowError(err?.data?.message || err.message || 'Unable to convert this candidate.');
+      setWorkflowError(extractRecruitmentError(err, 'Unable to convert this candidate.'));
+    } finally {
+      setSavingRecord(false);
     }
     setTimeout(() => setConvertFeedback(null), 5000);
   };
@@ -426,6 +441,11 @@ export default function RecruitmentView() {
         subtitle="Save a new requisition to the HRMS database"
       >
         <form onSubmit={handleCreateJob} className="space-y-3 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <label className="block font-semibold text-slate-700">
             Job title
             <input
@@ -497,6 +517,11 @@ export default function RecruitmentView() {
         subtitle="Record a separate candidate assessment for Interview or Offered stages."
       >
         <form onSubmit={handleEvaluationSubmit} className="space-y-4 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <label className="block font-semibold text-slate-700">
             Candidate rating (1–5)
             <select
@@ -538,6 +563,11 @@ export default function RecruitmentView() {
         subtitle="Save applicant details to the recruitment pipeline"
       >
         <form onSubmit={handleCreateCandidate} className="space-y-3 text-xs">
+          {workflowError && (
+            <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">
+              {workflowError}
+            </p>
+          )}
           <label className="block font-semibold text-slate-700">
             Job opening
             <select

@@ -56,12 +56,18 @@ const panelCopy = {
   auditor: {
     title: 'Audit & Compliance Panel',
     description: 'Review audit activity and payroll records without changing them.',
-    links: [['platform', 'Audit Logs'], ['reports', 'View Reports'], ['payroll', 'Payroll Records']],
+    links: [
+      ['platform', 'Audit Logs'],
+      ['reports', 'View Reports'],
+      ['payroll', 'Payroll Records'],
+      ['employees', 'Employee Directory'],
+      ['organization', 'Company Masters'],
+    ],
   },
 };
 
 export default function RoleDashboard({ onNavigate }) {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const {
     employees,
     projects,
@@ -83,15 +89,26 @@ export default function RoleDashboard({ onNavigate }) {
     return <RecruiterDashboard onNavigate={onNavigate} />;
   }
 
+  const selectedBranchObj = activeBranch && activeBranch !== 'All Branches'
+    ? branches.find((b) => b.name === activeBranch)
+    : null;
+  const scopedEmployees = selectedBranchObj
+    ? employees.filter((e) => Number(e.branch_id) === Number(selectedBranchObj.id) || e.branch_name === selectedBranchObj.name)
+    : employees;
+  const scopedEmployeeIds = new Set(scopedEmployees.map((e) => Number(e.id)));
+
   const panel = panelCopy[role] || panelCopy.employee;
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
   const myAttendance = attendance.filter(record => Number(record.employee_id) === Number(currentUser.employee_id));
   const pendingLeaves = leaveRequests.filter(leave => canReviewLeave(leave, currentUser));
-  const employeeCount = employees.filter(employee => employee.status === 'active').length;
+  const employeeCount = scopedEmployees.filter(employee => String(employee.status || '').toLowerCase() === 'active').length || scopedEmployees.length;
   const today = new Date().toISOString().slice(0, 10);
-  const presentToday = attendance.filter(record => record.date === today && record.status === 'Present').length;
-  const isHrRole = ['hr_admin', 'hr_executive'].includes(role);
-  const absentToday = attendance.filter(
+  const scopedAttendance = selectedBranchObj
+    ? attendance.filter(record => scopedEmployeeIds.has(Number(record.employee_id)))
+    : attendance;
+  const presentToday = scopedAttendance.filter(record => record.date === today && record.status === 'Present').length;
+  const isHrRole = ['hr_admin', 'hr_executive', 'recruiter'].includes(role);
+  const absentToday = scopedAttendance.filter(
     record => record.date === today && String(record.status || '').toLowerCase() === 'absent'
   ).length;
   const latestPendingLeaves = pendingLeaves.slice(0, 4);
@@ -100,7 +117,7 @@ export default function RoleDashboard({ onNavigate }) {
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
     const dateKey = date.toISOString().slice(0, 10);
-    const records = attendance.filter(record => record.date === dateKey);
+    const records = scopedAttendance.filter(record => record.date === dateKey);
     return {
       label: date.toLocaleDateString('en-IN', { weekday: 'short' }),
       present: records.filter(record => String(record.status || '').toLowerCase() === 'present').length,
@@ -108,6 +125,9 @@ export default function RoleDashboard({ onNavigate }) {
     };
   });
   const maxAttendance = Math.max(1, ...attendanceByDay.map(day => day.present + day.absent));
+  const scopedAuditLogs = selectedBranchObj
+    ? auditLogs.filter(log => !log.user_id || scopedEmployeeIds.has(Number(log.user_id)))
+    : auditLogs;
   const statCards = role === 'employee'
     ? [
       { title: 'My Active Projects', value: myProjects.filter(project => project.status !== 'completed').length, icon: FolderKanban, color: 'indigo' },
@@ -130,6 +150,29 @@ export default function RoleDashboard({ onNavigate }) {
     ? [
       { title: 'Payroll Runs', value: payrollRuns.length, icon: Banknote, color: 'indigo' },
       { title: 'Runs Awaiting Review', value: payrollRuns.filter(run => run.status === 'review').length, icon: CalendarCheck, color: 'amber' },
+    ]
+    : role === 'auditor'
+    ? [
+      {
+        title: selectedBranchObj ? `Total Employees (${selectedBranchObj.name.replace(' Branch', '')})` : 'Total Employees',
+        value: employeeCount,
+        icon: Users,
+        color: 'emerald',
+        badge: selectedBranchObj ? selectedBranchObj.city || selectedBranchObj.name : 'All Staff',
+      },
+      {
+        title: 'Audit Trail Records',
+        value: scopedAuditLogs.length,
+        icon: ShieldCheck,
+        color: 'indigo',
+        badge: selectedBranchObj ? selectedBranchObj.name.replace(' Branch', '') : undefined,
+      },
+      {
+        title: 'Payroll Cycles',
+        value: payrollRuns.length,
+        icon: Banknote,
+        color: 'blue',
+      },
     ]
     : [
       { title: 'Audit Events', value: auditLogs.length, icon: ShieldCheck, color: 'indigo' },
@@ -328,7 +371,7 @@ export default function RoleDashboard({ onNavigate }) {
         </div>
       </section>
 
-      <section aria-label={`${getPanelName(role)} overview`} className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section aria-label={`${getPanelName(role)} overview`} className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {statCards.map(card => (
           <StatCard key={card.title} {...card} />
         ))}

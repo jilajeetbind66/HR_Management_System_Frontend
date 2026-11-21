@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useHRMS } from '../../context/HRMSContext';
 import api from '../../services/api';
 import Button from '../../components/common/Button';
@@ -21,6 +21,7 @@ export default function EmployeeCsvImport() {
   const [setupLinkExpiresInMinutes, setSetupLinkExpiresInMinutes] = useState(60);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const fileInputRef = useRef(null);
 
   const downloadTemplate = () => {
     const blob = new Blob([`${CSV_HEADERS.join(',')}\r\n`], { type: 'text/csv;charset=utf-8' });
@@ -58,6 +59,7 @@ export default function EmployeeCsvImport() {
       setSetupLinkExpiresInMinutes(result?.setup_link_expires_in_minutes || 60);
       setReport(null);
       setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (importError) {
       setError(importError?.data?.message || importError.message || 'The CSV import failed.');
       setReport(importError?.data?.data || null);
@@ -73,6 +75,8 @@ export default function EmployeeCsvImport() {
     setCredentials([]);
     setSetupLinkExpiresInMinutes(60);
     setError('');
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -95,6 +99,7 @@ export default function EmployeeCsvImport() {
           <label className="block font-semibold text-slate-700">
             Employee CSV file
             <input
+              ref={fileInputRef}
               type="file"
               accept=".csv,text/csv"
               onChange={(event) => {

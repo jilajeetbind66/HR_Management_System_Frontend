@@ -56,6 +56,22 @@ export function AuthProvider({ children }) {
       .finally(() => setIsLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (currentUser) {
+      if (currentUser.role === 'super_admin') {
+        setActiveBranch((prev) => prev || 'All Branches');
+      } else if (currentUser.branch_name) {
+        setActiveBranch(currentUser.branch_name);
+      }
+    }
+  }, [currentUser]);
+
+  const handleSetActiveBranch = (branch) => {
+    if (currentUser?.role === 'super_admin') {
+      setActiveBranch(branch);
+    }
+  };
+
   const login = async (identifier, password, roleType, rememberMe) => {
     try {
       const response = await api.login(identifier, password, roleType);
@@ -94,6 +110,16 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const refreshCurrentUser = async () => {
+    const response = await api.currentUser();
+    const user = response?.data;
+    if (user) {
+      setCurrentUser(user);
+      setCachedUser(user);
+    }
+    return user;
+  };
+
   const logout = async () => {
     try {
       if (isAuthenticated) await api.logout();
@@ -104,6 +130,7 @@ export function AuthProvider({ children }) {
       setCachedUser(null);
       setCurrentUser(null);
       setIsAuthenticated(false);
+      setActiveBranch('All Branches');
     }
   };
 
@@ -118,9 +145,10 @@ export function AuthProvider({ children }) {
       isAuthenticated,
       isLoading,
       activeBranch,
-      setActiveBranch,
+      setActiveBranch: handleSetActiveBranch,
       login,
       changePassword,
+      refreshCurrentUser,
       logout,
       hasPermission,
     }}>

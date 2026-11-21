@@ -121,9 +121,10 @@ function SectionMessage({ children }) {
 }
 
 export default function DocumentsView() {
-  const { currentUser } = useAuth();
+  const { currentUser, activeBranch } = useAuth();
   const { employees = [] } = useHRMS();
   const canManage = ['super_admin', 'hr_admin'].includes(currentUser?.role);
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
   const [activeTab, setActiveTab] = useState('policies');
   const [policies, setPolicies] = useState([]);
   const [employeeDocs, setEmployeeDocs] = useState([]);
@@ -164,7 +165,9 @@ export default function DocumentsView() {
       else failures.push(errorText(letterResult.reason));
       if (documentResult.status === 'fulfilled') setEmployeeDocs(documentResult.value?.data || []);
       else failures.push(errorText(documentResult.reason));
-      setFeedback(failures.length ? { type: 'error', text: failures.join(' ') } : null);
+      if (failures.length) {
+        setFeedback({ type: 'error', text: failures.join(' ') });
+      }
       setLoading(false);
     });
 
@@ -174,9 +177,44 @@ export default function DocumentsView() {
   }, [currentUser?.employee_id, currentUser?.role, refreshKey]);
 
   const activeEmployees = useMemo(
-    () => employees.filter((employee) => employee.status === 'active'),
-    [employees]
+    () => employees.filter((employee) => {
+      if (employee.status !== 'active') return false;
+      if (!isBranchScoped) return true;
+      const bName = employee.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    }),
+    [employees, isBranchScoped, activeBranch]
   );
+
+  const filteredEmployeeDocs = useMemo(() => {
+    if (!isBranchScoped) return employeeDocs;
+    return employeeDocs.filter((doc) => {
+      const emp = employees.find((e) => Number(e.id) === Number(doc.employee_id));
+      const bName = emp?.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    });
+  }, [employeeDocs, employees, isBranchScoped, activeBranch]);
+
+  const filteredLetters = useMemo(() => {
+    if (!isBranchScoped) return letters;
+    return letters.filter((letter) => {
+      const emp = employees.find((e) => Number(e.id) === Number(letter.employee_id));
+      const bName = emp?.branch_name || '';
+      return (
+        bName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
+      );
+    });
+  }, [letters, employees, isBranchScoped, activeBranch]);
   const selectedUploadEmployeeId = canManage ? selectedEmployeeId : String(currentUser?.employee_id || '');
   const today = todayIsoDate();
 
@@ -585,7 +623,7 @@ export default function DocumentsView() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {employeeDocs.map((document) => (
+                  {filteredEmployeeDocs.map((document) => (
                     <tr key={document.id} className="align-top hover:bg-slate-50">
                       <td className="px-4 py-3 font-semibold text-slate-900">
                         {[document.first_name, document.last_name].filter(Boolean).join(' ') || 'My document'}
@@ -643,7 +681,8 @@ export default function DocumentsView() {
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={busyAction === `document-${document.id}`}
+                                  disabled={busyAction === `document-${document.id}` || !(reviewNotes[document.id] || '').trim()}
+                                  title={!(reviewNotes[document.id] || '').trim() ? 'Enter a review note before rejecting' : undefined}
                                   onClick={() => reviewDocument(document, 'rejected')}
                                   className="inline-flex items-center gap-1 rounded-md bg-rose-600 px-2 py-1 font-semibold text-white disabled:opacity-60"
                                 >
@@ -657,8 +696,8 @@ export default function DocumentsView() {
                       </td>
                     </tr>
                   ))}
-                  {employeeDocs.length === 0 && !loading && (
-                    <tr><td colSpan="6"><SectionMessage>No employee documents uploaded yet.</SectionMessage></td></tr>
+                  {filteredEmployeeDocs.length === 0 && !loading && (
+                    <tr><td colSpan="6"><SectionMessage>{isBranchScoped ? `No employee documents uploaded for ${activeBranch}.` : 'No employee documents uploaded yet.'}</SectionMessage></td></tr>
                   )}
                 </tbody>
               </table>
@@ -718,8 +757,8 @@ export default function DocumentsView() {
           )}
 
           <Card title="HR Letter Drafts" subtitle="Print a reviewed draft or save it as a PDF from your browser">
-            {letters.length === 0 && !loading ? (
-              <SectionMessage>No HR letter drafts are available.</SectionMessage>
+            {filteredLetters.length === 0 && !loading ? (
+              <SectionMessage>{isBranchScoped ? `No HR letter drafts are available for ${activeBranch}.` : 'No HR letter drafts are available.'}</SectionMessage>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
@@ -734,7 +773,7 @@ export default function DocumentsView() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {letters.map((letter) => (
+                    {filteredLetters.map((letter) => (
                       <tr key={letter.id}>
                         <td className="px-4 py-3 font-semibold text-slate-900">{letter.letter_number}</td>
                         <td className="px-4 py-3">

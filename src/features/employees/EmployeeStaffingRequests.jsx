@@ -14,18 +14,31 @@ const initialForm = {
 };
 
 export default function EmployeeStaffingRequests() {
-  const { currentUser } = useAuth();
-  const { employees } = useHRMS();
+  const { currentUser, activeBranch } = useAuth();
+  const { employees, refreshEmployees } = useHRMS();
   const isManager = currentUser?.role === 'manager';
   const isHr = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
   const [requests, setRequests] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [employeeSelections, setEmployeeSelections] = useState({});
+  const [reviewNotes, setReviewNotes] = useState({});
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
 
+  const isBranchScoped = Boolean(isHr && activeBranch && activeBranch !== 'All Branches');
+  const filteredRequests = requests.filter((request) => {
+    if (!isBranchScoped) return true;
+    const branchName = request.manager_branch_name || '';
+    return (
+      branchName === activeBranch ||
+      (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+      (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+    );
+  });
+
   const loadRequests = async () => {
+    if (!isManager && !isHr) return;
     try {
       const response = await api.getEmployeeStaffingRequests();
       setRequests(Array.isArray(response?.data) ? response.data : []);
@@ -35,8 +48,10 @@ export default function EmployeeStaffingRequests() {
   };
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    if (isManager || isHr) {
+      loadRequests();
+    }
+  }, [isManager, isHr]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitRequest = async (event) => {
     event.preventDefault();
@@ -67,12 +82,16 @@ export default function EmployeeStaffingRequests() {
     try {
       await api.reviewEmployeeStaffingRequest(request.id, {
         decision,
+        review_note: (reviewNotes[request.id] || '').trim() || null,
         assigned_employee_id: decision === 'approved' && request.request_type === 'team_member'
           ? Number(employeeSelections[request.id])
           : null,
       });
       setStatus(`Request #${request.id} ${decision}.`);
       await loadRequests();
+      if (decision === 'approved' && request.request_type === 'team_member') {
+        await refreshEmployees?.();
+      }
     } catch (reviewError) {
       setError(reviewError?.data?.message || reviewError.message || 'Could not review the staffing request.');
     } finally {
@@ -83,7 +102,7 @@ export default function EmployeeStaffingRequests() {
   if (!isManager && !isHr) return null;
 
   return (
-    <Card title="Staffing requests" subtitle={isManager ? 'Submit requests for HR approval and track their status.' : 'Review manager hiring and team-member requests.'}>
+    <Card title="Staffing requests" subtitle={isManager ? 'Submit requests for HR approval and track their status.' : `Review manager hiring and team-member requests${isBranchScoped ? ` · Filtered: ${activeBranch}` : ''}`}>
       <div className="space-y-4 text-xs">
         {error && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-800">{error}</p>}
         {status && <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">{status}</p>}
@@ -159,12 +178,17 @@ export default function EmployeeStaffingRequests() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {requests.map((request) => (
+              {filteredRequests.map((request) => (
                 <tr key={request.id} className="align-top">
                   {isHr && (
                     <td className="py-3 pr-3 font-medium text-slate-800">
                       {request.manager_first_name} {request.manager_last_name}
-                      <span className="block text-slate-500">{request.manager_employee_code}</span>
+                      <span className="block text-slate-500 font-mono text-[10px]">{request.manager_employee_code}</span>
+                      {request.manager_branch_name && (
+                        <span className="inline-block mt-0.5 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
+                          {request.manager_branch_name}
+                        </span>
+                      )}
                     </td>
                   )}
                   <td className="py-3 pr-3">
@@ -183,7 +207,7 @@ export default function EmployeeStaffingRequests() {
                     {request.review_note && <span className="mt-1 block text-slate-500">{request.review_note}</span>}
                   </td>
                   {isHr && (
-                    <td className="min-w-52 py-3">
+                    <td className="min-w-56 py-3">
                       {request.status === 'pending' ? (
                         <div className="space-y-2">
                           {request.request_type === 'team_member' && (
@@ -194,13 +218,22 @@ export default function EmployeeStaffingRequests() {
                               aria-label={`Employee to assign for request ${request.id}`}
                             >
                               <option value="">Select active employee</option>
-                              {employees.filter((employee) => employee.status === 'active').map((employee) => (
+                              {employees
+                                .filter((employee) => employee.status === 'active' && Number(employee.id) !== Number(request.manager_employee_id))
+                                .map((employee) => (
                                 <option key={employee.id} value={employee.id}>
                                   {employee.employee_code} — {employee.first_name} {employee.last_name}
                                 </option>
                               ))}
                             </select>
                           )}
+                          <input
+                            type="text"
+                            placeholder="Review note (optional)"
+                            value={reviewNotes[request.id] || ''}
+                            onChange={(e) => setReviewNotes({ ...reviewNotes, [request.id]: e.target.value })}
+                            className="w-full rounded-lg border border-slate-300 px-2.5 py-1 text-xs"
+                          />
                           <div className="flex gap-2">
                             <Button size="sm" disabled={busy || (request.request_type === 'team_member' && !employeeSelections[request.id])} onClick={() => reviewRequest(request, 'approved')}>Approve</Button>
                             <Button size="sm" variant="secondary" disabled={busy} onClick={() => reviewRequest(request, 'rejected')}>Reject</Button>
@@ -213,8 +246,10 @@ export default function EmployeeStaffingRequests() {
                   )}
                 </tr>
               ))}
-              {requests.length === 0 && (
-                <tr><td colSpan={isHr ? 6 : 4} className="py-6 text-center text-slate-500">No staffing requests yet.</td></tr>
+              {filteredRequests.length === 0 && (
+                <tr><td colSpan={isHr ? 6 : 4} className="py-6 text-center text-slate-500">
+                  {isBranchScoped ? `No staffing requests found for ${activeBranch}.` : 'No staffing requests yet.'}
+                </td></tr>
               )}
             </tbody>
           </table>

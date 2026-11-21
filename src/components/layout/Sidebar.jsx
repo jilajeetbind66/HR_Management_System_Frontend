@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { initialBranches } from '../../data/mockData';
 import { canAccessModule, getModuleLabel } from '../../config/roleAccess';
 import { canReviewLeave } from '../../utils/leaveApproval';
 import {
@@ -8,6 +9,7 @@ import {
   FolderGit2,
   Users,
   Building,
+  Building2,
   Clock,
   CalendarCheck2,
   Banknote,
@@ -34,8 +36,12 @@ function SidebarShell({
   onLogout,
   showLogout = true,
   isHrWorkspace = false,
+  isSuperAdmin = false,
   ariaLabel,
   navClassName = '',
+  activeBranch,
+  setActiveBranch,
+  availableBranches,
   children,
 }) {
   return (
@@ -68,6 +74,29 @@ function SidebarShell({
             </span>
           )}
         </div>
+
+        {/* Mobile Drawer Branch Selector (Super Admin Only) */}
+        {isSuperAdmin && availableBranches && availableBranches.length > 0 && (
+          <div className="lg:hidden mx-3 my-2.5 rounded-xl border border-white/15 bg-white/10 p-2.5">
+            <div className="flex items-center gap-1.5 mb-1.5 text-teal-200 text-[11px] font-semibold">
+              <Building2 className="h-3.5 w-3.5 text-teal-300" />
+              <span>Active Branch Location</span>
+            </div>
+            <select
+              value={activeBranch || 'All Branches'}
+              onChange={(e) => {
+                setActiveBranch?.(e.target.value);
+                onClose?.();
+              }}
+              className="w-full rounded-lg bg-slate-900 border border-white/20 px-2 py-1.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-teal-400 font-medium cursor-pointer"
+            >
+              <option value="All Branches">All Branches (Prayagraj & Kaushambi)</option>
+              {availableBranches.map((b) => (
+                <option key={b.id} value={b.name}>{b.name} ({b.city})</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <nav aria-label={ariaLabel} className={`hrms-sidebar__nav min-h-0 flex-1 overflow-y-auto overscroll-contain ${navClassName}`}>
           {children}
@@ -110,7 +139,9 @@ function SidebarShell({
 }
 
 function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjectCount }) {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, activeBranch, setActiveBranch, logout } = useAuth();
+  const { branches } = useHRMS();
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const links = [
     { id: 'dashboard', icon: LayoutDashboard },
     { id: 'developer_space', icon: Users },
@@ -141,6 +172,10 @@ function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjec
       isOpen={isOpen}
       onClose={onClose}
       onLogout={handleLogout}
+      isSuperAdmin={false}
+      activeBranch={activeBranch}
+      setActiveBranch={setActiveBranch}
+      availableBranches={availableBranches}
       ariaLabel="Employee navigation"
       navClassName="space-y-1 px-2 py-4"
     >
@@ -176,8 +211,9 @@ function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjec
 }
 
 export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
-  const { currentUser, logout } = useAuth();
-  const { projects, myProjects, leaveRequests } = useHRMS();
+  const { currentUser, activeBranch, setActiveBranch, logout } = useAuth();
+  const { projects, myProjects, leaveRequests, branches } = useHRMS();
+  const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
   const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser.role);
   const isManagerWorkspace = currentUser.role === 'manager';
   const isAdminWorkspace = currentUser.role === 'super_admin';
@@ -210,7 +246,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
     {
       items: [
         { id: 'dashboard', icon: LayoutDashboard },
-        { id: 'developer_space', icon: Code2, badge: 'Self-Service' },
+        { id: 'developer_space', icon: Code2, badge: isAdminWorkspace ? 'Executive' : 'Self-Service' },
         {
           id: 'projects',
           icon: FolderGit2,
@@ -234,7 +270,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
       items: [
         { id: 'attendance', icon: Clock },
         { id: 'leaves', icon: CalendarCheck2, badge: pendingLeaves > 0 ? `${pendingLeaves} Req` : null },
-        { id: 'payslips', icon: Banknote },
+        ...(!isAdminWorkspace ? [{ id: 'payslips', icon: Banknote }] : []),
         { id: 'payroll', icon: Banknote },
         { id: 'expenses', icon: Receipt }
       ]
@@ -333,6 +369,10 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
       isOpen={isOpen}
       onClose={onClose}
       onLogout={handleLogout}
+      isSuperAdmin={currentUser?.role === 'super_admin'}
+      activeBranch={activeBranch}
+      setActiveBranch={setActiveBranch}
+      availableBranches={availableBranches}
       showLogout={isNavyWorkspace || isHrWorkspace}
       isHrWorkspace={isHrWorkspace}
       ariaLabel="Main navigation"

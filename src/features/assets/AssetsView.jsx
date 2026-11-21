@@ -81,18 +81,39 @@ export default function AssetsView() {
       setFeedback({ type: 'error', text: 'Select an active employee before allocation.' });
       return;
     }
-    runAction(`assign:${asset.id}`, () => assignAsset(asset.id, employeeId), 'Asset allocated.');
+    runAction(`assign:${asset.id}`, async () => {
+      await assignAsset(asset.id, employeeId);
+      setEmployeeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[asset.id];
+        return next;
+      });
+    }, 'Asset allocated.');
   };
 
   const handleReturn = (asset) => {
     if (!window.confirm(`Return ${asset.asset_code} from ${asset.assigned_to}?`)) return;
-    runAction(`return:${asset.id}`, () => returnAsset(asset.id), 'Asset returned to the register.');
+    runAction(`return:${asset.id}`, async () => {
+      await returnAsset(asset.id);
+      setEmployeeDrafts((prev) => {
+        const next = { ...prev };
+        delete next[asset.id];
+        return next;
+      });
+    }, 'Asset returned to the register.');
   };
 
   const handleStatusUpdate = (asset) => {
     const status = statusDrafts[asset.id] ?? asset.status;
     if (status === 'Retired' && !window.confirm(`Retire ${asset.asset_code}? This cannot be undone.`)) return;
-    runAction(`status:${asset.id}`, () => updateAssetStatus(asset.id, status), 'Asset status updated.');
+    runAction(`status:${asset.id}`, async () => {
+      await updateAssetStatus(asset.id, status);
+      setStatusDrafts((prev) => {
+        const next = { ...prev };
+        delete next[asset.id];
+        return next;
+      });
+    }, 'Asset status updated.');
   };
 
   return (

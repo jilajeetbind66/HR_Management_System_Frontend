@@ -26,7 +26,8 @@ import {
   FileText,
   History,
   Info,
-  CalendarClock
+  CalendarClock,
+  Building2
 } from 'lucide-react';
 
 const PROJECT_PRIORITY_PRESENTATION = {
@@ -65,7 +66,7 @@ const validateProjectDates = ({ start_date, planned_end_date }, showRequiredErro
 };
 
 export default function ProjectsView() {
-  const { currentUser, hasPermission } = useAuth();
+  const { currentUser, hasPermission, activeBranch } = useAuth();
   const {
     projects,
     employees,
@@ -79,6 +80,22 @@ export default function ProjectsView() {
     assessPenalty,
     waivePenalty
   } = useHRMS();
+
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
+
+  const branchProjects = React.useMemo(() => {
+    if (!isBranchScoped) return projects;
+    return projects.filter((p) => {
+      const emp = employees.find((e) => Number(e.id) === Number(p.assigned_employee_id));
+      const branchName = emp?.branch_name || p.assigned_employee_branch_name;
+      if (!branchName) return false;
+      return (
+        branchName === activeBranch ||
+        (activeBranch.includes('Prayagraj') && branchName.includes('Prayagraj')) ||
+        (activeBranch.includes('Kaushambi') && branchName.includes('Kaushambi'))
+      );
+    });
+  }, [projects, employees, activeBranch, isBranchScoped]);
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -145,10 +162,9 @@ export default function ProjectsView() {
   const activeEmployees = employees.filter(
     (employee) => employee.status?.toLowerCase() === 'active' && !employee.deleted_at
   );
-  const canUpdateProject = (project) => Boolean(project?.assignment_id) && (
-    currentUser?.role === 'super_admin'
-    || (currentUser?.employee_id
-      && Number(project.assigned_employee_id) === Number(currentUser.employee_id))
+  const canUpdateProject = (project) => Boolean(project?.assignment_id) && Boolean(
+    currentUser?.employee_id
+    && Number(project.assigned_employee_id) === Number(currentUser.employee_id)
   );
   const canReviewProject = (project) => Boolean(project?.assignment_id) && (
     ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role)
@@ -158,6 +174,7 @@ export default function ProjectsView() {
     )
   );
   const canRecordPenaltyReview = ['super_admin', 'hr_admin', 'hr_executive'].includes(currentUser?.role);
+  const canWaivePenaltyReview = ['super_admin', 'manager'].includes(currentUser?.role);
 
   useEffect(() => {
     if (!selectedProject?.assignment_id) {
@@ -182,7 +199,7 @@ export default function ProjectsView() {
   };
 
   // Filter projects
-  const filteredProjects = projects.filter(p => {
+  const filteredProjects = branchProjects.filter(p => {
     const matchesSearch = p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           p.project_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (p.assigned_employee_name || '')?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -192,13 +209,13 @@ export default function ProjectsView() {
   });
 
   // Calculate high-level stats
-  const totalProjects = projects.length;
-  const inProgressCount = projects.filter(p => p.status === 'in_progress').length;
-  const underReviewCount = projects.filter(p => p.status === 'under_review').length;
-  const overdueCount = projects.filter(p => p.is_overdue || p.status === 'overdue').length;
-  const completedCount = projects.filter(p => p.status === 'completed').length;
+  const totalProjects = branchProjects.length;
+  const inProgressCount = branchProjects.filter(p => p.status === 'in_progress').length;
+  const underReviewCount = branchProjects.filter(p => p.status === 'under_review').length;
+  const overdueCount = branchProjects.filter(p => p.is_overdue || p.status === 'overdue').length;
+  const completedCount = branchProjects.filter(p => p.status === 'completed').length;
 
-  const allExtensionRequests = projects.flatMap(p =>
+  const allExtensionRequests = branchProjects.flatMap(p =>
     (p.extensions || [])
       .map(e => ({
         ...e,
@@ -260,9 +277,13 @@ export default function ProjectsView() {
   const handleUpdateProgressSubmit = async (e) => {
     e.preventDefault();
     if (!selectedProject) return;
+    if (Number(progressVal) < Number(selectedProject.progress_percent || 0)) {
+      setProjectFormError(`Progress cannot be reduced from ${selectedProject.progress_percent}% to ${progressVal}%. Milestone progress can only advance forward.`);
+      return;
+    }
     setProjectFormError(null);
     try {
-      await updateProjectProgress(selectedProject.id, progressVal, progressNote);
+      await updateProjectProgress(selectedProject.id, Number(progressVal), progressNote);
       setShowProgressModal(false);
       setProgressNote('');
     } catch (error) {
@@ -418,15 +439,15 @@ export default function ProjectsView() {
       </div>
 
       {/* Sub-Tabs: List View vs Extension History vs Policy Safeguards */}
-      <div className="border-b border-slate-200 flex items-center justify-between overflow-x-auto whitespace-nowrap">
-        <div className="flex items-center gap-2">
+      <div className="border-b border-slate-200 flex items-center justify-between overflow-x-auto">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab('list')}
             className={`px-4 py-2.5 text-xs font-semibold border-b-2 transition ${
               activeTab === 'list' ? 'border-teal-600 text-teal-600' : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            All Assigned Projects ({projects.length})
+            All Assigned Projects ({branchProjects.length})
           </button>
           <button
             onClick={() => setActiveTab('extensions')}
@@ -451,6 +472,13 @@ export default function ProjectsView() {
             Penalty Policy & India Legal Safeguards
           </button>
         </div>
+
+        {isBranchScoped && (
+          <div className="pb-2 hidden sm:flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1">
+            <Building2 className="w-3.5 h-3.5 text-teal-600" />
+            <span>Branch: {activeBranch}</span>
+          </div>
+        )}
       </div>
 
       {/* TAB 1: ALL PROJECTS LIST */}
@@ -738,7 +766,7 @@ export default function ProjectsView() {
                           <AlertTriangle className="w-4 h-4 text-rose-600" />
                           Assessed Penalty Record (Non-Monetary Baseline)
                         </span>
-                        {canRecordPenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && (
+                        {canWaivePenaltyReview && canReviewProject(project) && project.penalties[0].status !== 'waived' && Number(project.assigned_employee_id) !== Number(currentUser?.employee_id) && (
                           <button
                             onClick={() => {
                               setSelectedProject(project);
@@ -802,21 +830,41 @@ export default function ProjectsView() {
                             Request Extension
                           </Button>
 
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={Send}
-                            onClick={() => {
-                              setSelectedProject(project);
-                              setShowSubmitModal(true);
-                            }}
-                          >
-                            Submit Completion
-                          </Button>
+                          {!isUnderReview && (
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              icon={Send}
+                              onClick={() => {
+                                setSelectedProject(project);
+                                setShowSubmitModal(true);
+                              }}
+                            >
+                              Submit Completion
+                            </Button>
+                          )}
                         </>
                       )}
 
                       {/* HR / Reviewer Buttons */}
+                      {hasPendingExtension && canReviewProject(project) && (
+                        <Button
+                          size="sm"
+                          variant="warning"
+                          icon={Calendar}
+                          onClick={() => {
+                            const ext = activeExtension || (project.extensions || []).find(e => e.status === 'pending');
+                            setSelectedProject(project);
+                            setSelectedExtension(ext);
+                            setExtDecisionNote('');
+                            setExtensionReviewError('');
+                            setShowReviewExtModal(true);
+                          }}
+                        >
+                          Review Extension
+                        </Button>
+                      )}
+
                       {canReviewProject(project) && isUnderReview && (
                         <Button
                           size="sm"
@@ -1164,11 +1212,20 @@ export default function ProjectsView() {
       {/* MODAL 2: Update Progress */}
       <Modal
         isOpen={showProgressModal}
-        onClose={() => setShowProgressModal(false)}
+        onClose={() => {
+          setShowProgressModal(false);
+          setProjectFormError(null);
+        }}
         title="Update Project Progress"
         subtitle={selectedProject ? `${selectedProject.project_code} - ${selectedProject.name}` : ""}
       >
         <form onSubmit={handleUpdateProgressSubmit} className="space-y-4 text-xs">
+          {projectFormError && (
+            <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs">
+              {projectFormError}
+            </div>
+          )}
+
           <div>
             <div className="flex justify-between font-semibold text-slate-700 mb-1">
               <span>Progress Percentage:</span>
@@ -1176,13 +1233,17 @@ export default function ProjectsView() {
             </div>
             <input
               type="range"
-              min="0"
+              min={selectedProject ? (selectedProject.progress_percent || 0) : 0}
               max="100"
               step="5"
               value={progressVal}
-              onChange={(e) => setProgressVal(e.target.value)}
+              onChange={(e) => setProgressVal(Number(e.target.value))}
               className="w-full accent-teal-600 cursor-pointer"
             />
+            <div className="flex justify-between text-[11px] text-slate-500 mt-1">
+              <span>Current Baseline: {selectedProject?.progress_percent || 0}%</span>
+              <span>Target Deliverable: 100%</span>
+            </div>
           </div>
 
           <div>
@@ -1389,6 +1450,24 @@ export default function ProjectsView() {
                   {selectedProject.deliverable_link}
                 </a>
               </p>
+            )}
+            {deliverableUploads.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-slate-200">
+                <strong>Attached Deliverable Files ({deliverableUploads.length}):</strong>
+                <ul className="mt-1 space-y-1">
+                  {deliverableUploads.map((file) => (
+                    <li key={file.id}>
+                      <button
+                        type="button"
+                        onClick={() => openProjectFile(file.id)}
+                        className="text-teal-600 underline hover:text-teal-800"
+                      >
+                        {file.original_filename} ({Math.round(file.file_size / 1024)} KB)
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
 

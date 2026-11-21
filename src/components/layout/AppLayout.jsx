@@ -80,7 +80,7 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
               <p className="mt-1">{backendError || 'The server could not load records from the database.'}</p>
               <button
                 type="button"
-                onClick={syncWithBackend}
+                onClick={() => syncWithBackend()}
                 className="mt-3 rounded-lg bg-rose-700 px-3 py-2 font-semibold text-white hover:bg-rose-800"
               >
                 Retry connection

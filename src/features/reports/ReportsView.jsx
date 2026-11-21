@@ -11,6 +11,7 @@ import {
 import Card from '../../components/common/Card';
 import Button from '../../components/common/Button';
 import StatCard from '../../components/common/StatCard';
+import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 const payrollExports = [
@@ -43,12 +44,16 @@ function escapeCsvCell(value) {
 }
 
 export default function ReportsView() {
+  const { activeBranch } = useAuth();
   const [reports, setReports] = useState(null);
   const [selectedRunId, setSelectedRunId] = useState('');
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState('');
-  const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [exportError, setExportError] = useState('');
   const [exportNotice, setExportNotice] = useState('');
+
+  const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
 
   useEffect(() => {
     let active = true;
@@ -63,7 +68,7 @@ export default function ReportsView() {
         }
       })
       .catch((requestError) => {
-        if (active) setError(requestError.message || 'Unable to load reports.');
+        if (active) setLoadError(requestError.message || 'Unable to load reports.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -75,20 +80,33 @@ export default function ReportsView() {
   }, []);
 
   const downloadReport = async (report) => {
-    setError('');
+    setExportError('');
     setExportNotice('');
     setExporting(report);
 
     try {
       const response = await api.getReportExport(
         report,
-        report === 'employee_master' ? undefined : selectedRunId
+        ['employee_master', 'training_compliance'].includes(report) ? undefined : selectedRunId
       );
       const result = response?.data;
-      const rows = result?.rows;
+      const allRows = result?.rows;
 
-      if (!Array.isArray(rows) || rows.length === 0) {
-        setError('No matching database records are available for this export.');
+      if (!Array.isArray(allRows) || allRows.length === 0) {
+        setExportError('No matching database records are available for this export.');
+        return;
+      }
+
+      const rows = isBranchScoped && report === 'employee_master'
+        ? allRows.filter((r) => (
+            r.branch_name === activeBranch
+            || (activeBranch.includes('Prayagraj') && r.branch_name?.includes('Prayagraj'))
+            || (activeBranch.includes('Kaushambi') && r.branch_name?.includes('Kaushambi'))
+          ))
+        : allRows;
+
+      if (rows.length === 0) {
+        setExportError(`No matching database records found for ${activeBranch}.`);
         return;
       }
 
@@ -102,8 +120,11 @@ export default function ReportsView() {
       const period = result.run
         ? `_${result.run.period_year}-${String(result.run.period_month).padStart(2, '0')}`
         : '';
+      const branchSuffix = isBranchScoped && report === 'employee_master'
+        ? `_${activeBranch.replace(/\s+/g, '_')}`
+        : '';
       link.href = url;
-      link.download = `${report}${period}.csv`;
+      link.download = `${report}${period}${branchSuffix}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -111,10 +132,10 @@ export default function ReportsView() {
 
       const missingCount = Number(result.missing_identifier_count || 0);
       setExportNotice(
-        `${rows.length} database record(s) exported.${missingCount ? ` ${missingCount} record(s) have a missing identifier.` : ''}`
+        `${rows.length} record(s) exported${isBranchScoped ? ` for ${activeBranch}` : ''}.${missingCount ? ` ${missingCount} record(s) have a missing identifier.` : ''}`
       );
     } catch (requestError) {
-      setError(requestError.message || 'Unable to export this report.');
+      setExportError(requestError.message || 'Unable to export this report.');
     } finally {
       setExporting('');
     }
@@ -126,6 +147,10 @@ export default function ReportsView() {
   const training = reports?.training;
   const exports = reports?.exports || {};
   const lockedRuns = payroll?.locked_runs || [];
+
+  const selectedBranchData = isBranchScoped && workforce?.branches
+    ? workforce.branches.find((b) => b.name === activeBranch || activeBranch.includes(b.city) || activeBranch.includes(b.name))
+    : null;
 
   return (
     <div className="space-y-6">
@@ -150,7 +175,11 @@ export default function ReportsView() {
             disabled={loading || exporting !== ''}
             onClick={() => downloadReport('employee_master')}
           >
-            {exporting === 'employee_master' ? 'Exporting…' : 'Export Employee Master'}
+            {exporting === 'employee_master'
+              ? 'Exporting…'
+              : isBranchScoped
+              ? `Export ${selectedBranchData?.city || 'Branch'} Master`
+              : 'Export Employee Master'}
           </Button>
         )}
         {exports.training_compliance && (
@@ -191,9 +220,9 @@ export default function ReportsView() {
           )}
         </Card>
       )}
-      {error && (
+      {(loadError || exportError) && (
         <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-800">
-          {error}
+          {loadError || exportError}
         </div>
       )}
       {exportNotice && (
@@ -203,14 +232,18 @@ export default function ReportsView() {
         </div>
       )}
 
-      {!loading && !error && (
+      {!loading && !loadError && (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             {workforce && (
               <StatCard
-                title="Active Headcount"
-                value={workforce.active_employee_count}
-                subvalue={`${workforce.total_employee_count} total employee records`}
+                title={isBranchScoped ? `Headcount (${selectedBranchData?.name || activeBranch})` : "Active Headcount"}
+                value={selectedBranchData ? selectedBranchData.active_employee_count : workforce.active_employee_count}
+                subvalue={selectedBranchData
+                  ? `${selectedBranchData.active_employee_count} of ${workforce.active_employee_count} total staff (${selectedBranchData.share_percent}%)`
+                  : `${workforce.total_employee_count} total employee records`}
+                trend={isBranchScoped ? `Filtered: ${activeBranch}` : `${workforce.branches.length} branches active`}
+                trendPositive={true}
                 icon={Users}
                 color="indigo"
               />
@@ -252,17 +285,43 @@ export default function ReportsView() {
                     {workforce.branches.length === 0 && (
                       <p className="text-slate-500">No active employee records are available in this reporting scope.</p>
                     )}
-                    {workforce.branches.map((branch) => (
-                      <div key={branch.id} className="space-y-1">
-                        <div className="flex justify-between gap-3 font-semibold text-slate-700">
-                          <span>{branch.name}{branch.city ? ` (${branch.city})` : ''}</span>
-                          <span>{branch.active_employee_count} staff ({branch.share_percent}%)</span>
+                    {workforce.branches.map((branch) => {
+                      const isSelected = isBranchScoped && (
+                        branch.name === activeBranch
+                        || activeBranch.includes(branch.city)
+                        || activeBranch.includes(branch.name)
+                      );
+                      return (
+                        <div
+                          key={branch.id}
+                          className={`space-y-1 p-2 rounded-lg transition ${
+                            isSelected ? 'bg-teal-50 border border-teal-200' : ''
+                          }`}
+                        >
+                          <div className="flex justify-between gap-3 font-semibold text-slate-700">
+                            <span className="flex items-center gap-1.5">
+                              {branch.name}{branch.city ? ` (${branch.city})` : ''}
+                              {isSelected && (
+                                <span className="bg-teal-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                                  Active Branch
+                                </span>
+                              )}
+                            </span>
+                            <span className={isSelected ? 'text-teal-700 font-bold' : ''}>
+                              {branch.active_employee_count} staff ({branch.share_percent}%)
+                            </span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div
+                              className={`h-full rounded-full transition-all duration-300 ${
+                                isSelected ? 'bg-teal-600' : 'bg-slate-400'
+                              }`}
+                              style={{ width: `${branch.share_percent}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                          <div className="h-full rounded-full bg-teal-600" style={{ width: `${branch.share_percent}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </Card>
               )}
@@ -344,7 +403,7 @@ export default function ReportsView() {
         </>
       )}
 
-      {!loading && !error && !workforce && !projects && !payroll && !training && (
+      {!loading && !loadError && !workforce && !projects && !payroll && !training && (
         <Card title="Reports unavailable" subtitle="No report data is assigned to this role.">
           <div className="flex items-center gap-2 text-sm text-slate-600">
             <BarChart3 className="h-4 w-4" />
