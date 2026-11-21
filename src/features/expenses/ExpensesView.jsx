@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Banknote, Receipt } from 'lucide-react';
+import { Banknote, Receipt, Clock, CheckCircle2, PlusCircle, Filter } from 'lucide-react';
 import Card from '../../components/common/Card';
 import CloudinaryUpload from '../../components/common/CloudinaryUpload';
 import { useAuth } from '../../context/AuthContext';
@@ -86,9 +86,21 @@ export default function ExpensesView() {
   }, []);
 
   const employeeId = currentUser?.employee_id ? Number(currentUser.employee_id) : null;
-  const canSubmit = employeeId !== null && ['employee', 'manager', 'super_admin'].includes(currentUser?.role);
   const isManager = currentUser?.role === 'manager';
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const canSubmit = employeeId !== null && ['employee', 'manager', 'super_admin'].includes(currentUser?.role);
+  const [showClaimForm, setShowClaimForm] = useState(!isSuperAdmin);
+  const [claimFilter, setClaimFilter] = useState('all');
+  const [loanFilter, setLoanFilter] = useState('all');
+
+  const pendingClaimsCount = data.claims.filter((c) => c.status === 'submitted').length;
+  const approvedClaimsCount = data.claims.filter((c) => c.status === 'approved').length;
+  const paidClaimsCount = data.claims.filter((c) => c.status === 'paid').length;
+  const pendingLoansCount = data.loans.filter((l) => l.status === 'submitted').length;
+  const approvedLoansCount = data.loans.filter((l) => l.status === 'approved').length;
+
+  const filteredClaims = data.claims.filter((c) => claimFilter === 'all' || c.status === claimFilter);
+  const filteredLoans = data.loans.filter((l) => loanFilter === 'all' || l.status === loanFilter);
 
   const createClaim = async (event) => {
     event.preventDefault();
@@ -243,9 +255,52 @@ export default function ExpensesView() {
         </div>
         <h1 className="text-2xl font-bold text-slate-900 mt-1">Expenses &amp; Loans</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Claims require Cloudinary receipts before approval. Loan approval records a decision only; no repayment schedule, disbursement, or payroll deduction is triggered.
+          {isSuperAdmin
+            ? 'Review, verify bills, and approve employee business expense reimbursements and loan requests.'
+            : 'Submit business expense claims with receipts or request a salary advance for review.'}
         </p>
       </div>
+
+      {/* Executive Stat Cards for Admin / Manager */}
+      {(isSuperAdmin || isManager) && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-amber-900">Pending Review</span>
+              <Clock className="w-4 h-4 text-amber-600" />
+            </div>
+            <p className="mt-2 text-xl font-bold text-amber-950">{pendingClaimsCount}</p>
+            <p className="text-[11px] text-amber-700 mt-0.5">Claims awaiting your decision</p>
+          </div>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-900">Ready to Pay</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            </div>
+            <p className="mt-2 text-xl font-bold text-emerald-950">{approvedClaimsCount}</p>
+            <p className="text-[11px] text-emerald-700 mt-0.5">Approved reimbursements</p>
+          </div>
+
+          <div className="rounded-xl border border-teal-200 bg-teal-50/70 p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-teal-900">Settled &amp; Paid</span>
+              <Receipt className="w-4 h-4 text-teal-600" />
+            </div>
+            <p className="mt-2 text-xl font-bold text-teal-950">{paidClaimsCount}</p>
+            <p className="text-[11px] text-teal-700 mt-0.5">Disbursed to staff</p>
+          </div>
+
+          <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 shadow-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-blue-900">Pending Loans</span>
+              <Banknote className="w-4 h-4 text-blue-600" />
+            </div>
+            <p className="mt-2 text-xl font-bold text-blue-950">{pendingLoansCount}</p>
+            <p className="text-[11px] text-blue-700 mt-0.5">Advance requests</p>
+          </div>
+        </div>
+      )}
 
       {feedback && (
         <div
@@ -287,8 +342,20 @@ export default function ExpensesView() {
 
       {activeTab === 'expenses' && (
         <div className="space-y-6">
-          {canSubmit && (
-            <Card title="Submit an expense claim" subtitle="Submit business expenses in INR. Attach one or more receipts to the saved claim.">
+          {canSubmit && showClaimForm && (
+            <Card
+              title="Submit an expense claim"
+              subtitle="Submit business expenses in INR. Attach one or more receipts to the saved claim."
+              action={isSuperAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setShowClaimForm(false)}
+                  className="text-xs font-semibold text-slate-500 hover:text-slate-800"
+                >
+                  ✕ Close Form
+                </button>
+              ) : null}
+            >
               <form onSubmit={createClaim} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <label className="text-xs font-medium text-slate-700">
@@ -347,14 +414,50 @@ export default function ExpensesView() {
             </Card>
           )}
 
-          <Card title="Expense claims" subtitle="Managers review their direct reports; only Super Admin can record manual reimbursement payment.">
+          <Card
+            title={isSuperAdmin ? "Employee Expense Claims" : "Expense claims"}
+            subtitle={isSuperAdmin ? "Review and approve employee business expense reimbursements, inspect receipts, and mark payments." : "Managers review their direct reports; only Super Admin can record manual reimbursement payment."}
+            action={isSuperAdmin && canSubmit && !showClaimForm ? (
+              <button
+                type="button"
+                onClick={() => setShowClaimForm(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition shadow-xs"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Record Business Expense
+              </button>
+            ) : null}
+          >
+            {(isSuperAdmin || isManager) && data.claims.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg mb-4 text-xs">
+                {[
+                  { key: 'all', label: `All Claims (${data.claims.length})` },
+                  { key: 'submitted', label: `Pending Approval (${pendingClaimsCount})` },
+                  { key: 'approved', label: `Approved (${approvedClaimsCount})` },
+                  { key: 'paid', label: `Paid (${paidClaimsCount})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setClaimFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                      claimFilter === tab.key ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {loading ? (
               <p className="py-8 text-center text-sm text-slate-500">Loading expense claims…</p>
-            ) : data.claims.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">No expense claims are available.</p>
+            ) : filteredClaims.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                {claimFilter !== 'all' ? `No claims found matching status "${claimFilter}".` : 'No expense claims are available.'}
+              </p>
             ) : (
               <div className="space-y-4">
-                {data.claims.map((claim) => {
+                {filteredClaims.map((claim) => {
                   const receipts = claim.receipts || [];
                   const isOwner = employeeId !== null && Number(claim.employee_id) === employeeId;
                   const reviewer = canReview(claim.employee_id) && claim.status === 'submitted';
@@ -513,7 +616,7 @@ export default function ExpensesView() {
 
       {activeTab === 'loans' && (
         <div className="space-y-6">
-          {canSubmit && (
+          {!isSuperAdmin && canSubmit && (
             <Card title="Request a loan or salary advance" subtitle="Submit a request for manager or Super Admin review.">
               <form onSubmit={createLoanRequest} className="space-y-4">
                 <label className="block max-w-sm text-xs font-medium text-slate-700">
@@ -551,14 +654,39 @@ export default function ExpensesView() {
             </Card>
           )}
 
-          <Card title="Loan requests" subtitle="Approval records the decision only; disbursement, interest, and repayment are not configured.">
+          <Card
+            title={isSuperAdmin ? "Employee Loan & Advance Requests" : "Loan requests"}
+            subtitle={isSuperAdmin ? "Review and decide on employee salary advance and loan applications." : "Approval records the decision only; disbursement, interest, and repayment are not configured."}
+          >
+            {(isSuperAdmin || isManager) && data.loans.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg mb-4 text-xs">
+                {[
+                  { key: 'all', label: `All Requests (${data.loans.length})` },
+                  { key: 'submitted', label: `Pending Review (${pendingLoansCount})` },
+                  { key: 'approved', label: `Approved (${approvedLoansCount})` },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setLoanFilter(tab.key)}
+                    className={`px-3 py-1.5 rounded-md font-semibold transition ${
+                      loanFilter === tab.key ? 'bg-white text-teal-800 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            )}
             {loading ? (
               <p className="py-8 text-center text-sm text-slate-500">Loading loan requests…</p>
-            ) : data.loans.length === 0 ? (
-              <p className="py-8 text-center text-sm text-slate-500">No loan requests are available.</p>
+            ) : filteredLoans.length === 0 ? (
+              <p className="py-8 text-center text-sm text-slate-500">
+                {loanFilter !== 'all' ? `No loan requests found matching status "${loanFilter}".` : 'No loan requests are available.'}
+              </p>
             ) : (
               <div className="space-y-3">
-                {data.loans.map((loan) => {
+                {filteredLoans.map((loan) => {
                   const reviewer = canReview(loan.employee_id) && loan.status === 'submitted';
                   const busy = busyRecordId === loan.id;
 
