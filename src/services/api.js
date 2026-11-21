@@ -429,6 +429,14 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(deductions),
   }),
+  markIndividualPayslipPaid: (runId, payslipId, paymentData) => request(`/payroll/runs/${runId}/payslips/${payslipId}/pay`, {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  }),
+  updatePayslipAdjustments: (runId, payslipId, adjustments) => request(`/payroll/runs/${runId}/payslips/${payslipId}/adjustments`, {
+    method: 'PATCH',
+    body: JSON.stringify(adjustments),
+  }),
   generatePayrollRun: (year, month, scopeKey, monthName) => request('/payroll/runs', {
     method: 'POST',
     body: JSON.stringify({
