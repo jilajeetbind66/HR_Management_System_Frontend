@@ -162,7 +162,11 @@ export default function OrganizationView() {
     setBranchModal({ open: true, editing: branch });
   };
 
+  const [capturingLocation, setCapturingLocation] = useState(false);
+
   const handleCaptureCurrentLocation = async () => {
+    setModalError('');
+    setCapturingLocation(true);
     try {
       const pos = await getCurrentPositionAsync();
       if (pos) {
@@ -174,6 +178,8 @@ export default function OrganizationView() {
       }
     } catch (err) {
       setModalError(err.message || 'Unable to capture GPS location.');
+    } finally {
+      setCapturingLocation(false);
     }
   };
 
@@ -911,13 +917,15 @@ export default function OrganizationView() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-teal-100">
               <button
                 type="button"
+                disabled={capturingLocation}
                 onClick={handleCaptureCurrentLocation}
-                className="inline-flex items-center gap-1 rounded-lg bg-teal-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-700 transition self-start"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-teal-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-teal-700 transition self-start disabled:opacity-60"
               >
-                <Navigation className="w-3.5 h-3.5" /> 📍 Pin My Current GPS Location
+                <Navigation className={`w-3.5 h-3.5 ${capturingLocation ? 'animate-spin' : ''}`} />
+                {capturingLocation ? 'Locating GPS...' : '📍 Pin My Current GPS Location'}
               </button>
               <span className="text-[10px] text-slate-500">
-                Employees outside this boundary cannot punch.
+                Tip: You can also copy/paste coordinates directly from Google Maps.
               </span>
             </div>
           </div>
