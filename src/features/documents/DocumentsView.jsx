@@ -191,30 +191,32 @@ export default function DocumentsView() {
   );
 
   const filteredEmployeeDocs = useMemo(() => {
+    if (!canManage) return employeeDocs;
     if (!isBranchScoped) return employeeDocs;
     return employeeDocs.filter((doc) => {
       const emp = employees.find((e) => Number(e.id) === Number(doc.employee_id));
-      const bName = emp?.branch_name || '';
+      const bName = emp?.branch_name || doc.branch_name || '';
       return (
         bName === activeBranch ||
         (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
         (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
       );
     });
-  }, [employeeDocs, employees, isBranchScoped, activeBranch]);
+  }, [employeeDocs, employees, isBranchScoped, activeBranch, canManage]);
 
   const filteredLetters = useMemo(() => {
+    if (!canManage) return letters;
     if (!isBranchScoped) return letters;
     return letters.filter((letter) => {
       const emp = employees.find((e) => Number(e.id) === Number(letter.employee_id));
-      const bName = emp?.branch_name || '';
+      const bName = emp?.branch_name || letter.branch_name || letter.snapshot?.branch || '';
       return (
         bName === activeBranch ||
         (activeBranch.includes('Prayagraj') && bName.includes('Prayagraj')) ||
         (activeBranch.includes('Kaushambi') && bName.includes('Kaushambi'))
       );
     });
-  }, [letters, employees, isBranchScoped, activeBranch]);
+  }, [letters, employees, isBranchScoped, activeBranch, canManage]);
   const selectedUploadEmployeeId = canManage ? selectedEmployeeId : String(currentUser?.employee_id || '');
   const today = todayIsoDate();
 
@@ -697,7 +699,7 @@ export default function DocumentsView() {
                     </tr>
                   ))}
                   {filteredEmployeeDocs.length === 0 && !loading && (
-                    <tr><td colSpan="6"><SectionMessage>{isBranchScoped ? `No employee documents uploaded for ${activeBranch}.` : 'No employee documents uploaded yet.'}</SectionMessage></td></tr>
+                    <tr><td colSpan="6"><SectionMessage>{!canManage ? 'No employee documents uploaded yet.' : (isBranchScoped ? `No employee documents uploaded for ${activeBranch}.` : 'No employee documents uploaded yet.')}</SectionMessage></td></tr>
                   )}
                 </tbody>
               </table>
@@ -758,7 +760,7 @@ export default function DocumentsView() {
 
           <Card title="HR Letter Drafts" subtitle="Print a reviewed draft or save it as a PDF from your browser">
             {filteredLetters.length === 0 && !loading ? (
-              <SectionMessage>{isBranchScoped ? `No HR letter drafts are available for ${activeBranch}.` : 'No HR letter drafts are available.'}</SectionMessage>
+              <SectionMessage>{!canManage ? 'No HR letter drafts are available for you yet.' : (isBranchScoped ? `No HR letter drafts are available for ${activeBranch}.` : 'No HR letter drafts are available.')}</SectionMessage>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
