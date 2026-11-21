@@ -41,22 +41,60 @@ const parseTimeToMinutes = (timeStr) => {
   return hours * 60 + minutes;
 };
 
-const getLateArrivalInfo = (punchInTime, shift) => {
-  if (!punchInTime || !shift) return { isLate: false, minutesLate: 0 };
-  const punchMinutes = parseTimeToMinutes(punchInTime);
-  const shiftStartMinutes = parseTimeToMinutes(shift.start_time || '09:30 AM');
-  if (punchMinutes === null || shiftStartMinutes === null) return { isLate: false, minutesLate: 0 };
+const staffRolesList = [
+  { id: 'manager', label: 'Managers', desc: 'Engineering & Project Managers' },
+  { id: 'hr_admin', label: 'HR Admins', desc: 'Head of HR & People Operations' },
+  { id: 'hr_executive', label: 'HR Executives', desc: 'HR Operations & Onboarding' },
+  { id: 'recruiter', label: 'Recruiters', desc: 'Talent Acquisition Partners' },
+  { id: 'payroll_admin', label: 'Payroll Specialists', desc: 'Finance & Payroll Staff' },
+  { id: 'auditor', label: 'Internal Auditors', desc: 'Compliance & Audit Officers' },
+];
 
-  const grace = parseInt(shift.grace_period_minutes || 15, 10);
-  const allowedCutoff = shiftStartMinutes + grace;
+const getLateArrivalInfo = (punchInTime, shift, role = null) => {
+  if (!punchInTime || !shift) return { isLate: false, minutesLate: 0, shiftName: 'General Employee Shift', startTimeStr: '09:30 AM', graceMinutes: 15, cutoffTimeStr: '09:45 AM' };
+  const punchMinutes = parseTimeToMinutes(punchInTime);
+  if (punchMinutes === null) return { isLate: false, minutesLate: 0, shiftName: 'General Employee Shift', startTimeStr: '09:30 AM', graceMinutes: 15, cutoffTimeStr: '09:45 AM' };
+
+  // Check if staff / executive custom shift applies to this role
+  const isStaffShift = Boolean(
+    shift.staff_shift_enabled &&
+    role &&
+    Array.isArray(shift.staff_applied_roles) &&
+    shift.staff_applied_roles.includes(role)
+  );
+
+  const startTimeStr = isStaffShift ? (shift.staff_start_time || '10:00 AM') : (shift.start_time || '09:30 AM');
+  const graceMinutes = isStaffShift ? parseInt(shift.staff_grace_period_minutes || 15, 10) : parseInt(shift.grace_period_minutes || 15, 10);
+  const shiftName = isStaffShift ? (shift.staff_shift_name || 'Management & Staff Shift') : (shift.shift_name || 'General Employee Shift');
+
+  const shiftStartMinutes = parseTimeToMinutes(startTimeStr);
+  if (shiftStartMinutes === null) return { isLate: false, minutesLate: 0, shiftName, startTimeStr, graceMinutes, cutoffTimeStr: '09:45 AM' };
+
+  const allowedCutoff = shiftStartMinutes + graceMinutes;
+  const h = Math.floor(allowedCutoff / 60);
+  const m = allowedCutoff % 60;
+  const cutoffTimeStr = `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 
   if (punchMinutes > allowedCutoff) {
     return {
       isLate: true,
       minutesLate: punchMinutes - allowedCutoff,
+      isStaffShift,
+      shiftName,
+      startTimeStr,
+      graceMinutes,
+      cutoffTimeStr,
     };
   }
-  return { isLate: false, minutesLate: 0 };
+  return {
+    isLate: false,
+    minutesLate: 0,
+    isStaffShift,
+    shiftName,
+    startTimeStr,
+    graceMinutes,
+    cutoffTimeStr,
+  };
 };
 
 export default function AttendanceView() {
@@ -131,12 +169,18 @@ export default function AttendanceView() {
 
   // Shift & Grace Period State
   const [shiftSettings, setShiftSettings] = useState({
-    shift_name: 'General Day Shift',
+    shift_name: 'General Employee Shift',
     start_time: '09:30 AM',
     end_time: '06:30 PM',
     grace_period_minutes: 15,
     late_mark_threshold: 3,
     auto_half_day_deduction: true,
+    staff_shift_enabled: true,
+    staff_shift_name: 'Management & Staff Shift',
+    staff_start_time: '10:00 AM',
+    staff_end_time: '07:00 PM',
+    staff_grace_period_minutes: 15,
+    staff_applied_roles: ['manager', 'hr_admin', 'hr_executive', 'recruiter', 'payroll_admin', 'auditor'],
   });
   const [savingShiftSettings, setSavingShiftSettings] = useState(false);
   const [shiftFeedback, setShiftFeedback] = useState(null);
@@ -155,7 +199,15 @@ export default function AttendanceView() {
     api.getAttendanceShiftSettings()
       .then((res) => {
         if (active && res?.data) {
-          setShiftSettings(res.data);
+          const raw = res.data;
+          setShiftSettings({
+            ...raw,
+            staff_applied_roles: Array.isArray(raw.staff_applied_roles)
+              ? raw.staff_applied_roles
+              : (typeof raw.staff_applied_roles === 'string'
+                ? JSON.parse(raw.staff_applied_roles)
+                : ['manager', 'hr_admin', 'hr_executive', 'recruiter', 'payroll_admin', 'auditor'])
+          });
         }
       })
       .catch((err) => {
@@ -263,15 +315,50 @@ export default function AttendanceView() {
     try {
       const res = await api.updateAttendanceShiftSettings(shiftSettings);
       if (res?.data) {
-        setShiftSettings(res.data);
+        const raw = res.data;
+        setShiftSettings({
+          ...raw,
+          staff_applied_roles: Array.isArray(raw.staff_applied_roles)
+            ? raw.staff_applied_roles
+            : (typeof raw.staff_applied_roles === 'string'
+              ? JSON.parse(raw.staff_applied_roles)
+              : ['manager', 'hr_admin', 'hr_executive', 'recruiter', 'payroll_admin', 'auditor'])
+        });
       }
-      setShiftFeedback({ text: 'Shift timing & grace period settings saved successfully.', type: 'success' });
+      setShiftFeedback({ text: 'All shift timings, grace allowances, and role assignments saved successfully.', type: 'success' });
     } catch (err) {
       setShiftFeedback({ text: err?.data?.message || err.message || 'Unable to update shift settings.', type: 'error' });
     } finally {
       setSavingShiftSettings(false);
       setTimeout(() => setShiftFeedback(null), 4000);
     }
+  };
+
+  const handleToggleStaffRole = (roleId) => {
+    setShiftSettings((prev) => {
+      const currentRoles = Array.isArray(prev.staff_applied_roles) ? prev.staff_applied_roles : [];
+      const exists = currentRoles.includes(roleId);
+      return {
+        ...prev,
+        staff_applied_roles: exists
+          ? currentRoles.filter((r) => r !== roleId)
+          : [...currentRoles, roleId],
+      };
+    });
+  };
+
+  const handleSelectAllStaffRoles = () => {
+    setShiftSettings((prev) => ({
+      ...prev,
+      staff_applied_roles: staffRolesList.map((r) => r.id),
+    }));
+  };
+
+  const handleClearAllStaffRoles = () => {
+    setShiftSettings((prev) => ({
+      ...prev,
+      staff_applied_roles: [],
+    }));
   };
 
   // Days in selected month
@@ -331,7 +418,7 @@ export default function AttendanceView() {
 
         if (attRec && attRec.punch_in) {
           const hours = parseFloat(attRec.work_hours || 0);
-          const late = getLateArrivalInfo(attRec.punch_in, shiftSettings);
+          const late = getLateArrivalInfo(attRec.punch_in, shiftSettings, emp.role);
           if (late.isLate) lateCount++;
 
           if (hours > 0 && hours < 4.5) {
@@ -421,7 +508,7 @@ export default function AttendanceView() {
               date: dateKey,
               day: d,
               punchIn: punch?.punch_in,
-              lateInfo: getLateArrivalInfo(punch?.punch_in, shiftSettings)
+              lateInfo: getLateArrivalInfo(punch?.punch_in, shiftSettings, row.employee?.role)
             });
           }
         }
@@ -754,7 +841,8 @@ export default function AttendanceView() {
                       <td className="px-4 py-3 font-medium text-slate-800">{att.date}</td>
                       <td className="px-4 py-3">
                         {(() => {
-                          const lateInfo = getLateArrivalInfo(att.punch_in, shiftSettings);
+                          const empRole = emp?.role || att.role || 'employee';
+                          const lateInfo = getLateArrivalInfo(att.punch_in, shiftSettings, empRole);
                           return (
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className={`font-semibold ${lateInfo.isLate ? 'text-amber-800 font-bold' : 'text-emerald-600'}`}>
@@ -763,7 +851,7 @@ export default function AttendanceView() {
                               {lateInfo.isLate && (
                                 <span
                                   className="inline-flex items-center gap-0.5 rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 border border-amber-200"
-                                  title={`Late by ${lateInfo.minutesLate} minutes (After ${shiftSettings?.start_time || '09:30 AM'} + ${shiftSettings?.grace_period_minutes || 15}m grace)`}
+                                  title={`Late by ${lateInfo.minutesLate} minutes (Shift: ${lateInfo.shiftName} · Allowed up to ${lateInfo.cutoffTimeStr})`}
                                 >
                                   <Clock className="w-2.5 h-2.5 text-amber-600" />
                                   Late (+{lateInfo.minutesLate}m)
@@ -1204,94 +1292,280 @@ export default function AttendanceView() {
               </div>
             )}
 
-            <form onSubmit={handleSaveShiftSettings} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Shift Name:</label>
-                  <input
-                    type="text"
-                    value={shiftSettings.shift_name || ''}
-                    disabled={!canManageAttendance}
-                    onChange={(e) => setShiftSettings((p) => ({ ...p, shift_name: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Standard Shift Start Time:</label>
-                  <input
-                    type="text"
-                    value={shiftSettings.start_time || '09:30 AM'}
-                    disabled={!canManageAttendance}
-                    placeholder="e.g. 09:30 AM"
-                    onChange={(e) => setShiftSettings((p) => ({ ...p, start_time: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM</span>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Standard Shift End Time:</label>
-                  <input
-                    type="text"
-                    value={shiftSettings.end_time || '06:30 PM'}
-                    disabled={!canManageAttendance}
-                    placeholder="e.g. 06:30 PM"
-                    onChange={(e) => setShiftSettings((p) => ({ ...p, end_time: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 disabled:bg-slate-50"
-                  />
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Total Duration: 9.0 Hours</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
-                <div className="bg-amber-50/60 p-3.5 rounded-xl border border-amber-200/80">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                    <span>Grace Period Allowance</span>
-                  </div>
-                  <label className="block font-medium text-slate-700 mb-1">Grace Period (Minutes):</label>
+            <form onSubmit={handleSaveShiftSettings} className="space-y-6 text-xs">
+              {/* SECTION 1: STANDARD EMPLOYEE SHIFT */}
+              <div className="bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200">
                   <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="60"
-                      value={shiftSettings.grace_period_minutes}
-                      disabled={!canManageAttendance}
-                      onChange={(e) => setShiftSettings((p) => ({ ...p, grace_period_minutes: Number(e.target.value) }))}
-                      className="w-24 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
-                    />
-                    <span className="text-xs text-amber-800 font-medium">
-                      Punches up to {(() => {
-                        const startMins = parseTimeToMinutes(shiftSettings.start_time || '09:30 AM') || 570;
-                        const cutoff = startMins + Number(shiftSettings.grace_period_minutes || 15);
-                        const h = Math.floor(cutoff / 60);
-                        const m = cutoff % 60;
-                        return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
-                      })()} will NOT be marked late.
+                    <span className="p-1 rounded bg-teal-100 text-teal-800">
+                      <Clock className="w-4 h-4" />
                     </span>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">1. Standard Employee Shift (Baseline)</h3>
+                      <p className="text-[11px] text-slate-500">Applies automatically to all Regular Employees</p>
+                    </div>
+                  </div>
+                  <Badge variant="primary" size="sm">Regular Employees</Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Shift Name:</label>
+                    <input
+                      type="text"
+                      value={shiftSettings.shift_name || 'General Employee Shift'}
+                      disabled={!canManageAttendance}
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, shift_name: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Standard Shift Start Time:</label>
+                    <input
+                      type="text"
+                      value={shiftSettings.start_time || '09:30 AM'}
+                      disabled={!canManageAttendance}
+                      placeholder="e.g. 09:30 AM"
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, start_time: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM</span>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">Standard Shift End Time:</label>
+                    <input
+                      type="text"
+                      value={shiftSettings.end_time || '06:30 PM'}
+                      disabled={!canManageAttendance}
+                      placeholder="e.g. 06:30 PM"
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, end_time: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                    />
+                    <span className="text-[10px] text-slate-400 mt-0.5 block">Working Window</span>
                   </div>
                 </div>
 
-                <div className="bg-teal-50/60 p-3.5 rounded-xl border border-teal-200/80">
-                  <div className="flex items-center gap-1.5 font-bold text-teal-900 mb-1">
-                    <ShieldAlert className="w-4 h-4 text-teal-600" />
-                    <span>Late-Mark Deduction Policy</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-3 border-t border-slate-200/70">
+                  <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                      <span>Employee Grace Period Allowance</span>
+                    </div>
+                    <label className="block font-medium text-slate-700 mb-1">Grace Period (Minutes):</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="60"
+                        value={shiftSettings.grace_period_minutes}
+                        disabled={!canManageAttendance}
+                        onChange={(e) => setShiftSettings((p) => ({ ...p, grace_period_minutes: Number(e.target.value) }))}
+                        className="w-20 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
+                      />
+                      <span className="text-xs text-amber-900 font-semibold">
+                        Punches up to {(() => {
+                          const startMins = parseTimeToMinutes(shiftSettings.start_time || '09:30 AM') || 570;
+                          const cutoff = startMins + Number(shiftSettings.grace_period_minutes || 15);
+                          const h = Math.floor(cutoff / 60);
+                          const m = cutoff % 60;
+                          return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                        })()} will NOT be marked late.
+                      </span>
+                    </div>
                   </div>
-                  <label className="block font-medium text-slate-700 mb-1">Threshold for Half-Day (0.5) Penalty:</label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={shiftSettings.late_mark_threshold}
-                      disabled={!canManageAttendance}
-                      onChange={(e) => setShiftSettings((p) => ({ ...p, late_mark_threshold: Number(e.target.value) }))}
-                      className="w-24 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
-                    />
-                    <span className="text-xs text-teal-800 font-medium">Late arrivals per month = 0.5 Day Leave Deduction</span>
+
+                  <div className="bg-teal-50/70 p-3.5 rounded-xl border border-teal-200/80">
+                    <div className="flex items-center gap-1.5 font-bold text-teal-900 mb-1">
+                      <ShieldAlert className="w-4 h-4 text-teal-600" />
+                      <span>Late-Mark Deduction Policy</span>
+                    </div>
+                    <label className="block font-medium text-slate-700 mb-1">Threshold for Half-Day (0.5) Penalty:</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={shiftSettings.late_mark_threshold}
+                        disabled={!canManageAttendance}
+                        onChange={(e) => setShiftSettings((p) => ({ ...p, late_mark_threshold: Number(e.target.value) }))}
+                        className="w-20 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
+                      />
+                      <span className="text-xs text-teal-900 font-medium">Late arrivals per month = 0.5 Day Leave Deduction</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
+              {/* SECTION 2: EXECUTIVE & STAFF ROLES SHIFT */}
+              <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 mb-3 border-b border-indigo-100">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded bg-indigo-100 text-indigo-800">
+                      <Sliders className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-slate-900 text-sm">2. Executive & Staff Shift (Special Timings for Selected Roles)</h3>
+                      <p className="text-[11px] text-slate-500">
+                        Configure different work timings and grace periods for HR, Managers, Recruiters, and Auditors
+                      </p>
+                    </div>
+                  </div>
+                  <label className="inline-flex items-center gap-2 cursor-pointer font-bold text-xs text-indigo-900 bg-white px-3 py-1.5 rounded-lg border border-indigo-200 shadow-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(shiftSettings.staff_shift_enabled)}
+                      disabled={!canManageAttendance}
+                      onChange={(e) => setShiftSettings((p) => ({ ...p, staff_shift_enabled: e.target.checked }))}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                    />
+                    <span>Enable Staff Shift</span>
+                  </label>
+                </div>
+
+                {shiftSettings.staff_shift_enabled && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Staff Shift Name:</label>
+                        <input
+                          type="text"
+                          value={shiftSettings.staff_shift_name || 'Management & Staff Shift'}
+                          disabled={!canManageAttendance}
+                          onChange={(e) => setShiftSettings((p) => ({ ...p, staff_shift_name: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Staff Shift Start Time:</label>
+                        <input
+                          type="text"
+                          value={shiftSettings.staff_start_time || '10:00 AM'}
+                          disabled={!canManageAttendance}
+                          placeholder="e.g. 10:00 AM"
+                          onChange={(e) => setShiftSettings((p) => ({ ...p, staff_start_time: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">Format: hh:mm AM/PM</span>
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-slate-700 mb-1">Staff Shift End Time:</label>
+                        <input
+                          type="text"
+                          value={shiftSettings.staff_end_time || '07:00 PM'}
+                          disabled={!canManageAttendance}
+                          placeholder="e.g. 07:00 PM"
+                          onChange={(e) => setShiftSettings((p) => ({ ...p, staff_end_time: e.target.value }))}
+                          className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white disabled:bg-slate-50"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">Working Window</span>
+                      </div>
+                    </div>
+
+                    <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80">
+                      <div className="flex items-center gap-1.5 font-bold text-amber-900 mb-1">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span>Staff Grace Period Allowance</span>
+                      </div>
+                      <label className="block font-medium text-slate-700 mb-1">Grace Period (Minutes):</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          max="60"
+                          value={shiftSettings.staff_grace_period_minutes}
+                          disabled={!canManageAttendance}
+                          onChange={(e) => setShiftSettings((p) => ({ ...p, staff_grace_period_minutes: Number(e.target.value) }))}
+                          className="w-20 rounded-lg border border-slate-300 p-2 font-bold text-slate-800 bg-white"
+                        />
+                        <span className="text-xs text-amber-900 font-semibold">
+                          Punches up to {(() => {
+                            const startMins = parseTimeToMinutes(shiftSettings.staff_start_time || '10:00 AM') || 600;
+                            const cutoff = startMins + Number(shiftSettings.staff_grace_period_minutes || 15);
+                            const h = Math.floor(cutoff / 60);
+                            const m = cutoff % 60;
+                            return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+                          })()} will NOT be marked late for selected staff roles.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* ROLE SELECTION CHECKBOXES */}
+                    <div className="bg-white p-4 rounded-xl border border-indigo-200">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 mb-3 border-b border-slate-100">
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                            <UserCheck className="w-4 h-4 text-indigo-600" />
+                            <span>Select Roles to Apply This Shift (Employee ko chhod kar baki sabhi):</span>
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            Checked roles will follow this shift. Unchecked roles will automatically use the Standard 09:30 AM Shift.
+                          </p>
+                        </div>
+                        {canManageAttendance && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={handleSelectAllStaffRoles}
+                              className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 underline"
+                            >
+                              Select All
+                            </button>
+                            <span className="text-slate-300">|</span>
+                            <button
+                              type="button"
+                              onClick={handleClearAllStaffRoles}
+                              className="text-[11px] font-semibold text-slate-500 hover:text-slate-700 underline"
+                            >
+                              Clear All
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {staffRolesList.map((role) => {
+                          const isChecked = Array.isArray(shiftSettings.staff_applied_roles) && shiftSettings.staff_applied_roles.includes(role.id);
+                          return (
+                            <label
+                              key={role.id}
+                              className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition cursor-pointer select-none ${
+                                isChecked
+                                  ? 'bg-indigo-50/60 border-indigo-300 shadow-sm'
+                                  : 'bg-slate-50/50 border-slate-200 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                disabled={!canManageAttendance}
+                                onChange={() => handleToggleStaffRole(role.id)}
+                                className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                              />
+                              <div>
+                                <span className={`font-bold block text-xs ${isChecked ? 'text-indigo-900' : 'text-slate-700'}`}>
+                                  {role.label}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block mt-0.5 leading-tight">
+                                  {role.desc}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-3 text-[11px] font-medium text-slate-500 bg-slate-50 p-2 rounded-lg flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                        <span>
+                          Currently {Array.isArray(shiftSettings.staff_applied_roles) ? shiftSettings.staff_applied_roles.length : 0} out of {staffRolesList.length} staff roles are configured with this custom timing.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* AUTOMATION TOGGLE & SAVE BUTTON */}
               <div className="pt-2 flex items-center justify-between flex-wrap gap-3">
                 <label className="flex items-center gap-2 cursor-pointer font-semibold text-slate-800 select-none">
                   <input
