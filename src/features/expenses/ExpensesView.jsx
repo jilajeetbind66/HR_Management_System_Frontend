@@ -88,7 +88,7 @@ export default function ExpensesView() {
   const employeeId = currentUser?.employee_id ? Number(currentUser.employee_id) : null;
   const isManager = currentUser?.role === 'manager';
   const isSuperAdmin = currentUser?.role === 'super_admin';
-  const canSubmit = employeeId !== null && ['employee', 'manager', 'super_admin'].includes(currentUser?.role);
+  const canSubmit = !isSuperAdmin && employeeId !== null && ['employee', 'manager'].includes(currentUser?.role);
   const [showClaimForm, setShowClaimForm] = useState(!isSuperAdmin);
   const [claimFilter, setClaimFilter] = useState('all');
   const [loanFilter, setLoanFilter] = useState('all');
@@ -417,16 +417,6 @@ export default function ExpensesView() {
           <Card
             title={isSuperAdmin ? "Employee Expense Claims" : "Expense claims"}
             subtitle={isSuperAdmin ? "Review and approve employee business expense reimbursements, inspect receipts, and mark payments." : "Managers review their direct reports; only Super Admin can record manual reimbursement payment."}
-            action={isSuperAdmin && canSubmit && !showClaimForm ? (
-              <button
-                type="button"
-                onClick={() => setShowClaimForm(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-3 py-1.5 text-xs font-semibold text-teal-700 hover:bg-teal-100 transition shadow-xs"
-              >
-                <PlusCircle className="w-3.5 h-3.5" />
-                Record Business Expense
-              </button>
-            ) : null}
           >
             {(isSuperAdmin || isManager) && data.claims.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-lg mb-4 text-xs">
