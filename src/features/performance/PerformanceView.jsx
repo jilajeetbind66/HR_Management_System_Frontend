@@ -64,6 +64,8 @@ export default function PerformanceView() {
   });
   const [objectiveForm, setObjectiveForm] = useState(emptyObjective);
   const [editingObjectiveId, setEditingObjectiveId] = useState(null);
+  const [editingSelfRatingId, setEditingSelfRatingId] = useState(null);
+  const [editingManagerRatingId, setEditingManagerRatingId] = useState(null);
   const [reviewNotes, setReviewNotes] = useState({});
   const [ratingDrafts, setRatingDrafts] = useState({});
   const [progressDrafts, setProgressDrafts] = useState({});
@@ -98,8 +100,9 @@ export default function PerformanceView() {
   }, [refreshPerformance]);
 
   const role = currentUser?.role;
-  const canCreateCycle = role === 'super_admin';
-  const canReviewObjectives = ['manager', 'super_admin'].includes(role);
+  const isSuperAdmin = role === 'super_admin';
+  const isManager = role === 'manager';
+  const canCreateCycle = isSuperAdmin;
   const canCreateObjectives = ['employee', 'manager'].includes(role) && Boolean(currentUser?.employee_id);
   const selectedCycle = performance.cycles.find((cycle) => String(cycle.id) === selectedCycleId) || null;
   const today = currentDate();
@@ -555,7 +558,11 @@ export default function PerformanceView() {
           <div className="space-y-4">
             {cycleObjectives.map((objective) => {
               const isOwner = Number(objective.employee_id) === Number(currentUser?.employee_id);
-              const canReviewThisObjective = canReviewObjectives && !isOwner;
+              const isDirectReport = objective.reporting_manager_id
+                ? Number(objective.reporting_manager_id) === Number(currentUser?.employee_id)
+                : false;
+              // Direct reporting manager (or Super Admin only for their direct executive reports) can review & rate
+              const canReviewThisObjective = (isManager && isDirectReport) || (isSuperAdmin && isDirectReport);
               const objectiveBusy = busy !== '' && (
                 busy.endsWith(`:${objective.id}`)
                 || busy === 'objective'
@@ -662,10 +669,23 @@ export default function PerformanceView() {
                   </div>
 
                   <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {/* Self-Rating Block */}
                     <div className="rounded-lg border border-slate-100 p-3">
-                      <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
-                        <Star className="h-3.5 w-3.5 text-amber-500" /> Self-rating
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
+                          <Star className="h-3.5 w-3.5 text-amber-500" /> Self-rating
+                        </p>
+                        {isOwner && objective.self_rating != null && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingSelfRatingId(editingSelfRatingId === objective.id ? null : objective.id)}
+                            className="text-[11px] text-teal-600 hover:text-teal-800 font-medium"
+                          >
+                            {editingSelfRatingId === objective.id ? 'Cancel' : 'Edit'}
+                          </button>
+                        )}
+                      </div>
+
                       {objective.self_rating == null ? (
                         <p className="mt-1 text-xs text-slate-500">Not submitted</p>
                       ) : (
@@ -674,8 +694,9 @@ export default function PerformanceView() {
                           {objective.self_review_note ? ` · ${objective.self_review_note}` : ''}
                         </p>
                       )}
-                      {isOwner && objective.status === 'approved' && selectedCycle.status === 'open' && (
-                        <div className="mt-3 space-y-2">
+
+                      {isOwner && objective.status === 'approved' && selectedCycle.status === 'open' && (objective.self_rating == null || editingSelfRatingId === objective.id) && (
+                        <div className="mt-3 space-y-2 border-t border-slate-100 pt-2">
                           <label className="block text-xs text-slate-600">
                             Rating (1–5)
                             <select
@@ -706,7 +727,10 @@ export default function PerformanceView() {
                             size="sm"
                             variant="secondary"
                             disabled={busy !== ''}
-                            onClick={() => saveSelfReview(objective)}
+                            onClick={async () => {
+                              await saveSelfReview(objective);
+                              setEditingSelfRatingId(null);
+                            }}
                           >
                             Save Self-rating
                           </Button>
@@ -714,23 +738,45 @@ export default function PerformanceView() {
                       )}
                     </div>
 
+                    {/* Manager-Rating Block */}
                     <div className="rounded-lg border border-slate-100 p-3">
-                      <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
-                        <ClipboardList className="h-3.5 w-3.5 text-teal-500" /> Manager-rating
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
+                          <ClipboardList className="h-3.5 w-3.5 text-teal-500" /> Manager-rating
+                        </p>
+                        {canReviewThisObjective && objective.manager_rating != null && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingManagerRatingId(editingManagerRatingId === objective.id ? null : objective.id)}
+                            className="text-[11px] text-teal-600 hover:text-teal-800 font-medium"
+                          >
+                            {editingManagerRatingId === objective.id ? 'Cancel' : 'Edit'}
+                          </button>
+                        )}
+                      </div>
+
                       {objective.manager_rating == null ? (
                         <p className="mt-1 text-xs text-slate-500">Not submitted</p>
                       ) : (
-                        <p className="mt-1 text-sm font-semibold text-slate-800">
-                          {objective.manager_rating}/5
-                          {objective.manager_review_note ? ` · ${objective.manager_review_note}` : ''}
-                        </p>
+                        <div className="mt-1">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {objective.manager_rating}/5
+                            {objective.manager_review_note ? ` · ${objective.manager_review_note}` : ''}
+                          </p>
+                          {objective.manager_rated_by_name && (
+                            <p className="text-[11px] text-slate-500 font-normal mt-0.5">
+                              Evaluated by {objective.manager_rated_by_name}
+                            </p>
+                          )}
+                        </div>
                       )}
+
                       {canReviewThisObjective
                         && objective.status === 'approved'
                         && selectedCycle.status === 'open'
-                        && objective.self_rating != null && (
-                          <div className="mt-3 space-y-2">
+                        && objective.self_rating != null
+                        && (objective.manager_rating == null || editingManagerRatingId === objective.id) && (
+                          <div className="mt-3 space-y-2 border-t border-slate-100 pt-2">
                             <label className="block text-xs text-slate-600">
                               Rating (1–5)
                               <select
@@ -761,7 +807,10 @@ export default function PerformanceView() {
                               size="sm"
                               variant="secondary"
                               disabled={busy !== ''}
-                              onClick={() => saveManagerReview(objective)}
+                              onClick={async () => {
+                                await saveManagerReview(objective);
+                                setEditingManagerRatingId(null);
+                              }}
                             >
                               Save Manager-rating
                             </Button>
