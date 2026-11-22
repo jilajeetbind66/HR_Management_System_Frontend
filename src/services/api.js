@@ -505,6 +505,9 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify({ status, notes }),
   }),
+  relieveLifecycleCase: (caseId) => request(`/lifecycle/cases/${caseId}/relieve`, {
+    method: 'POST',
+  }),
   getTraining: () => request('/training'),
   createTrainingCourse: (course) => request('/training/courses', {
     method: 'POST',

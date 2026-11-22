@@ -31,7 +31,7 @@ const modulesByRole = {
   ],
   manager: [
     'dashboard', 'developer_space', 'projects', 'employees', 'documents', 'attendance', 'leaves',
-    'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
+    'payslips', 'expenses', 'lifecycle', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
   ],
   hr_admin: [
     'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
