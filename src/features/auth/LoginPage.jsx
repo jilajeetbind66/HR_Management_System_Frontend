@@ -138,7 +138,7 @@ export default function LoginPage() {
         <section className="flex items-center justify-center bg-white px-6 py-9 sm:px-10 sm:py-12 lg:px-8 lg:py-3">
           <div className="w-full max-w-[474px] lg:translate-x-3 lg:translate-y-4">
             <div className="flex justify-center">
-              <img src="/hrm-logo.png" alt="HRM logo" className="h-20 w-auto object-contain lg:h-16" />
+              <img src="/pinweb-logo-login.png" alt="Pinweb logo" className="h-20 w-auto object-contain lg:h-16" />
             </div>
             <h2 className="mt-2 text-center text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl lg:mt-1">
               <span className="text-green-600">HR</span> Management System
