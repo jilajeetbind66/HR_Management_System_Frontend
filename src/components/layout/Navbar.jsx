@@ -105,7 +105,9 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     : null;
   const hasPunchedIn = Boolean(todayPunch?.punch_in);
   const isPunchComplete = Boolean(todayPunch?.punch_in && todayPunch?.punch_out);
+  const unreadAnnouncementsCount = (announcements || []).filter((a) => !a.is_read).length;
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
+  const totalUnreadBadge = unreadNotifications + unreadAnnouncementsCount;
 
   const handlePunch = async () => {
     if (!hasEmployeeProfile || isPunchComplete || isPunching) return;
@@ -264,9 +266,9 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             aria-expanded={showNotifications}
           >
             <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-bold text-white">
-                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+            {totalUnreadBadge > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+                {totalUnreadBadge > 9 ? '9+' : totalUnreadBadge}
               </span>
             )}
           </button>
@@ -278,8 +280,10 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-800">Notifications & Alerts</span>
-                    {unreadNotifications > 0 && (
-                      <Badge variant="teal" size="sm">{unreadNotifications} New</Badge>
+                    {totalUnreadBadge > 0 && (
+                      <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                        {totalUnreadBadge} New
+                      </span>
                     )}
                   </div>
                   {notificationTab === 'unread' && unreadNotifications > 0 && (

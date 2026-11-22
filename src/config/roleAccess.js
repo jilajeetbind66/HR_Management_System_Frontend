@@ -41,9 +41,9 @@ const modulesByRole = {
     'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
     'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
-  recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'account'],
-  payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'reports', 'account'],
-  auditor: ['dashboard', 'developer_space', 'employees', 'organization', 'payroll', 'payslips', 'reports', 'platform', 'account'],
+  recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'announcements', 'account'],
+  payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'announcements', 'reports', 'account'],
+  auditor: ['dashboard', 'developer_space', 'employees', 'organization', 'payroll', 'payslips', 'announcements', 'reports', 'platform', 'account'],
   super_admin: allModules,
 };
 

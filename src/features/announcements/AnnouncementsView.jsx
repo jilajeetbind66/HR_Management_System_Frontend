@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Building, Calendar, CheckCircle2, Eye, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Building, Calendar, CheckCircle2, Eye, Plus, RefreshCw } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
@@ -27,6 +27,7 @@ export default function AnnouncementsView() {
   const { currentUser } = useAuth();
   const {
     announcements,
+    refreshAnnouncements,
     createAnnouncement,
     markAnnouncementRead,
     branches,
@@ -38,6 +39,19 @@ export default function AnnouncementsView() {
   const [busy, setBusy] = useState('');
   const canPublish = ['super_admin', 'hr_admin'].includes(currentUser?.role);
 
+  // Auto-refresh announcements and read counts every 6 seconds
+  useEffect(() => {
+    if (typeof refreshAnnouncements === 'function') {
+      refreshAnnouncements();
+    }
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && typeof refreshAnnouncements === 'function') {
+        refreshAnnouncements();
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [refreshAnnouncements]);
+
   const handleCreateSubmit = async (event) => {
     event.preventDefault();
     setFormError('');
@@ -47,6 +61,7 @@ export default function AnnouncementsView() {
       setShowCreateModal(false);
       setAnnouncementForm(emptyAnnouncement);
       setFeedback({ type: 'success', text: 'Announcement published.' });
+      if (typeof refreshAnnouncements === 'function') refreshAnnouncements();
     } catch (error) {
       setFormError(errorText(error));
     } finally {
@@ -60,6 +75,7 @@ export default function AnnouncementsView() {
     try {
       await markAnnouncementRead(announcement.id);
       setFeedback({ type: 'success', text: 'Read receipt recorded.' });
+      if (typeof refreshAnnouncements === 'function') refreshAnnouncements();
     } catch (error) {
       setFeedback({ type: 'error', text: errorText(error) });
     } finally {
@@ -82,14 +98,28 @@ export default function AnnouncementsView() {
             Read company and branch notices; your acknowledgement is recorded once for each announcement.
           </p>
         </div>
-        {canPublish && (
-          <Button variant="primary" icon={Plus} onClick={() => {
-            setFormError('');
-            setShowCreateModal(true);
-          }}>
-            Publish Announcement
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            disabled={busy === 'refreshing'}
+            onClick={async () => {
+              setBusy('refreshing');
+              if (typeof refreshAnnouncements === 'function') await refreshAnnouncements();
+              setBusy('');
+            }}
+          >
+            {busy === 'refreshing' ? 'Syncing...' : 'Live Sync'}
           </Button>
-        )}
+          {canPublish && (
+            <Button variant="primary" icon={Plus} onClick={() => {
+              setFormError('');
+              setShowCreateModal(true);
+            }}>
+              Publish Announcement
+            </Button>
+          )}
+        </div>
       </div>
 
       {feedback && (

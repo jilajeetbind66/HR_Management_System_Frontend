@@ -63,7 +63,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       .slice(0, 5);
   }, [query]);
   const recentAnnouncements = announcements.slice(0, 3);
+  const unreadAnnouncementsCount = announcements.filter((a) => !a.is_read).length;
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
+  const totalUnreadBadge = unreadNotifications + unreadAnnouncementsCount;
   const today = getIndiaDateString();
   const todayPunch = attendance.find((record) => (
     Number(record.employee_id) === Number(currentUser?.employee_id) && record.date === today
@@ -307,9 +309,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           >
             <Bell className="h-5 w-5" />
-            {unreadNotifications > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-bold text-white">
-                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+            {totalUnreadBadge > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-600 px-1 text-[9px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+                {totalUnreadBadge > 9 ? '9+' : totalUnreadBadge}
               </span>
             )}
           </button>
@@ -318,9 +320,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-xs font-bold text-slate-900">Notifications</h2>
-                  {unreadNotifications > 0 && (
-                    <span className="rounded-full bg-teal-100 px-1.5 py-0.2 text-[10px] font-bold text-teal-700">
-                      {unreadNotifications} new
+                  {totalUnreadBadge > 0 && (
+                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                      {totalUnreadBadge} new
                     </span>
                   )}
                 </div>

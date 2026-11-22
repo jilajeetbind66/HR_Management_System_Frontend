@@ -146,7 +146,7 @@ export function HRMSProvider({ children }) {
     ].includes(role);
     const canViewAssets = role === 'super_admin';
     const canViewHelpdesk = ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'super_admin'].includes(role);
-    const canViewAnnouncements = ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'super_admin'].includes(role);
+    const canViewAnnouncements = ['employee', 'manager', 'hr_admin', 'hr_executive', 'recruiter', 'payroll_admin', 'auditor', 'super_admin'].includes(role);
     const canViewPayroll = ['super_admin', 'payroll_admin', 'auditor'].includes(role);
     const canViewAudit = ['super_admin', 'auditor'].includes(role);
     const canViewRecruitment = ['super_admin', 'hr_admin', 'hr_executive', 'recruiter'].includes(role);
@@ -815,6 +815,16 @@ export function HRMSProvider({ children }) {
     return upsertAnnouncement(response.data);
   };
 
+  const refreshAnnouncements = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await api.getAnnouncements();
+      setAnnouncements(responseDataArray(response));
+    } catch {
+      // silent
+    }
+  }, [isAuthenticated]);
+
   const upsertAsset = (asset) => {
     setAssets((previous) => [
       asset,
@@ -954,6 +964,7 @@ export function HRMSProvider({ children }) {
       addTicketMessage,
       updateTicketStatus,
       announcements,
+      refreshAnnouncements,
       notifications,
       refreshNotifications,
       markNotificationRead,
