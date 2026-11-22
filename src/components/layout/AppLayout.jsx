@@ -41,7 +41,7 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
   }, [pathname, refreshAttendance]);
 
   return (
-    <div className={`${isHrWorkspace ? 'hr-workspace ' : ''}${isManagerWorkspace ? 'manager-workspace ' : ''}${isAdminWorkspace ? 'admin-workspace ' : ''}${isEmployeeWorkspace ? 'employee-workspace ' : ''}hrms-app-shell flex h-screen overflow-hidden antialiased text-slate-800`}>
+    <div className={`${isHrWorkspace ? 'hr-workspace ' : ''}${isManagerWorkspace ? 'manager-workspace ' : ''}${isAdminWorkspace ? 'admin-workspace ' : ''}${isEmployeeWorkspace ? 'employee-workspace ' : ''}hrms-app-shell flex h-full h-screen h-[100dvh] w-full overflow-hidden antialiased text-slate-800`}>
       {/* Sidebar Navigation */}
       <Sidebar
         activeTab={activeTab}
@@ -51,7 +51,7 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
       />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 flex-col overflow-y-auto min-w-0">
+      <div className="flex flex-1 flex-col h-full min-h-0 overflow-y-auto min-w-0">
         {isEmployeeWorkspace ? (
           <EmployeeNavbar
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}

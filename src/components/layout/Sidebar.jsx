@@ -54,7 +54,7 @@ function SidebarShell({
           onClick={onClose}
         />
       )}
-      <aside className={`hrms-sidebar ${isHrWorkspace ? 'hrms-sidebar--hr' : ''} fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 transform flex-col overflow-hidden shadow-2xl transition-transform duration-200 ease-in-out lg:static lg:z-auto lg:translate-x-0 lg:shadow-none ${
+      <aside className={`hrms-sidebar ${isHrWorkspace ? 'hrms-sidebar--hr' : ''} fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 transform flex-col overflow-hidden shadow-2xl transition-transform duration-200 ease-in-out lg:sticky lg:top-0 lg:h-full lg:z-auto lg:translate-x-0 lg:shadow-none ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className={`hrms-sidebar__brand flex shrink-0 items-center border-b ${
