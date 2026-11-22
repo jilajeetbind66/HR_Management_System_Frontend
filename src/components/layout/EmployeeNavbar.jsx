@@ -116,6 +116,8 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       navigateTo('announcements');
     } else if (eventKey.startsWith('performance.')) {
       navigateTo('performance');
+    } else if (eventKey.startsWith('lifecycle.')) {
+      navigateTo('lifecycle');
     } else if (eventKey.startsWith('helpdesk.')) {
       navigateTo('helpdesk');
     } else if (eventKey.startsWith('lead.')) {
@@ -305,9 +307,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
           >
             <Bell className="h-5 w-5" />
-            {(unreadNotifications + announcements.length) > 0 && (
+            {unreadNotifications > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-bold text-white">
-                {unreadNotifications + announcements.length > 9 ? '9+' : unreadNotifications + announcements.length}
+                {unreadNotifications > 9 ? '9+' : unreadNotifications}
               </span>
             )}
           </button>
@@ -327,7 +329,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                     <button
                       type="button"
                       onClick={() => {
-                        markAllNotificationsRead().catch((error) => {
+                        clearAllNotifications().catch((error) => {
                           setNotificationError(error?.data?.message || error.message || 'Unable to mark all as read.');
                         });
                       }}

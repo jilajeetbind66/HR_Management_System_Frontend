@@ -617,7 +617,7 @@ export function HRMSProvider({ children }) {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    // Refresh notification badge when user switches back to this tab
+    // Refresh notification badge when user switches back to this tab or periodically in background
     const handleSync = () => {
       if (document.visibilityState === 'visible') {
         refreshNotifications().catch(() => {});
@@ -626,7 +626,10 @@ export function HRMSProvider({ children }) {
     window.addEventListener('focus', handleSync);
     document.addEventListener('visibilitychange', handleSync);
 
+    const pollInterval = setInterval(handleSync, 15000);
+
     return () => {
+      clearInterval(pollInterval);
       window.removeEventListener('focus', handleSync);
       document.removeEventListener('visibilitychange', handleSync);
     };

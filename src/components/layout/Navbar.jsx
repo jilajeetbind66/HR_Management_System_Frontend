@@ -75,6 +75,8 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
         onNavigate('announcements');
       } else if (eventKey.startsWith('performance.')) {
         onNavigate('performance');
+      } else if (eventKey.startsWith('lifecycle.')) {
+        onNavigate('lifecycle');
       } else if (eventKey.startsWith('helpdesk.')) {
         onNavigate('helpdesk');
       } else {
@@ -286,7 +288,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
                       onClick={async (e) => {
                         e.stopPropagation();
                         try {
-                          await markAllNotificationsRead();
+                          await clearAllNotifications();
                         } catch (err) {
                           setNotificationError(err?.data?.message || err.message || 'Unable to mark all as read.');
                         }
