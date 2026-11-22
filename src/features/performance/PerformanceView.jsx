@@ -673,7 +673,8 @@ export default function PerformanceView() {
                     <div className="rounded-lg border border-slate-100 p-3">
                       <div className="flex items-center justify-between">
                         <p className="flex items-center gap-1 text-xs font-bold text-slate-700">
-                          <Star className="h-3.5 w-3.5 text-amber-500" /> Self-rating
+                          <Star className="h-3.5 w-3.5 text-amber-500" />
+                          {isOwner ? 'Self-rating' : 'Employee Rating'}
                         </p>
                         {isOwner && objective.self_rating != null && (
                           <button
