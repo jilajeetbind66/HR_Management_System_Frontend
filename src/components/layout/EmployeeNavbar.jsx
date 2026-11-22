@@ -63,9 +63,8 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       .slice(0, 5);
   }, [query]);
   const recentAnnouncements = announcements.slice(0, 3);
-  const unreadAnnouncementsCount = announcements.filter((a) => !a.is_read).length;
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
-  const totalUnreadBadge = unreadNotifications + unreadAnnouncementsCount;
+  const totalUnreadBadge = unreadNotifications;
   const today = getIndiaDateString();
   const todayPunch = attendance.find((record) => (
     Number(record.employee_id) === Number(currentUser?.employee_id) && record.date === today
@@ -301,9 +300,13 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               setSearchOpen(false);
               if (nextOpen) {
                 setNotificationError('');
-                refreshNotifications().catch((error) => {
-                  setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
-                });
+                if (unreadNotifications > 0) {
+                  markAllNotificationsRead().catch(() => {});
+                } else {
+                  refreshNotifications().catch((error) => {
+                    setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
+                  });
+                }
               }
             }}
             className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Building, Calendar, CheckCircle2, Eye, Plus, RefreshCw } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
@@ -38,6 +38,23 @@ export default function AnnouncementsView() {
   const [feedback, setFeedback] = useState(null);
   const [busy, setBusy] = useState('');
   const canPublish = ['super_admin', 'hr_admin'].includes(currentUser?.role);
+  const markedRef = useRef(new Set());
+
+  // Auto-mark unread announcements as read upon viewing this page
+  useEffect(() => {
+    if (!Array.isArray(announcements) || !announcements.length) return;
+    const unread = announcements.filter((a) => !a.is_read && !markedRef.current.has(a.id));
+    if (!unread.length) return;
+
+    unread.forEach(async (a) => {
+      markedRef.current.add(a.id);
+      try {
+        await markAnnouncementRead(a.id);
+      } catch (err) {
+        markedRef.current.delete(a.id);
+      }
+    });
+  }, [announcements, markAnnouncementRead]);
 
   // Auto-refresh announcements and read counts every 6 seconds
   useEffect(() => {

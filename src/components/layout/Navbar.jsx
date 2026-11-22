@@ -105,9 +105,8 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     : null;
   const hasPunchedIn = Boolean(todayPunch?.punch_in);
   const isPunchComplete = Boolean(todayPunch?.punch_in && todayPunch?.punch_out);
-  const unreadAnnouncementsCount = (announcements || []).filter((a) => !a.is_read).length;
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
-  const totalUnreadBadge = unreadNotifications + unreadAnnouncementsCount;
+  const totalUnreadBadge = unreadNotifications;
 
   const handlePunch = async () => {
     if (!hasEmployeeProfile || isPunchComplete || isPunching) return;
@@ -255,7 +254,11 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
               if (nextOpen) {
                 setNotificationError('');
                 try {
-                  await refreshNotifications();
+                  if (unreadNotifications > 0) {
+                    markAllNotificationsRead().catch(() => {});
+                  } else {
+                    await refreshNotifications();
+                  }
                 } catch (error) {
                   setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
                 }
