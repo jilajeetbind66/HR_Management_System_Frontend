@@ -674,7 +674,7 @@ export default function PerformanceView() {
                           {objective.self_review_note ? ` · ${objective.self_review_note}` : ''}
                         </p>
                       )}
-                      {isOwner && objective.status === 'approved' && hasCycleEnded && selectedCycle.status === 'open' && (
+                      {isOwner && objective.status === 'approved' && selectedCycle.status === 'open' && (
                         <div className="mt-3 space-y-2">
                           <label className="block text-xs text-slate-600">
                             Rating (1–5)
@@ -728,7 +728,6 @@ export default function PerformanceView() {
                       )}
                       {canReviewThisObjective
                         && objective.status === 'approved'
-                        && hasCycleEnded
                         && selectedCycle.status === 'open'
                         && objective.self_rating != null && (
                           <div className="mt-3 space-y-2">
