@@ -784,6 +784,16 @@ export function HRMSProvider({ children }) {
     return upsertTicket(response.data);
   };
 
+  const refreshTickets = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const response = await api.getTickets();
+      setTickets(responseDataArray(response));
+    } catch {
+      // silent
+    }
+  }, [isAuthenticated]);
+
   const upsertAnnouncement = (announcement) => {
     setAnnouncements((previous) => {
       const exists = previous.some((item) => Number(item.id) === Number(announcement.id));
@@ -939,6 +949,7 @@ export function HRMSProvider({ children }) {
       evaluateCandidate,
       convertCandidate,
       tickets,
+      refreshTickets,
       createTicket,
       addTicketMessage,
       updateTicketStatus,

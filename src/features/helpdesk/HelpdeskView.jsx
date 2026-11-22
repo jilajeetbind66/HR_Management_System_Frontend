@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, Clock, LifeBuoy, MessageSquare, Plus, Send } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { AlertTriangle, CheckCircle2, Clock, LifeBuoy, MessageSquare, Plus, RefreshCw, Send } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
@@ -53,6 +53,7 @@ function statusOptions(ticket) {
 export default function HelpdeskView() {
   const {
     tickets,
+    refreshTickets,
     createTicket,
     addTicketMessage,
     updateTicketStatus,
@@ -72,6 +73,56 @@ export default function HelpdeskView() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [reply, setReply] = useState('');
   const [statusDraft, setStatusDraft] = useState('');
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll conversation to bottom when new messages arrive
+  useEffect(() => {
+    if (selectedTicket?.messages?.length) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [selectedTicket?.messages?.length]);
+
+  // Initial fetch and auto-refresh ticket list every 6 seconds
+  useEffect(() => {
+    if (typeof refreshTickets === 'function') {
+      refreshTickets();
+    }
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible' && typeof refreshTickets === 'function') {
+        refreshTickets();
+      }
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [refreshTickets]);
+
+  // Auto-poll active ticket thread every 3 seconds for live chat sync
+  useEffect(() => {
+    if (!detailsOpen || !selectedTicket?.id) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const response = await api.getTicket(selectedTicket.id);
+        if (response?.data) {
+          setSelectedTicket((prev) => {
+            if (!prev || Number(prev.id) !== Number(response.data.id)) return response.data;
+            const messagesChanged = (prev.messages?.length || 0) !== (response.data.messages?.length || 0);
+            const statusChanged = prev.status !== response.data.status;
+            if (messagesChanged || statusChanged) {
+              if (statusChanged) {
+                setStatusDraft(response.data.status);
+              }
+              return response.data;
+            }
+            return prev;
+          });
+        }
+      } catch {
+        // silent
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [detailsOpen, selectedTicket?.id, api]);
 
   const openTicket = async (ticketId) => {
     setDetailsOpen(true);
@@ -103,6 +154,7 @@ export default function HelpdeskView() {
       setShowCreateModal(false);
       setTicketForm(getEmptyTicket(role));
       setFeedback({ type: 'success', text: 'Support ticket created.' });
+      if (typeof refreshTickets === 'function') refreshTickets();
     } catch (error) {
       setFormError(errorText(error));
     } finally {
@@ -119,6 +171,7 @@ export default function HelpdeskView() {
       const updated = await addTicketMessage(selectedTicket.id, reply.trim());
       setSelectedTicket(updated);
       setReply('');
+      if (typeof refreshTickets === 'function') refreshTickets();
     } catch (error) {
       setDetailsError(errorText(error));
     } finally {
@@ -135,6 +188,7 @@ export default function HelpdeskView() {
       setSelectedTicket(updated);
       setStatusDraft(updated.status);
       setFeedback({ type: 'success', text: `${updated.ticket_code} moved to ${updated.status}.` });
+      if (typeof refreshTickets === 'function') refreshTickets();
     } catch (error) {
       setDetailsError(errorText(error));
     } finally {
@@ -165,17 +219,31 @@ export default function HelpdeskView() {
             Track support requests, communicate in a ticket thread, and monitor priority response deadlines.
           </p>
         </div>
-        <Button
-          variant="primary"
-          icon={Plus}
-          onClick={() => {
-            setTicketForm(getEmptyTicket(role));
-            setFormError('');
-            setShowCreateModal(true);
-          }}
-        >
-          Raise New Ticket
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            icon={RefreshCw}
+            disabled={busy === 'refreshing'}
+            onClick={async () => {
+              setBusy('refreshing');
+              if (typeof refreshTickets === 'function') await refreshTickets();
+              setBusy('');
+            }}
+          >
+            {busy === 'refreshing' ? 'Syncing...' : 'Live Sync'}
+          </Button>
+          <Button
+            variant="primary"
+            icon={Plus}
+            onClick={() => {
+              setTicketForm(getEmptyTicket(role));
+              setFormError('');
+              setShowCreateModal(true);
+            }}
+          >
+            Raise New Ticket
+          </Button>
+        </div>
       </div>
 
       {feedback && (
@@ -412,6 +480,7 @@ export default function HelpdeskView() {
                       <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{message.body}</p>
                     </li>
                   ))}
+                  <div ref={messagesEndRef} />
                 </ol>
               ) : (
                 <p className="text-sm text-slate-500">No replies yet.</p>
