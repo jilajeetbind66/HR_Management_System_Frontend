@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Building2,
@@ -35,6 +36,7 @@ const formatDate = (date) => {
 };
 
 export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
+  const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const {
     announcements,
@@ -83,48 +85,62 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     setProfileOpen(false);
   };
 
-  const handleNotificationClick = async (notification) => {
-    // 1. Delete notification from database and list on click
-    try {
-      await deleteNotification(notification.id);
-    } catch (err) {
-      console.warn('Unable to delete notification:', err);
-      try {
-        await markNotificationRead(notification.id);
-      } catch (_) {}
-    }
+  const handleNotificationClick = (notification) => {
+    // 1. Immediately close dropdown and dismiss notification in background
+    setNotificationsOpen(false);
+    deleteNotification(notification.id).catch(() => {
+      markNotificationRead(notification.id).catch(() => {});
+    });
 
-    // 2. Redirect to exact module
+    // 2. Redirect to exact module instantly via React Router
     const eventKey = notification.event_key || '';
+    let targetPath = '/dashboard';
+    let targetTab = 'dashboard';
+
     if (eventKey.startsWith('attendance.')) {
       if (eventKey.includes('regularization')) {
         window.location.hash = 'regularization';
       }
-      navigateTo('attendance');
+      targetPath = '/attendance';
+      targetTab = 'attendance';
     } else if (eventKey.startsWith('leave.')) {
-      navigateTo('leaves');
+      targetPath = '/leaves';
+      targetTab = 'leaves';
     } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
-      navigateTo('my_projects');
+      targetPath = '/my-projects';
+      targetTab = 'my_projects';
     } else if (eventKey.startsWith('payroll.')) {
-      navigateTo('payslips');
+      targetPath = '/payslips';
+      targetTab = 'payslips';
     } else if (eventKey.startsWith('training.')) {
-      navigateTo('training');
+      targetPath = '/training';
+      targetTab = 'training';
     } else if (eventKey.startsWith('expense.')) {
-      navigateTo('expenses');
+      targetPath = '/expenses';
+      targetTab = 'expenses';
     } else if (eventKey.startsWith('document.')) {
-      navigateTo('documents');
+      targetPath = '/documents';
+      targetTab = 'documents';
     } else if (eventKey.startsWith('announcement.')) {
-      navigateTo('announcements');
+      targetPath = '/announcements';
+      targetTab = 'announcements';
     } else if (eventKey.startsWith('performance.')) {
-      navigateTo('performance');
+      targetPath = '/performance';
+      targetTab = 'performance';
     } else if (eventKey.startsWith('lifecycle.')) {
-      navigateTo('lifecycle');
+      targetPath = '/lifecycle';
+      targetTab = 'lifecycle';
     } else if (eventKey.startsWith('helpdesk.')) {
-      navigateTo('helpdesk');
+      targetPath = '/helpdesk';
+      targetTab = 'helpdesk';
     } else if (eventKey.startsWith('lead.')) {
-      navigateTo('leads');
-    } else {
-      navigateTo('dashboard');
+      targetPath = '/leads';
+      targetTab = 'leads';
+    }
+
+    navigate(targetPath);
+    if (typeof onNavigate === 'function') {
+      onNavigate(targetTab);
     }
   };
 
@@ -300,13 +316,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
               setSearchOpen(false);
               if (nextOpen) {
                 setNotificationError('');
-                if (unreadNotifications > 0) {
-                  markAllNotificationsRead().catch(() => {});
-                } else {
-                  refreshNotifications().catch((error) => {
-                    setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
-                  });
-                }
+                refreshNotifications().catch((error) => {
+                  setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
+                });
               }
             }}
             className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"

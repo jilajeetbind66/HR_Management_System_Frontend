@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import { initialBranches } from '../../data/mockData';
@@ -18,6 +19,7 @@ import { getIndiaDateString } from '../../utils/date';
 import { getCurrentPositionAsync } from '../../utils/geolocation';
 
 export default function Navbar({ onMenuToggle, onNavigate }) {
+  const navigate = useNavigate();
   const { currentUser, activeBranch, setActiveBranch, logout } = useAuth();
   const {
     punchAttendance,
@@ -42,46 +44,63 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [isPunching, setIsPunching] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
-  const handleNotificationClick = async (notification) => {
-    try {
-      await deleteNotification(notification.id);
-    } catch (error) {
-      console.warn('Unable to delete notification:', error);
-      try { await markNotificationRead(notification.id); } catch (_) {}
-    }
+  const handleNotificationClick = (notification) => {
+    // 1. Immediately close dropdown and remove notification
     setShowNotifications(false);
-    if (typeof onNavigate === 'function') {
-      const eventKey = notification.event_key || '';
-      if (eventKey.startsWith('attendance.')) {
-        if (eventKey.includes('regularization')) {
-          window.location.hash = 'regularization';
-        }
-        onNavigate('attendance');
-      } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
-        onNavigate(currentUser?.role === 'employee' ? 'my_projects' : 'projects');
-      } else if (eventKey.startsWith('leave.')) {
-        onNavigate('leaves');
-      } else if (eventKey.startsWith('payroll.')) {
-        onNavigate(['super_admin', 'payroll_admin', 'auditor'].includes(currentUser?.role) ? 'payroll' : 'payslips');
-      } else if (eventKey.startsWith('lead.')) {
-        onNavigate('leads');
-      } else if (eventKey.startsWith('training.')) {
-        onNavigate('training');
-      } else if (eventKey.startsWith('expense.')) {
-        onNavigate('expenses');
-      } else if (eventKey.startsWith('document.')) {
-        onNavigate('documents');
-      } else if (eventKey.startsWith('announcement.')) {
-        onNavigate('announcements');
-      } else if (eventKey.startsWith('performance.')) {
-        onNavigate('performance');
-      } else if (eventKey.startsWith('lifecycle.')) {
-        onNavigate('lifecycle');
-      } else if (eventKey.startsWith('helpdesk.')) {
-        onNavigate('helpdesk');
-      } else {
-        onNavigate('dashboard');
+    deleteNotification(notification.id).catch(() => {
+      markNotificationRead(notification.id).catch(() => {});
+    });
+
+    // 2. Determine target path and tab
+    const eventKey = notification.event_key || '';
+    let targetPath = '/dashboard';
+    let targetTab = 'dashboard';
+
+    if (eventKey.startsWith('attendance.')) {
+      if (eventKey.includes('regularization')) {
+        window.location.hash = 'regularization';
       }
+      targetPath = '/attendance';
+      targetTab = 'attendance';
+    } else if (eventKey.startsWith('project.') || eventKey.startsWith('staffing.')) {
+      targetPath = currentUser?.role === 'employee' ? '/my-projects' : '/projects';
+      targetTab = currentUser?.role === 'employee' ? 'my_projects' : 'projects';
+    } else if (eventKey.startsWith('leave.')) {
+      targetPath = '/leaves';
+      targetTab = 'leaves';
+    } else if (eventKey.startsWith('payroll.')) {
+      targetPath = ['super_admin', 'hr_admin', 'payroll_admin', 'auditor'].includes(currentUser?.role) ? '/payroll' : '/payslips';
+      targetTab = ['super_admin', 'hr_admin', 'payroll_admin', 'auditor'].includes(currentUser?.role) ? 'payroll' : 'payslips';
+    } else if (eventKey.startsWith('lead.')) {
+      targetPath = '/leads';
+      targetTab = 'leads';
+    } else if (eventKey.startsWith('training.')) {
+      targetPath = '/training';
+      targetTab = 'training';
+    } else if (eventKey.startsWith('expense.')) {
+      targetPath = '/expenses';
+      targetTab = 'expenses';
+    } else if (eventKey.startsWith('document.')) {
+      targetPath = '/documents';
+      targetTab = 'documents';
+    } else if (eventKey.startsWith('announcement.')) {
+      targetPath = '/announcements';
+      targetTab = 'announcements';
+    } else if (eventKey.startsWith('performance.')) {
+      targetPath = '/performance';
+      targetTab = 'performance';
+    } else if (eventKey.startsWith('lifecycle.')) {
+      targetPath = '/lifecycle';
+      targetTab = 'lifecycle';
+    } else if (eventKey.startsWith('helpdesk.')) {
+      targetPath = '/helpdesk';
+      targetTab = 'helpdesk';
+    }
+
+    // 3. Navigate instantly via React Router
+    navigate(targetPath);
+    if (typeof onNavigate === 'function') {
+      onNavigate(targetTab);
     }
   };
   const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
@@ -254,11 +273,7 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
               if (nextOpen) {
                 setNotificationError('');
                 try {
-                  if (unreadNotifications > 0) {
-                    markAllNotificationsRead().catch(() => {});
-                  } else {
-                    await refreshNotifications();
-                  }
+                  await refreshNotifications();
                 } catch (error) {
                   setNotificationError(error?.data?.message || error.message || 'Unable to load notifications.');
                 }
