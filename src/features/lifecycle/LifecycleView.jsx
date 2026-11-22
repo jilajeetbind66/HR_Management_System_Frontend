@@ -117,13 +117,13 @@ export default function LifecycleView() {
   );
 
   const activeOffboardings = useMemo(
-    () => cases.filter((c) => c.case_type === 'offboarding' && c.status === 'active'),
+    () => cases.filter((c) => c.case_type === 'offboarding' && c.employee_status !== 'inactive'),
     [cases]
   );
 
   const pendingClearanceTasksCount = useMemo(() => {
     return cases
-      .filter((c) => c.status === 'active')
+      .filter((c) => (c.case_type === 'onboarding' ? c.status === 'active' : c.employee_status !== 'inactive'))
       .flatMap((c) => c.tasks || [])
       .filter((t) => !['completed', 'waived'].includes(t.status)).length;
   }, [cases]);
@@ -131,15 +131,20 @@ export default function LifecycleView() {
   // Exiting employees whose 5 department tasks are all completed/waived, awaiting Owner final sign-off
   const readyForRelievingCases = useMemo(() => {
     return cases.filter((c) => {
-      if (c.case_type !== 'offboarding' || c.status !== 'active') return false;
+      if (c.case_type !== 'offboarding') return false;
+      if (c.employee_status === 'inactive') return false;
       const tasks = c.tasks || [];
       if (tasks.length === 0) return false;
       return tasks.every((t) => ['completed', 'waived'].includes(t.status));
     });
   }, [cases]);
 
-  const activeCount = visibleCases.filter((lifecycleCase) => lifecycleCase.status === 'active').length;
-  const completedCount = visibleCases.filter((lifecycleCase) => lifecycleCase.status === 'completed').length;
+  const activeCount = visibleCases.filter((c) =>
+    c.case_type === 'offboarding' ? c.employee_status !== 'inactive' : c.status === 'active'
+  ).length;
+  const completedCount = visibleCases.filter((c) =>
+    c.case_type === 'offboarding' ? c.employee_status === 'inactive' : c.status === 'completed'
+  ).length;
 
   const changeType = (caseType) => {
     setActiveTab(caseType);
@@ -666,7 +671,7 @@ export default function LifecycleView() {
                 : null;
 
               return (
-                <details key={lifecycleCase.id} className="rounded-lg border border-slate-200 bg-white" open={lifecycleCase.status === 'active'}>
+                <details key={lifecycleCase.id} className="rounded-lg border border-slate-200 bg-white" open={lifecycleCase.status === 'active' || (lifecycleCase.case_type === 'offboarding' && lifecycleCase.employee_status !== 'inactive')}>
                   <summary className="cursor-pointer list-none p-4 hover:bg-slate-50">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -674,11 +679,15 @@ export default function LifecycleView() {
                           <p className="font-semibold text-sm text-slate-800">
                             {lifecycleCase.employee_code} — {lifecycleCase.first_name} {lifecycleCase.last_name}
                           </p>
-                          {lifecycleCase.status === 'active' && allDone && lifecycleCase.case_type === 'offboarding' && (
+                          {allDone && lifecycleCase.case_type === 'offboarding' && lifecycleCase.employee_status !== 'inactive' ? (
                             <Badge variant="warning" size="sm">
                               All Clearances Done · Ready to Relieve
                             </Badge>
-                          )}
+                          ) : lifecycleCase.employee_status === 'inactive' ? (
+                            <Badge variant="neutral" size="sm">
+                              Officially Relieved
+                            </Badge>
+                          ) : null}
                         </div>
                         <p className="mt-1 text-xs text-slate-500">
                           {activeTab === 'onboarding' ? 'Joining' : 'Last working'} date: {displayDate(lifecycleCase.effective_date)}
@@ -687,8 +696,8 @@ export default function LifecycleView() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyle(lifecycleCase.status)}`}>
-                          {lifecycleCase.status}
+                        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusStyle(lifecycleCase.employee_status === 'inactive' ? 'completed' : allDone && lifecycleCase.case_type === 'offboarding' ? 'pending' : lifecycleCase.status)}`}>
+                          {lifecycleCase.employee_status === 'inactive' ? 'relieved' : allDone && lifecycleCase.case_type === 'offboarding' ? 'clearances done' : lifecycleCase.status}
                         </span>
                         <span className="text-xs text-slate-500 font-medium">
                           {closedTasks}/{tasks.length} tasks
@@ -709,8 +718,8 @@ export default function LifecycleView() {
                     </p>
                   )}
 
-                  {/* Super Admin 1-Click Relieving Button inside card if all clearances done */}
-                  {isSuperAdmin && lifecycleCase.status === 'active' && allDone && lifecycleCase.case_type === 'offboarding' && (
+                  {/* Super Admin 1-Click Relieving Button inside card if all clearances done and not relieved yet */}
+                  {isSuperAdmin && allDone && lifecycleCase.case_type === 'offboarding' && lifecycleCase.employee_status !== 'inactive' && (
                     <div className="border-t border-amber-200 bg-amber-50/80 p-3 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-amber-900 font-semibold">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
