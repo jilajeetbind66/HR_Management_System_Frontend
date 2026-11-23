@@ -74,15 +74,27 @@ function buildPrintDocument(payslip) {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>${escapeHtml(payslip.month_name)} Payslip</title>
         <style>
-          body{font:14px Arial,sans-serif;color:#172033;margin:40px auto;max-width:760px}
+          *,*::before,*::after{box-sizing:border-box}
+          body{font:14px Arial,sans-serif;color:#172033;width:100%;max-width:760px;min-width:0;margin:0 auto;padding:24px}
           header{border-bottom:2px solid #172033;margin-bottom:24px;padding-bottom:16px}
           h1{font-size:22px;margin:0 0 6px}p{margin:5px 0;color:#475569}
-          .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:24px 0}
-          table{border-collapse:collapse;width:100%;margin:16px 0}
-          th,td{border-bottom:1px solid #dbe1ea;padding:10px;text-align:left}
-          td{text-align:right;font-variant-numeric:tabular-nums}
+          .meta{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;margin:24px 0}
+          table{border-collapse:collapse;width:100%;margin:16px 0;table-layout:fixed}
+          th,td{border-bottom:1px solid #dbe1ea;padding:10px;text-align:left;overflow-wrap:anywhere}
+          th{width:70%}
+          td{width:30%;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
           .net{background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:16px;font-size:18px;font-weight:700}
-          @media print{body{margin:0;max-width:none}}
+          @media(max-width:600px){
+            body{padding:14px;font-size:13px}
+            header{margin-bottom:18px;padding-bottom:12px}
+            h1{font-size:20px}
+            h2{font-size:16px}
+            .meta{grid-template-columns:minmax(0,1fr);gap:6px;margin:18px 0}
+            table{margin:12px 0}
+            th,td{padding:8px 6px;font-size:12px}
+            .net{padding:12px;font-size:16px}
+          }
+          @media print{body{max-width:none;margin:0;padding:0}}
         </style>
       </head>
       <body>
@@ -106,7 +118,7 @@ function buildPrintDocument(payslip) {
 }
 
 function printPayslip(payslip, onError) {
-  const printWindow = window.open('', '_blank', 'width=800,height=700');
+  const printWindow = window.open('', '_blank');
   if (!printWindow) {
     onError('Allow pop-ups to print or save this payslip as a PDF.');
     return;

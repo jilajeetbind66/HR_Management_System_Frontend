@@ -210,12 +210,12 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
           type="button"
           onClick={onMenuToggle}
           aria-label="Open navigation"
-          className="rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
+          className="shrink-0 rounded-lg p-2 text-slate-500 transition hover:bg-teal-50 hover:text-teal-600 lg:hidden"
         >
         <span className="block h-0.5 w-5 rounded bg-current before:block before:h-0.5 before:w-5 before:-translate-y-1.5 before:rounded before:bg-current after:block after:h-0.5 after:w-5 after:translate-y-1 after:rounded after:bg-current" />
       </button>
 
-      <div className="relative w-full max-w-[460px]">
+      <div className="relative min-w-0 w-full max-w-[460px] flex-1">
         <label htmlFor="employee-dashboard-search" className="sr-only">Search workspace</label>
         <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         {query && (
@@ -267,7 +267,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+      <div className="relative flex shrink-0 items-center gap-2 sm:gap-3">
         <div
           title={`Branch: ${currentUser?.branch_name || 'Not assigned'}`}
           className="hidden max-w-44 items-center gap-1.5 truncate rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[10px] font-medium text-slate-600 lg:flex"
@@ -319,7 +319,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             </div>
           )}
         </div>
-        <div className="relative">
+        <div>
           <button
             type="button"
             aria-label={`Notifications and company updates${unreadNotifications ? ` (${unreadNotifications} unread)` : ''}`}
@@ -346,7 +346,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             )}
           </button>
           {notificationsOpen && (
-            <div className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+            <div className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1.5rem)] max-w-[22rem] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                 <div className="flex items-center gap-1.5">
                   <h2 className="text-xs font-bold text-slate-900">Notifications</h2>
