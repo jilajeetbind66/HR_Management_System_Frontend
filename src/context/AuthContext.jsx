@@ -72,9 +72,9 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (identifier, password, roleType, rememberMe) => {
+  const login = async (identifier, password, roleType, rememberMe = false) => {
     try {
-      const response = await api.login(identifier, password, roleType);
+      const response = await api.login(identifier, password, roleType, rememberMe);
       const { token, user } = response.data;
       setAuthToken(token, rememberMe);
       setCachedUser(user, rememberMe);

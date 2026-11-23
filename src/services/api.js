@@ -131,9 +131,9 @@ function request(endpoint, options = {}) {
 export const api = {
   // Base Health Check
   health: () => request('/health'),
-  login: (identifier, password, roleType) => request('/auth/login', {
+  login: (identifier, password, roleType, remember = false) => request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ identifier, password, role_type: roleType }),
+    body: JSON.stringify({ identifier, password, role_type: roleType, remember }),
   }),
   completeAccountSetup: (email, token, password, passwordConfirmation) => request('/auth/complete-account-setup', {
     method: 'POST',

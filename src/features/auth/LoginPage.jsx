@@ -7,7 +7,9 @@ import {
   Briefcase,
   Building2,
   CalendarDays,
+  Check,
   CheckCircle2,
+  Copy,
   Eye,
   EyeOff,
   KeyRound,
@@ -38,26 +40,35 @@ const features = [
   { label: 'Reports & Analytics', icon: BarChart3 },
 ];
 
-const hrContactEmail = 'hr@pinweb.in';
+const hrContactEmail = import.meta.env.VITE_HR_CONTACT_EMAIL || 'jilajeetbind7765@gmail.com';
 const hrContactHref = `mailto:${hrContactEmail}?subject=${encodeURIComponent('Request HRMS access')}&body=${encodeURIComponent(
   'Hello HR Department,\n\nI need help with HRMS account access.\n\nName:\nWork email or employee code:\n\nPlease do not include any password.'
 )}`;
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(() => localStorage.getItem('hrms_remembered_identifier') || '');
   const [password, setPassword] = useState('');
   const [roleType, setRoleType] = useState('hr');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem('hrms_remember_me') === 'true' || localStorage.getItem('hrms_remembered_identifier')));
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [forgotError, setForgotError] = useState('');
+
+  const handleCopyEmail = () => {
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(hrContactEmail);
+    }
+    setCopiedEmail(true);
+    setTimeout(() => setCopiedEmail(false), 2500);
+  };
 
   const handleOpenForgotModal = () => {
     setForgotEmail(identifier ? identifier.trim() : '');
@@ -94,7 +105,15 @@ export default function LoginPage() {
 
     try {
       const result = await login(identifier.trim(), password, roleType, rememberMe);
-      if (!result.success) {
+      if (result.success) {
+        if (rememberMe) {
+          localStorage.setItem('hrms_remembered_identifier', identifier.trim());
+          localStorage.setItem('hrms_remember_me', 'true');
+        } else {
+          localStorage.removeItem('hrms_remembered_identifier');
+          localStorage.removeItem('hrms_remember_me');
+        }
+      } else {
         setErrorMessage(result.message || 'Sign-in failed. Check your credentials and account type.');
       }
     } finally {
@@ -288,7 +307,14 @@ export default function LoginPage() {
               </button>
             </p>
             <p className="hrms-login-footer mt-3 text-center text-xs text-slate-400 lg:mt-1">
-              © 2026 Pinweb Private Limited. All rights reserved.
+              <a
+                href="https://pinweb.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition hover:text-green-700 hover:underline"
+              >
+                &copy; 2026 Pinweb Private Limited. All rights reserved.
+              </a>
             </p>
           </div>
         </section>
@@ -378,18 +404,33 @@ export default function LoginPage() {
         subtitle="New employee accounts are provisioned by HR"
       >
         <div className="space-y-4 text-xs">
-          <p className="text-slate-600">
-            HR will create your employee record and linked login account, then send a one-time password setup link to your work email.
-            Use that link to create your password, then sign in with your work email or employee code.
+          <p className="text-slate-600 leading-relaxed">
+            Corporate accounts are provisioned by the HR Department. HR will create your employee profile and dispatch a one-time password setup link to your email.
           </p>
+
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
+            <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider block">Official HR Contact Email:</span>
+            <div className="flex items-center justify-between gap-2 bg-white rounded-lg border border-emerald-200 px-3 py-2">
+              <span className="font-semibold text-slate-800 text-xs select-all">{hrContactEmail}</span>
+              <button
+                type="button"
+                onClick={handleCopyEmail}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-100/70 hover:bg-emerald-100 px-2 py-1 rounded transition"
+              >
+                {copiedEmail ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : <Copy className="h-3.5 w-3.5" />}
+                <span>{copiedEmail ? 'Copied!' : 'Copy Email'}</span>
+              </button>
+            </div>
+          </div>
+
           <a
             href={hrContactHref}
-            className="flex items-center justify-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800 transition hover:bg-green-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-600"
+            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-700 to-green-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-emerald-700/20 hover:from-emerald-800 hover:to-green-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
           >
             <Mail className="h-4 w-4" />
-            Email HR Department ({hrContactEmail})
+            Send Email via Mail App
           </a>
-          <p className="text-center text-[11px] text-slate-500">Do not include your password in the email.</p>
+          <p className="text-center text-[11px] text-slate-500">Please do not include passwords or sensitive personal documents in the request.</p>
           <div className="flex justify-end border-t border-slate-100 pt-2">
             <Button variant="secondary" onClick={() => setShowHelpModal(false)}>Close</Button>
           </div>
