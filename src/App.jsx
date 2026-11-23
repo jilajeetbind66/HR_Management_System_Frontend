@@ -28,6 +28,7 @@ import RoleDashboard from './features/dashboard/RoleDashboard';
 import { canAccessModule, hasRolePermission } from './config/roleAccess';
 import EmailChangeVerificationPage from './features/account/EmailChangeVerificationPage';
 import EmployeeAccountSetupPage from './features/account/EmployeeAccountSetupPage';
+import ResetPasswordPage from './features/auth/ResetPasswordPage';
 
 const EmployeesView = lazy(() => import('./features/employees/EmployeesView'));
 const LeadManagementView = lazy(() => import('./features/leads/LeadManagementView'));
@@ -76,7 +77,8 @@ function MainApp() {
   const currentPath = normalizePathname(pathname);
   const isEmailChangeVerification = currentPath === '/verify-email-change';
   const isEmployeeAccountSetup = currentPath === '/setup-password';
-  const isPublicAccountAction = isEmailChangeVerification || isEmployeeAccountSetup;
+  const isResetPassword = currentPath === '/reset-password';
+  const isPublicAccountAction = isEmailChangeVerification || isEmployeeAccountSetup || isResetPassword;
   const activeTab = currentPath === '/employees/create'
     ? 'employees'
     : ROUTE_TABS[currentPath] || 'dashboard';
@@ -120,6 +122,10 @@ function MainApp() {
 
   if (isEmployeeAccountSetup) {
     return <EmployeeAccountSetupPage />;
+  }
+
+  if (isResetPassword) {
+    return <ResetPasswordPage />;
   }
 
   if (isLoading) {

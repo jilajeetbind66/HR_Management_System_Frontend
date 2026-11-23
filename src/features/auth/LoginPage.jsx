@@ -7,9 +7,11 @@ import {
   Briefcase,
   Building2,
   CalendarDays,
+  CheckCircle2,
   Eye,
   EyeOff,
   KeyRound,
+  LoaderCircle,
   Lock,
   Mail,
   ShieldCheck,
@@ -19,6 +21,7 @@ import {
 } from 'lucide-react';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
+import api from '../../services/api';
 
 const roleChoices = [
   { id: 'employee', label: 'Employee', icon: UserRound },
@@ -51,6 +54,38 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotError, setForgotError] = useState('');
+
+  const handleOpenForgotModal = () => {
+    setForgotEmail(identifier ? identifier.trim() : '');
+    setForgotMessage('');
+    setForgotError('');
+    setShowForgotModal(true);
+  };
+
+  const handleForgotSubmit = async (event) => {
+    event.preventDefault();
+    setForgotError('');
+    setForgotMessage('');
+
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your work email or employee code.');
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await api.forgotPassword(forgotEmail.trim());
+      setForgotMessage(response?.message || 'A password reset link has been sent to your email.');
+    } catch (err) {
+      setForgotError(err?.message || 'Could not send reset link. Please verify your email or contact HR.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -224,7 +259,7 @@ export default function LoginPage() {
                 </label>
                 <button
                   type="button"
-                  onClick={() => setShowForgotModal(true)}
+                  onClick={handleOpenForgotModal}
                   className="text-sm font-semibold text-green-700 hover:text-green-800 hover:underline lg:text-xs"
                 >
                   Forgot Password?
@@ -263,13 +298,76 @@ export default function LoginPage() {
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
         title="Reset Corporate Password"
-        subtitle="Password recovery"
+        subtitle="Password recovery via Brevo SMTP"
       >
         <div className="space-y-4 text-xs">
-          <p className="text-slate-600">Password recovery is not configured yet. Contact your HR administrator to reset your account.</p>
-          <div className="flex justify-end border-t border-slate-100 pt-2">
-            <Button variant="secondary" onClick={() => setShowForgotModal(false)}>Close</Button>
-          </div>
+          {forgotMessage ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-emerald-950 text-sm">Reset Link Sent</h4>
+                    <p className="mt-1 text-emerald-800 text-xs leading-relaxed">
+                      {forgotMessage}
+                    </p>
+                    <p className="mt-2 text-emerald-700 text-[11px]">
+                      Please check your inbox (and spam/junk folder) for the password reset email. The link is valid for 60 minutes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button variant="primary" onClick={() => setShowForgotModal(false)}>Back to Sign In</Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotSubmit} className="space-y-4">
+              <p className="text-slate-600 leading-relaxed">
+                Enter your registered corporate email address (or employee code). We will send a secure one-time link to reset your password.
+              </p>
+
+              {forgotError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-800 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{forgotError}</span>
+                </div>
+              )}
+
+              <label className="block text-xs font-semibold text-slate-700">
+                Work Email or Employee Code
+                <div className="relative mt-1.5">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="e.g. employee@pinweb.in or EMP-001"
+                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3 text-xs text-slate-900 shadow-sm outline-none transition focus:border-green-600 focus:ring-2 focus:ring-green-100"
+                  />
+                </div>
+              </label>
+
+              <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
+                <Button type="button" variant="secondary" onClick={() => setShowForgotModal(false)} disabled={forgotLoading}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={forgotLoading} className="flex items-center gap-1.5">
+                  {forgotLoading ? (
+                    <>
+                      <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                      <span>Sending...</span>
+                    </>
+                  ) : (
+                    <span>Send Reset Link</span>
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </Modal>
 

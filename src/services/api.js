@@ -144,6 +144,19 @@ export const api = {
       password_confirmation: passwordConfirmation,
     }),
   }),
+  forgotPassword: (email) => request('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  }),
+  resetPassword: (email, token, password, passwordConfirmation) => request('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({
+      email,
+      token,
+      password,
+      password_confirmation: passwordConfirmation,
+    }),
+  }),
   currentUser: () => request('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getNotifications: () => request('/notifications'),
