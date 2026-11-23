@@ -149,11 +149,13 @@ export default function EmployeesView() {
 
   const canManageEmployees = hasPermission('employees.manage');
   const canEditHierarchy = ['super_admin', 'hr_admin'].includes(currentUser?.role);
-  const canArchiveSelectedEmployee = currentUser?.role === 'super_admin'
+  const canArchiveSelectedEmployee = (
+    currentUser?.role === 'super_admin'
     || (
       currentUser?.role === 'hr_admin'
       && (!selectedEmployee?.role || ['employee', 'manager', 'hr_executive', 'recruiter'].includes(selectedEmployee.role))
-    );
+    )
+  ) && selectedEmployee?.status === 'active' && !selectedEmployee?.deleted_at;
   const assignableRoles = getAssignableUserRoles(currentUser?.role);
   const profileRoleOptions = selectedEmployee?.role && !assignableRoles.some((role) => role.value === selectedEmployee.role)
     ? [...assignableRoles, { value: selectedEmployee.role, label: userRoleLabels[selectedEmployee.role] || selectedEmployee.role }]
@@ -477,7 +479,12 @@ export default function EmployeesView() {
       const response = await api.getEmployeeArchiveImpact(selectedEmployee.id);
       setArchiveImpact(response?.data || null);
     } catch (error) {
-      setHierarchyError(error?.data?.message || error.message || 'Could not load employee dependencies.');
+      const errMsg = error?.data?.message || error.message;
+      setHierarchyError(
+        errMsg === 'Failed to fetch'
+          ? 'Network or server error while connecting to the API. Please ensure the backend server is running.'
+          : (errMsg || 'Could not load employee dependencies.')
+      );
     } finally {
       setIsLoadingArchiveImpact(false);
     }
