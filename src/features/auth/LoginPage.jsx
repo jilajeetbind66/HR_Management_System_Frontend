@@ -41,7 +41,7 @@ const features = [
   { label: 'Reports & Analytics', icon: BarChart3 },
 ];
 
-const hrContactEmail = import.meta.env.VITE_HR_CONTACT_EMAIL || 'jilajeetbind7765@gmail.com';
+const hrContactEmail = import.meta.env.VITE_HR_CONTACT_EMAIL || 'khansania2200@gmail.com';
 const hrContactHref = `mailto:${hrContactEmail}?subject=${encodeURIComponent('Request HRMS access')}&body=${encodeURIComponent(
   'Hello HR Department,\n\nI need help with HRMS account access.\n\nName:\nWork email or employee code:\n\nPlease do not include any password.'
 )}`;
