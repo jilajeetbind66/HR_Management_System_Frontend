@@ -78,7 +78,7 @@ export default function RoleDashboard({ onNavigate }) {
     branches,
     announcements,
   } = useHRMS();
-  const role = currentUser.role;
+  const role = currentUser?.role;
   if (role === 'employee') {
     return <EmployeeDashboard onNavigate={onNavigate} />;
   }

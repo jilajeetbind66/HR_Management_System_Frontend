@@ -214,11 +214,11 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
   const { currentUser, activeBranch, setActiveBranch, logout } = useAuth();
   const { projects, myProjects, leaveRequests, branches } = useHRMS();
   const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
-  const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser.role);
-  const isManagerWorkspace = currentUser.role === 'manager';
-  const isAdminWorkspace = currentUser.role === 'super_admin';
+  const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser?.role);
+  const isManagerWorkspace = currentUser?.role === 'manager';
+  const isAdminWorkspace = currentUser?.role === 'super_admin';
   const isNavyWorkspace = isManagerWorkspace || isAdminWorkspace;
-  const isEmployeeWorkspace = currentUser.role === 'employee';
+  const isEmployeeWorkspace = currentUser?.role === 'employee';
 
   // Calculate pending counts
   const activeProjectCount = myProjects.filter((project) => project.status !== 'completed').length;

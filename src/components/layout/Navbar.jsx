@@ -104,9 +104,9 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     }
   };
   const availableBranches = Array.isArray(branches) && branches.length > 0 ? branches : initialBranches;
-  const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser.role);
-  const isManagerWorkspace = currentUser.role === 'manager';
-  const isAdminWorkspace = currentUser.role === 'super_admin';
+  const isHrWorkspace = ['hr_admin', 'hr_executive', 'recruiter'].includes(currentUser?.role);
+  const isManagerWorkspace = currentUser?.role === 'manager';
+  const isAdminWorkspace = currentUser?.role === 'super_admin';
   const isNavyWorkspace = isManagerWorkspace || isAdminWorkspace;
   const initials = `${currentUser?.first_name?.[0] || ''}${currentUser?.last_name?.[0] || ''}`.toUpperCase()
     || currentUser?.name?.slice(0, 2).toUpperCase()
