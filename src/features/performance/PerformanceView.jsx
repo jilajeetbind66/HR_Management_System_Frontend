@@ -129,6 +129,10 @@ export default function PerformanceView() {
     (total, objective) => total + Number(objective.weight_percent || 0),
     0
   );
+  const otherObjectivesWeight = ownCycleObjectives
+    .filter((objective) => objective.id !== editingObjectiveId)
+    .reduce((total, objective) => total + Number(objective.weight_percent || 0), 0);
+  const remainingWeight = Math.max(0, Math.round((100 - otherObjectivesWeight) * 100) / 100);
   const canSubmitOwnGoals = isGoalWindowOpen
     && editableOwnGoals.length > 0
     && Math.abs(ownWeightTotal - 100) < 0.001;
@@ -173,10 +177,24 @@ export default function PerformanceView() {
 
   const saveObjective = (event) => {
     event.preventDefault();
+    const weightVal = Number(objectiveForm.weight_percent);
+    if (isNaN(weightVal) || weightVal <= 0 || weightVal > 100) {
+      setFeedback({ type: 'error', text: 'Weight must be greater than 0% and at most 100%.' });
+      return;
+    }
+    const projectedTotal = Math.round((otherObjectivesWeight + weightVal) * 100) / 100;
+    if (projectedTotal > 100.0) {
+      setFeedback({
+        type: 'error',
+        text: `Total objective weights cannot exceed 100% for this cycle. Remaining available weight is ${remainingWeight.toFixed(2)}%.`,
+      });
+      return;
+    }
+
     const payload = {
       title: objectiveForm.title.trim(),
       description: objectiveForm.description.trim() || null,
-      weight_percent: Number(objectiveForm.weight_percent),
+      weight_percent: weightVal,
       key_results: objectiveForm.key_result_titles
         .map((title) => title.trim())
         .filter(Boolean)
@@ -412,12 +430,29 @@ export default function PerformanceView() {
                   required
                   type="number"
                   min="0.01"
-                  max="100"
+                  max={remainingWeight > 0 ? remainingWeight : 100}
                   step="0.01"
                   value={objectiveForm.weight_percent}
-                  onChange={(event) => updateObjectiveForm('weight_percent', event.target.value)}
+                  onChange={(event) => {
+                    const raw = event.target.value;
+                    if (raw === '') {
+                      updateObjectiveForm('weight_percent', '');
+                      return;
+                    }
+                    const num = Number(raw);
+                    if (num > 100) {
+                      updateObjectiveForm('weight_percent', 100);
+                    } else if (num < 0) {
+                      updateObjectiveForm('weight_percent', 0);
+                    } else {
+                      updateObjectiveForm('weight_percent', raw);
+                    }
+                  }}
                   className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 />
+                <span className="mt-1 block text-[11px] font-normal text-slate-500">
+                  Remaining available: <strong>{remainingWeight.toFixed(2)}%</strong> (Max: 100%)
+                </span>
               </label>
             </div>
             <label className="block text-xs font-semibold text-slate-700">
@@ -501,8 +536,14 @@ export default function PerformanceView() {
             <div className="mt-5 border-t border-slate-100 pt-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-xs text-slate-600">
-                  Current weight total: <strong>{ownWeightTotal.toFixed(2)}%</strong>
-                  {Math.abs(ownWeightTotal - 100) >= 0.001 && ' — must equal 100% to submit'}
+                  Current weight total: <strong className={ownWeightTotal > 100 ? 'text-rose-600' : 'text-slate-900'}>{ownWeightTotal.toFixed(2)}%</strong>
+                  {Math.abs(ownWeightTotal - 100) >= 0.001 && (
+                    <span className={ownWeightTotal > 100 ? 'font-semibold text-rose-600' : 'text-amber-700'}>
+                      {ownWeightTotal > 100
+                        ? ` — Exceeds 100% by ${(ownWeightTotal - 100).toFixed(2)}% (must equal 100% to submit)`
+                        : ` — ${(100 - ownWeightTotal).toFixed(2)}% remaining (must equal 100% to submit)`}
+                    </span>
+                  )}
                 </p>
                 {!hasSubmittedGoals && (
                   <Button

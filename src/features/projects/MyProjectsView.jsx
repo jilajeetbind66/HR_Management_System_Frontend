@@ -71,11 +71,23 @@ export default function MyProjectsView() {
     event.preventDefault();
     if (!selectedProject || !action) return;
     setActionError('');
+
+    if (action === 'progress') {
+      const currentBaseline = Number(selectedProject?.progress_percent) || 0;
+      const parsed = Number(progressPercent);
+      if (isNaN(parsed) || parsed < currentBaseline || parsed > 100) {
+        setActionError(`Progress must be between current baseline (${currentBaseline}%) and 100%.`);
+        return;
+      }
+    }
+
     setSubmitting(true);
 
     try {
       if (action === 'progress') {
-        await updateProjectProgress(selectedProject.id, Number(progressPercent), progressNote);
+        const currentBaseline = Number(selectedProject?.progress_percent) || 0;
+        const validPercent = Math.min(100, Math.max(currentBaseline, Number(progressPercent) || 0));
+        await updateProjectProgress(selectedProject.id, validPercent, progressNote);
       } else if (action === 'extension') {
         await requestExtension(selectedProject.id, requestedDueDate, extensionReason);
       } else {
@@ -283,25 +295,61 @@ export default function MyProjectsView() {
         <form onSubmit={handleActionSubmit} className="space-y-4">
           {action === 'progress' && (
             <>
-              <label className="block text-sm font-medium text-slate-700">
-                Progress percentage
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  required
-                  value={progressPercent}
-                  onChange={(event) => setProgressPercent(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
-                />
-              </label>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-sm font-medium text-slate-700">
+                  <span>Progress percentage</span>
+                  <span className="font-bold text-teal-600">{progressPercent === '' ? 0 : progressPercent}%</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={Number(selectedProject?.progress_percent) || 0}
+                    max="100"
+                    step="1"
+                    value={progressPercent === '' ? (Number(selectedProject?.progress_percent) || 0) : Number(progressPercent)}
+                    onChange={(event) => setProgressPercent(Number(event.target.value))}
+                    className="flex-1 accent-teal-600 cursor-pointer"
+                  />
+                  <div className="relative w-24">
+                    <input
+                      type="number"
+                      min={Number(selectedProject?.progress_percent) || 0}
+                      max="100"
+                      required
+                      value={progressPercent}
+                      onChange={(event) => {
+                        const raw = event.target.value;
+                        if (raw === '') {
+                          setProgressPercent('');
+                          return;
+                        }
+                        const num = Number(raw);
+                        if (num > 100) {
+                          setProgressPercent(100);
+                        } else if (num < 0) {
+                          setProgressPercent(0);
+                        } else {
+                          setProgressPercent(num);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-center text-sm font-semibold text-slate-800 focus:border-teal-500 focus:outline-none"
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 flex justify-between text-[11px] text-slate-500">
+                  <span>Current baseline: {selectedProject?.progress_percent || 0}%</span>
+                  <span>Target: 100% (cannot exceed 100%)</span>
+                </div>
+              </div>
               <label className="block text-sm font-medium text-slate-700">
                 Progress note
                 <textarea
                   required
                   value={progressNote}
                   onChange={(event) => setProgressNote(event.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2"
+                  placeholder="Describe progress, updates, deliverables or milestone status..."
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
                   rows="3"
                 />
               </label>
