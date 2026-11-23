@@ -148,6 +148,10 @@ export const api = {
     method: 'POST',
     body: JSON.stringify({ email }),
   }),
+  contactHr: (payload) => request('/auth/contact-hr', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
   resetPassword: (email, token, password, passwordConfirmation) => request('/auth/reset-password', {
     method: 'POST',
     body: JSON.stringify({

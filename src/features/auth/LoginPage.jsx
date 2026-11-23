@@ -16,6 +16,7 @@ import {
   LoaderCircle,
   Lock,
   Mail,
+  Send,
   ShieldCheck,
   TrendingUp,
   UserRound,
@@ -61,6 +62,54 @@ export default function LoginPage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [forgotError, setForgotError] = useState('');
+
+  // Contact HR Modal State
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactEmployeeCode, setContactEmployeeCode] = useState('');
+  const [contactMessage, setContactMessage] = useState('Hello HR, I need access to Pinweb HRMS. Please provide my login credentials or setup link.');
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactSuccess, setContactSuccess] = useState('');
+  const [contactError, setContactError] = useState('');
+
+  const handleOpenHelpModal = () => {
+    if (identifier) {
+      if (identifier.includes('@')) {
+        setContactEmail(identifier.trim());
+      } else {
+        setContactEmployeeCode(identifier.trim());
+      }
+    }
+    setContactError('');
+    setContactSuccess('');
+    setShowHelpModal(true);
+  };
+
+  const handleContactHrSubmit = async (event) => {
+    event.preventDefault();
+    setContactError('');
+    setContactSuccess('');
+
+    if (!contactName.trim() || !contactEmail.trim() || !contactMessage.trim()) {
+      setContactError('Please complete all required fields.');
+      return;
+    }
+
+    setContactLoading(true);
+    try {
+      const response = await api.contactHr({
+        name: contactName.trim(),
+        email: contactEmail.trim(),
+        employee_code: contactEmployeeCode.trim() || null,
+        message: contactMessage.trim(),
+      });
+      setContactSuccess(response?.message || 'Your access request has been sent directly to the HR Department.');
+    } catch (err) {
+      setContactError(err?.message || 'Failed to dispatch email. Please try again or copy HR email directly.');
+    } finally {
+      setContactLoading(false);
+    }
+  };
 
   const handleCopyEmail = () => {
     if (navigator?.clipboard?.writeText) {
@@ -300,7 +349,7 @@ export default function LoginPage() {
               Don&apos;t have an account?{' '}
               <button
                 type="button"
-                onClick={() => setShowHelpModal(true)}
+                onClick={handleOpenHelpModal}
                 className="font-semibold text-green-700 hover:text-green-800 hover:underline"
               >
                 Contact HR Department
@@ -401,39 +450,158 @@ export default function LoginPage() {
         isOpen={showHelpModal}
         onClose={() => setShowHelpModal(false)}
         title="Request HRMS Access"
-        subtitle="New employee accounts are provisioned by HR"
+        subtitle="Send your access request directly to the HR Department"
       >
         <div className="space-y-4 text-xs">
-          <p className="text-slate-600 leading-relaxed">
-            Corporate accounts are provisioned by the HR Department. HR will create your employee profile and dispatch a one-time password setup link to your email.
-          </p>
-
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 space-y-2">
-            <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider block">Official HR Contact Email:</span>
-            <div className="flex items-center justify-between gap-2 bg-white rounded-lg border border-emerald-200 px-3 py-2">
-              <span className="font-semibold text-slate-800 text-xs select-all">{hrContactEmail}</span>
-              <button
-                type="button"
-                onClick={handleCopyEmail}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-100/70 hover:bg-emerald-100 px-2 py-1 rounded transition"
-              >
-                {copiedEmail ? <Check className="h-3.5 w-3.5 text-emerald-700" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copiedEmail ? 'Copied!' : 'Copy Email'}</span>
-              </button>
+          {contactSuccess ? (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-emerald-950 text-sm">Request Dispatched to HR!</h4>
+                    <p className="mt-1 text-emerald-800 text-xs leading-relaxed">
+                      {contactSuccess}
+                    </p>
+                    <p className="mt-2 text-emerald-700 text-[11px]">
+                      HR (<strong>{hrContactEmail}</strong>) has received your request and will follow up with your account setup details.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    setShowHelpModal(false);
+                    setContactSuccess('');
+                  }}
+                >
+                  Back to Sign In
+                </Button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <form onSubmit={handleContactHrSubmit} className="space-y-3">
+              <p className="text-slate-600 leading-relaxed">
+                Fill out the form below to dispatch an email directly to the HR Department. HR will review your profile and generate your setup credentials.
+              </p>
 
-          <a
-            href={hrContactHref}
-            className="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-700 to-green-600 px-4 py-3 text-sm font-bold text-white shadow-md shadow-emerald-700/20 hover:from-emerald-800 hover:to-green-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-          >
-            <Mail className="h-4 w-4" />
-            Send Email via Mail App
-          </a>
-          <p className="text-center text-[11px] text-slate-500">Please do not include passwords or sensitive personal documents in the request.</p>
-          <div className="flex justify-end border-t border-slate-100 pt-2">
-            <Button variant="secondary" onClick={() => setShowHelpModal(false)}>Close</Button>
-          </div>
+              {contactError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <span>{contactError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="e.g. Jila Jeet"
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Your Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="name@example.com"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-semibold mb-1">
+                    Employee Code or Phone
+                  </label>
+                  <input
+                    type="text"
+                    value={contactEmployeeCode}
+                    onChange={(e) => setContactEmployeeCode(e.target.value)}
+                    placeholder="EMP-XXX or Phone (optional)"
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Message / Request Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={contactMessage}
+                  onChange={(e) => setContactMessage(e.target.value)}
+                  placeholder="Describe your request..."
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-green-600 focus:outline-none focus:ring-1 focus:ring-green-600 resize-none"
+                />
+              </div>
+
+              {/* Official HR Contact Info */}
+              <div className="flex items-center justify-between gap-2 bg-emerald-50/70 border border-emerald-200/80 rounded-xl px-3 py-2">
+                <span className="text-[11px] text-slate-600">
+                  Target Recipient: <strong className="text-emerald-950">{hrContactEmail}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyEmail}
+                  className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-800 bg-white border border-emerald-200 px-2 py-0.5 rounded-lg transition"
+                >
+                  {copiedEmail ? <Check className="h-3 w-3 text-emerald-700" /> : <Copy className="h-3 w-3" />}
+                  <span>{copiedEmail ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <a
+                  href={hrContactHref}
+                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-slate-800 hover:underline"
+                  title="Open external mail client"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  <span>Open Mail App instead</span>
+                </a>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary" type="button" onClick={() => setShowHelpModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={contactLoading}
+                    className="flex items-center gap-1.5 bg-emerald-700 hover:bg-emerald-800 font-semibold"
+                  >
+                    {contactLoading ? (
+                      <>
+                        <LoaderCircle className="h-4 w-4 animate-spin" />
+                        <span>Sending Email...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Send className="h-4 w-4" />
+                        <span>Send Email to HR</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
         </div>
       </Modal>
     </main>
