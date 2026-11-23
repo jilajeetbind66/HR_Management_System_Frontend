@@ -48,6 +48,7 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     markAllNotificationsRead,
     clearAllNotifications,
     deleteNotification,
+    markAnnouncementRead,
   } = useHRMS();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -64,9 +65,12 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
       .filter((link) => link.label.toLowerCase().includes(normalizedQuery))
       .slice(0, 5);
   }, [query]);
-  const recentAnnouncements = announcements.slice(0, 3);
+  const unreadAnnouncements = useMemo(() => {
+    return (announcements || []).filter((a) => !a.is_read);
+  }, [announcements]);
+  const recentAnnouncements = unreadAnnouncements.slice(0, 5);
   const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
-  const totalUnreadBadge = unreadNotifications;
+  const totalUnreadBadge = unreadNotifications + unreadAnnouncements.length;
   const today = getIndiaDateString();
   const todayPunch = attendance.find((record) => (
     Number(record.employee_id) === Number(currentUser?.employee_id) && record.date === today
@@ -142,6 +146,17 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     if (typeof onNavigate === 'function') {
       onNavigate(targetTab);
     }
+  };
+
+  const handleAnnouncementClick = async (announcement) => {
+    try {
+      if (!announcement.is_read && typeof markAnnouncementRead === 'function') {
+        await markAnnouncementRead(announcement.id);
+      }
+    } catch (err) {
+      console.warn('Failed to mark announcement as read:', err);
+    }
+    navigateTo('announcements');
   };
 
   const handleLogout = async () => {
@@ -342,25 +357,33 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                   )}
                 </div>
                 <div className="flex items-center gap-2.5">
-                  {unreadNotifications > 0 && (
+                  {totalUnreadBadge > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
-                        clearAllNotifications().catch((error) => {
+                      onClick={async () => {
+                        try {
+                          await clearAllNotifications();
+                          if (unreadAnnouncements.length > 0 && typeof markAnnouncementRead === 'function') {
+                            await Promise.all(unreadAnnouncements.map((a) => markAnnouncementRead(a.id)));
+                          }
+                        } catch (error) {
                           setNotificationError(error?.data?.message || error.message || 'Unable to mark all as read.');
-                        });
+                        }
                       }}
                       className="text-[10px] font-semibold text-teal-700 hover:text-teal-800 hover:underline"
                     >
                       Mark read
                     </button>
                   )}
-                  {notifications.length > 0 && (
+                  {(notifications.length > 0 || unreadAnnouncements.length > 0) && (
                     <button
                       type="button"
                       onClick={async () => {
                         try {
                           await clearAllNotifications();
+                          if (unreadAnnouncements.length > 0 && typeof markAnnouncementRead === 'function') {
+                            await Promise.all(unreadAnnouncements.map((a) => markAnnouncementRead(a.id)));
+                          }
                         } catch (error) {
                           setNotificationError(error?.data?.message || error.message || 'Unable to clear notifications.');
                         }
@@ -422,28 +445,70 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
                 ) : null}
               </section>
               <section aria-label="Company updates" className="border-t border-slate-100">
-                <h3 className="px-4 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  Company updates
-                </h3>
-              {recentAnnouncements.length ? (
-                <div className="divide-y divide-slate-100">
-                  {recentAnnouncements.map((announcement) => (
+                <div className="flex items-center justify-between px-4 pb-1 pt-3">
+                  <h3 className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                    Company updates {unreadAnnouncements.length > 0 ? `(${unreadAnnouncements.length})` : ''}
+                  </h3>
+                  {unreadAnnouncements.length > 0 && (
                     <button
                       type="button"
-                      key={announcement.id}
-                      onClick={() => navigateTo('announcements')}
-                      className="block w-full px-4 py-3 text-left hover:bg-teal-50/60"
+                      onClick={async () => {
+                        try {
+                          await Promise.all(unreadAnnouncements.map((a) => markAnnouncementRead(a.id)));
+                        } catch (err) {
+                          console.warn(err);
+                        }
+                      }}
+                      className="text-[10px] font-semibold text-teal-700 hover:text-teal-800 hover:underline"
                     >
-                      <span className="flex items-start justify-between gap-3">
-                        <span className="line-clamp-1 text-xs font-semibold text-slate-800">{announcement.title}</span>
-                        <span className="shrink-0 text-[10px] text-slate-400">{formatDate(announcement.published_at || announcement.created_at)}</span>
-                      </span>
-                      <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed text-slate-500">{announcement.content}</span>
+                      Mark all read
                     </button>
+                  )}
+                </div>
+              {recentAnnouncements.length ? (
+                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                  {recentAnnouncements.map((announcement) => (
+                    <div
+                      key={announcement.id}
+                      onClick={() => handleAnnouncementClick(announcement)}
+                      className="group flex items-start justify-between gap-2 px-4 py-2.5 text-left transition hover:bg-teal-50/70 cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="line-clamp-1 text-xs font-semibold text-slate-800 group-hover:text-teal-800">
+                            {announcement.title}
+                          </span>
+                          <span className="shrink-0 text-[10px] text-slate-400">
+                            {formatDate(announcement.published_at || announcement.created_at)}
+                          </span>
+                        </div>
+                        <span className="mt-0.5 line-clamp-2 block text-[11px] leading-relaxed text-slate-500">
+                          {announcement.content}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        title="Mark read & remove"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await markAnnouncementRead(announcement.id);
+                          } catch (err) {
+                            console.warn(err);
+                          }
+                        }}
+                        className="shrink-0 p-1 text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 rounded transition mt-0.5"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               ) : (
-                <p role="status" className="px-4 py-6 text-center text-xs text-slate-500">No company updates yet.</p>
+                <div className="px-4 py-5 text-center text-xs text-slate-400">
+                  <p className="font-medium text-slate-600">No new company updates</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">All company updates are read!</p>
+                </div>
               )}
               </section>
             </div>
