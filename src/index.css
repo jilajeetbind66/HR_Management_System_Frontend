@@ -169,8 +169,8 @@ body {
 }
 
 .hrms-login-submit:hover {
-  background-position: 0 0;
   border-color: #0f9488;
+  background-position: 0 0;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -232,6 +232,20 @@ body {
 }
 
 @media (max-width: 1023px) {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 100%;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .hrms-login-page {
+    height: auto !important;
+    min-height: 100dvh;
+  }
+
   .hrms-login-hero::after {
     inset: 15% 0 0 auto;
     z-index: -2;

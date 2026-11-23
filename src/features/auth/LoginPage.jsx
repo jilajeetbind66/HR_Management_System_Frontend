@@ -146,7 +146,7 @@ export default function LoginPage() {
             <h3 className="mt-2 text-center text-xl font-bold text-slate-900 sm:text-2xl lg:mt-1 lg:text-xl">Welcome Back!</h3>
             <p className="mt-2 text-center text-base text-slate-500 lg:mt-1 lg:text-sm">Sign in to your account to continue</p>
 
-            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-1.5 rounded-2xl border border-slate-200 bg-slate-100 p-1 lg:mt-3" role="group" aria-label="Account type">
+            <div className="mt-5 grid grid-cols-4 gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1 lg:mt-3 lg:rounded-2xl" role="group" aria-label="Account type">
               {roleChoices.map(({ id, label, icon: Icon }) => {
                 const selected = roleType === id;
                 return (
@@ -155,7 +155,7 @@ export default function LoginPage() {
                     type="button"
                     aria-pressed={selected}
                     onClick={() => setRoleType(id)}
-                    className={`flex min-h-12 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold transition sm:gap-1.5 sm:px-2 sm:text-sm lg:min-h-11 lg:gap-1 lg:px-1 lg:text-xs ${
+                    className={`flex min-h-12 items-center justify-center gap-1 rounded-xl px-1.5 text-[11px] font-semibold transition sm:gap-1.5 sm:px-2 sm:text-sm lg:min-h-11 lg:gap-1 lg:px-1 lg:text-xs lg:rounded-xl ${
                       selected
                         ? 'bg-gradient-to-r from-green-500 to-green-700 text-white shadow-md shadow-green-700/20'
                         : 'text-slate-600 hover:bg-white hover:text-slate-900'
@@ -186,7 +186,7 @@ export default function LoginPage() {
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
                   placeholder="Email Address / Employee ID"
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-14 pr-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:border-slate-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 lg:h-11 lg:rounded-xl lg:pl-11 lg:pr-3 lg:text-sm"
+                  className="h-14 w-full rounded-xl border border-slate-200 bg-white pl-14 pr-4 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:border-slate-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 lg:h-11 lg:rounded-xl lg:pl-11 lg:pr-3 lg:text-sm"
                 />
               </label>
 
@@ -200,7 +200,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="Password"
-                  className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-14 pr-14 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:border-slate-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 lg:h-11 lg:rounded-xl lg:pl-11 lg:pr-11 lg:text-sm"
+                  className="h-14 w-full rounded-xl border border-slate-200 bg-white pl-14 pr-14 text-base text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 hover:border-slate-300 focus:border-green-500 focus:ring-4 focus:ring-green-100 lg:h-11 lg:rounded-xl lg:pl-11 lg:pr-11 lg:text-sm"
                 />
                 <button
                   type="button"
