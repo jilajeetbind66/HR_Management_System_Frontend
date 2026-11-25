@@ -152,7 +152,6 @@ function EmployeeSidebar({ activeTab, onTabSelect, isOpen, onClose, activeProjec
     { id: 'payslips', icon: Banknote },
     { id: 'my_projects', icon: FolderGit2 },
     ...(currentUser?.has_lead_access ? [{ id: 'leads', icon: TrendingUp }] : []),
-    { id: 'chat', icon: MessageSquare },
     { id: 'performance', icon: BarChart3 },
     { id: 'training', icon: GraduationCap },
     { id: 'documents', icon: FileText },
@@ -266,7 +265,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
         { id: 'leads', icon: TrendingUp },
         { id: 'clients', icon: Handshake },
         { id: 'employees', icon: Users },
-        { id: 'chat', icon: MessageSquare },
+        ...(isAdminWorkspace ? [{ id: 'chat', icon: MessageSquare }] : []),
         { id: 'organization', icon: Building },
         { id: 'documents', icon: FileText }
       ]
