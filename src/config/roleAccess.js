@@ -4,6 +4,7 @@ const allModules = [
   'my_projects',
   'projects',
   'leads',
+  'clients',
   'employees',
   'organization',
   'documents',
@@ -34,7 +35,7 @@ const modulesByRole = {
     'payslips', 'expenses', 'lifecycle', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
   ],
   hr_admin: [
-    'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
+    'dashboard', 'developer_space', 'projects', 'leads', 'clients', 'employees', 'organization', 'documents', 'attendance',
     'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
   ],
   hr_executive: [
@@ -63,6 +64,7 @@ const moduleLabels = {
   my_projects: 'My Projects',
   projects: 'Projects & Deadlines',
   leads: 'Lead Management',
+  clients: 'Client Management',
   employees: 'Employees Directory',
   organization: 'Organization & Branches',
   documents: 'Documents & Policies',
@@ -105,6 +107,8 @@ const permissions = {
   'announcements.create': ['hr_admin', 'super_admin'],
   'leads.manage': ['hr_admin', 'super_admin'],
   'leads.view': ['employee', 'manager', 'recruiter', 'payroll_admin', 'auditor', 'hr_executive', 'hr_admin', 'super_admin'],
+  'clients.manage': ['hr_admin', 'super_admin'],
+  'clients.view': ['hr_admin', 'super_admin'],
 };
 
 export function canAccessModule(userOrRole, module) {

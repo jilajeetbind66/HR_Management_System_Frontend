@@ -74,6 +74,9 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     } else if (eventKey.startsWith('lead.')) {
       targetPath = '/leads';
       targetTab = 'leads';
+    } else if (eventKey.startsWith('client.')) {
+      targetPath = '/clients';
+      targetTab = 'clients';
     } else if (eventKey.startsWith('training.')) {
       targetPath = '/training';
       targetTab = 'training';

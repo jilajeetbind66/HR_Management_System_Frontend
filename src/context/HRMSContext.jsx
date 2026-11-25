@@ -16,6 +16,7 @@ const ROUTE_TABS = {
   '/my-projects': 'my_projects',
   '/projects': 'projects',
   '/leads': 'leads',
+  '/clients': 'clients',
   '/employees': 'employees',
   '/organization': 'organization',
   '/documents': 'documents',

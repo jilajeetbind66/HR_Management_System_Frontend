@@ -32,6 +32,7 @@ import ResetPasswordPage from './features/auth/ResetPasswordPage';
 
 const EmployeesView = lazy(() => import('./features/employees/EmployeesView'));
 const LeadManagementView = lazy(() => import('./features/leads/LeadManagementView'));
+const ClientManagementView = lazy(() => import('./features/clients/ClientManagementView'));
 const PlatformView = lazy(() => import('./features/platform/PlatformView'));
 const EmployeePayslipsView = lazy(() => import('./features/payroll/EmployeePayslipsView'));
 const AccountSettingsView = lazy(() => import('./features/account/AccountSettingsView'));
@@ -42,6 +43,7 @@ const TAB_ROUTES = {
   my_projects: '/my-projects',
   projects: '/projects',
   leads: '/leads',
+  clients: '/clients',
   employees: '/employees',
   organization: '/organization',
   documents: '/documents',
@@ -150,6 +152,8 @@ function MainApp() {
         return <ProjectsView />;
       case 'leads':
         return <LeadManagementView />;
+      case 'clients':
+        return <ClientManagementView />;
       case 'employees':
         return <EmployeesView />;
       case 'organization':

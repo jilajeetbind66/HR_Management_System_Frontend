@@ -28,6 +28,7 @@ import {
   UserRound,
   LogOut,
   TrendingUp,
+  Handshake,
 } from 'lucide-react';
 
 function SidebarShell({
@@ -261,6 +262,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
     {
       items: [
         { id: 'leads', icon: TrendingUp },
+        { id: 'clients', icon: Handshake },
         { id: 'employees', icon: Users },
         { id: 'organization', icon: Building },
         { id: 'documents', icon: FileText }
@@ -303,7 +305,7 @@ export default function Sidebar({ activeTab, onTabSelect, isOpen, onClose }) {
     .filter(group => group.items.length > 0);
   const visibleItems = visibleGroups.flatMap((group) => group.items);
   const hrNavigationOrder = [
-    'dashboard', 'leads', 'employees', 'organization', 'documents', 'attendance', 'leaves',
+    'dashboard', 'leads', 'clients', 'employees', 'organization', 'documents', 'attendance', 'leaves',
     'payslips', 'recruitment', 'lifecycle', 'training', 'helpdesk', 'projects',
     'developer_space', 'payroll', 'expenses', 'performance', 'reports', 'announcements', 'account',
   ];

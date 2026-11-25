@@ -714,6 +714,35 @@ export const api = {
     method: 'PATCH',
     body: JSON.stringify(data),
   }),
+
+  // Client Management Module
+  getClients: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.search) query.set('search', params.search);
+    if (params.project_status && params.project_status !== 'all') query.set('project_status', params.project_status);
+    if (params.payment_status && params.payment_status !== 'all') query.set('payment_status', params.payment_status);
+    if (params.date_from) query.set('date_from', params.date_from);
+    if (params.date_to) query.set('date_to', params.date_to);
+    if (params.overdue_only) query.set('overdue_only', '1');
+    const qs = query.toString();
+    return request(`/clients${qs ? `?${qs}` : ''}`);
+  },
+  getClient: (id) => request(`/clients/${id}`),
+  createClient: (data) => request('/clients', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  updateClient: (id, data) => request(`/clients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }),
+  recordClientPayment: (id, data) => request(`/clients/${id}/payment`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  deleteClient: (id) => request(`/clients/${id}`, {
+    method: 'DELETE',
+  }),
 };
 
 export default api;
