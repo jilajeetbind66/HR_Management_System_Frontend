@@ -45,31 +45,7 @@ export default function LiveChatView() {
     }
   };
 
-  // 1. Fetch conversations / employees list
-  const fetchThreads = useCallback(async (quiet = false) => {
-    if (!quiet) setLoadingThreads(true);
-    try {
-      const response = await api.getChatThreads();
-      const data = response?.data || [];
-      setThreads(data);
-
-      // Auto-select first thread on desktop if none selected yet
-      if (!selectedThread && data.length > 0 && window.innerWidth >= 1024) {
-        setSelectedThread(data[0]);
-      }
-    } catch (err) {
-      console.error('Failed to load chat conversations:', err);
-      if (!quiet) setErrorMessage('Could not load chat conversations. Please try again.');
-    } finally {
-      if (!quiet) setLoadingThreads(false);
-    }
-  }, [selectedThread]);
-
-  useEffect(() => {
-    fetchThreads();
-  }, [fetchThreads]);
-
-  // 2. Fetch messages for selected thread
+  // 1. Fetch messages for selected thread
   const fetchMessages = useCallback(async (threadId, isInitial = false) => {
     if (!threadId) return;
     if (isInitial) setLoadingMessages(true);
@@ -105,7 +81,7 @@ export default function LiveChatView() {
   }, []);
 
   // When a thread/contact is selected
-  const handleSelectThread = (threadItem) => {
+  const handleSelectThread = useCallback((threadItem) => {
     setSelectedThread(threadItem);
     setMobileView('chat');
     lastMessageIdRef.current = null;
@@ -113,6 +89,7 @@ export default function LiveChatView() {
 
     if (threadItem.thread_id) {
       fetchMessages(threadItem.thread_id, true);
+      api.markChatAsRead(threadItem.thread_id).catch(() => {});
     } else {
       // New conversation with no prior thread in DB
       setLoadingMessages(false);
@@ -122,7 +99,35 @@ export default function LiveChatView() {
     setThreads((prev) =>
       prev.map((t) => (t.user_id === threadItem.user_id ? { ...t, unread_count: 0 } : t))
     );
-  };
+  }, [fetchMessages]);
+
+  // 2. Fetch conversations / employees list
+  const fetchThreads = useCallback(async (quiet = false) => {
+    if (!quiet) setLoadingThreads(true);
+    try {
+      const response = await api.getChatThreads();
+      const data = response?.data || [];
+      setThreads(data);
+
+      // Auto-select first thread on desktop if none selected yet
+      setSelectedThread((current) => {
+        if (!current && data.length > 0 && window.innerWidth >= 1024) {
+          handleSelectThread(data[0]);
+          return data[0];
+        }
+        return current;
+      });
+    } catch (err) {
+      console.error('Failed to load chat conversations:', err);
+      if (!quiet) setErrorMessage('Could not load chat conversations. Please try again.');
+    } finally {
+      if (!quiet) setLoadingThreads(false);
+    }
+  }, [handleSelectThread]);
+
+  useEffect(() => {
+    fetchThreads();
+  }, [fetchThreads]);
 
   // 3. Smart Polling: Every 2.5 seconds when active thread is open
   useEffect(() => {
