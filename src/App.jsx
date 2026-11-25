@@ -36,6 +36,7 @@ const ClientManagementView = lazy(() => import('./features/clients/ClientManagem
 const PlatformView = lazy(() => import('./features/platform/PlatformView'));
 const EmployeePayslipsView = lazy(() => import('./features/payroll/EmployeePayslipsView'));
 const AccountSettingsView = lazy(() => import('./features/account/AccountSettingsView'));
+const LiveChatView = lazy(() => import('./features/chat/LiveChatView'));
 
 const TAB_ROUTES = {
   dashboard: '/dashboard',
@@ -60,6 +61,7 @@ const TAB_ROUTES = {
   helpdesk: '/helpdesk',
   announcements: '/announcements',
   reports: '/reports',
+  chat: '/chat',
   platform: '/platform',
   account: '/account',
 };
@@ -186,6 +188,8 @@ function MainApp() {
         return <AnnouncementsView />;
       case 'reports':
         return <ReportsView />;
+      case 'chat':
+        return <LiveChatView />;
       case 'platform':
         return <PlatformView />;
       case 'account':

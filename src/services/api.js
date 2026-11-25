@@ -743,6 +743,21 @@ export const api = {
   deleteClient: (id) => request(`/clients/${id}`, {
     method: 'DELETE',
   }),
+
+  // Live Chat Module (Super Admin & Employee 1-on-1 Chat)
+  getChatThreads: () => request('/chat/threads'),
+  getChatMessages: (threadId, afterId = null) => {
+    const qs = afterId ? `?after_id=${afterId}` : '';
+    return request(`/chat/threads/${threadId}/messages${qs}`);
+  },
+  sendChatMessage: (payload) => request('/chat/messages', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+  markChatAsRead: (threadId) => request(`/chat/threads/${threadId}/read`, {
+    method: 'POST',
+  }),
+  getChatUnreadCount: () => request('/chat/unread-count'),
 };
 
 export default api;

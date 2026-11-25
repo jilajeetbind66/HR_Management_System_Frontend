@@ -11,8 +11,10 @@ import {
   AlertCircle,
   Trash2,
   LogOut,
-  SlidersHorizontal
+  SlidersHorizontal,
+  MessageSquare
 } from 'lucide-react';
+import api from '../../services/api';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
 import { getIndiaDateString } from '../../utils/date';
@@ -43,6 +45,27 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [isPunching, setIsPunching] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchChatUnread = async () => {
+      try {
+        const res = await api.getChatUnreadCount();
+        if (isMounted && res?.data) {
+          setChatUnreadCount(Number(res.data.unread_count) || 0);
+        }
+      } catch (e) {
+        // quiet error
+      }
+    };
+    fetchChatUnread();
+    const interval = setInterval(fetchChatUnread, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   const handleNotificationClick = (notification) => {
     // 1. Immediately close dropdown and remove notification
@@ -98,6 +121,9 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
     } else if (eventKey.startsWith('helpdesk.')) {
       targetPath = '/helpdesk';
       targetTab = 'helpdesk';
+    } else if (eventKey.startsWith('chat.')) {
+      targetPath = '/chat';
+      targetTab = 'chat';
     }
 
     // 3. Navigate instantly via React Router
@@ -266,6 +292,25 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
             {currentUser.role.replace('_', ' ')}
           </span>
         </div>
+
+        {/* Live Chat Shortcut */}
+        <button
+          type="button"
+          onClick={() => {
+            navigate('/chat');
+            if (typeof onNavigate === 'function') onNavigate('chat');
+          }}
+          className="relative rounded-lg p-2 text-teal-600 focus:outline-none hover:bg-teal-50 focus:ring-2 focus:ring-teal-300 transition"
+          aria-label={`Live Chat${chatUnreadCount > 0 ? ` (${chatUnreadCount} unread)` : ''}`}
+          title="Open Live Chat"
+        >
+          <MessageSquare className="h-5 w-5" />
+          {chatUnreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </span>
+          )}
+        </button>
 
         {/* Notifications Dropdown */}
         <div className="relative">
