@@ -12,7 +12,10 @@ import {
   ArrowLeft,
   ShieldAlert,
   Sparkles,
-  Inbox
+  Inbox,
+  Pencil,
+  Trash2,
+  X
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
@@ -31,6 +34,9 @@ export default function LiveChatView() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [editInputText, setEditInputText] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
 
   // Mobile navigation state: show contacts or active chat
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'chat'
@@ -54,23 +60,58 @@ export default function LiveChatView() {
       const afterId = isInitial ? null : lastMessageIdRef.current;
       const response = await api.getChatMessages(threadId, afterId);
       const incoming = response?.data || [];
+      const lastReadId = Number(response?.last_read_message_id) || 0;
+      const deletedIds = new Set((response?.deleted_message_ids || []).map(Number));
 
       if (isInitial) {
-        setMessages(incoming);
+        setMessages(
+          incoming.map((m) => ({
+            ...m,
+            is_read: m.is_read || (lastReadId > 0 && m.id <= lastReadId),
+          }))
+        );
         if (incoming.length > 0) {
           lastMessageIdRef.current = incoming[incoming.length - 1].id;
         }
         setTimeout(() => scrollToBottom(false), 80);
-      } else if (incoming.length > 0) {
+      } else {
         setMessages((prev) => {
-          const existingIds = new Set(prev.map((m) => m.id));
-          const uniqueNew = incoming.filter((m) => !existingIds.has(m.id));
-          if (uniqueNew.length > 0) {
-            lastMessageIdRef.current = uniqueNew[uniqueNew.length - 1].id;
-            setTimeout(() => scrollToBottom(true), 50);
-            return [...prev, ...uniqueNew];
+          let updated = prev;
+
+          // Real-time double tick: Mark all own messages as read if id <= lastReadId
+          if (lastReadId > 0) {
+            updated = updated.map((m) =>
+              !m.is_read && m.id <= lastReadId ? { ...m, is_read: true } : m
+            );
           }
-          return prev;
+
+          // Mark any deleted messages
+          if (deletedIds.size > 0) {
+            updated = updated.map((m) =>
+              deletedIds.has(m.id) && !m.is_deleted
+                ? { ...m, is_deleted: true, message: 'This message was deleted' }
+                : m
+            );
+          }
+
+          // Append new incoming messages
+          if (incoming.length > 0) {
+            const existingIds = new Set(updated.map((m) => m.id));
+            const uniqueNew = incoming
+              .filter((m) => !existingIds.has(m.id))
+              .map((m) => ({
+                ...m,
+                is_read: m.is_read || (lastReadId > 0 && m.id <= lastReadId),
+              }));
+
+            if (uniqueNew.length > 0) {
+              lastMessageIdRef.current = uniqueNew[uniqueNew.length - 1].id;
+              setTimeout(() => scrollToBottom(true), 50);
+              return [...updated, ...uniqueNew];
+            }
+          }
+
+          return updated;
         });
       }
     } catch (err) {
@@ -156,10 +197,11 @@ export default function LiveChatView() {
     setSending(true);
 
     // Optimistic message placeholder
+    const currentUserId = currentUser?.user_id || currentUser?.id;
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage = {
       id: tempId,
-      sender_id: currentUser.id,
+      sender_id: currentUserId,
       receiver_id: selectedThread.user_id,
       message: text,
       created_at: new Date().toISOString(),
@@ -217,6 +259,60 @@ export default function LiveChatView() {
       setErrorMessage(err?.data?.message || 'Failed to send message. Please retry.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleStartEdit = (msg) => {
+    if (msg.is_deleted) return;
+    setEditingMessageId(msg.id);
+    setEditInputText(msg.message);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditInputText('');
+  };
+
+  const handleSaveEdit = async (messageId) => {
+    const text = editInputText.trim();
+    if (!text || actionLoading) return;
+
+    setActionLoading(true);
+    try {
+      await api.updateChatMessage(messageId, { message: text });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, message: text, is_edited: true, edited_at: new Date().toISOString() }
+            : m
+        )
+      );
+      setEditingMessageId(null);
+      setEditInputText('');
+    } catch (err) {
+      alert(err?.data?.message || 'Failed to update message.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm('Are you sure you want to delete this message?')) return;
+
+    setActionLoading(true);
+    try {
+      await api.deleteChatMessage(messageId);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, is_deleted: true, message: 'This message was deleted' }
+            : m
+        )
+      );
+    } catch (err) {
+      alert(err?.data?.message || 'Failed to delete message.');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -511,39 +607,113 @@ export default function LiveChatView() {
                   </div>
                 ) : (
                   messages.map((msg, idx) => {
-                    const isOwnMessage = Number(msg.sender_id) === Number(currentUser?.id);
+                    const currentUserId = currentUser?.user_id || currentUser?.id;
+                    const isOwnMessage =
+                      Number(msg.sender_id) === Number(currentUserId) ||
+                      Number(msg.sender_id) === Number(currentUser?.id) ||
+                      Number(msg.sender_id) === Number(currentUser?.user_id);
+                    const isEditingThis = editingMessageId === msg.id;
 
                     return (
                       <div
                         key={msg.id || idx}
-                        className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
+                        className={`group relative flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}
                       >
+                        {/* Hover Action Toolbar: Edit & Delete for own message, or Super Admin delete */}
+                        {!msg.isPending && !msg.is_deleted && !isEditingThis && (
+                          <div
+                            className={`mb-1 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150 text-[11px] text-slate-400 ${
+                              isOwnMessage ? 'justify-end' : 'justify-start'
+                            }`}
+                          >
+                            {isOwnMessage && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(msg)}
+                                className="rounded-md p-1 hover:bg-slate-200 hover:text-slate-700 transition"
+                                title="Edit message"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            )}
+                            {(isOwnMessage || isSuperAdmin) && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="rounded-md p-1 hover:bg-rose-100 hover:text-rose-600 transition"
+                                title="Delete message"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Message Bubble */}
                         <div
-                          className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3.5 py-2.5 text-xs shadow-xs break-words ${
+                          className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3.5 py-2.5 text-xs shadow-xs break-words transition-all ${
                             isOwnMessage
                               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-tr-xs'
                               : 'bg-white text-slate-900 border border-slate-200/90 rounded-tl-xs'
-                          }`}
+                          } ${msg.is_deleted ? 'italic opacity-60 bg-slate-100 text-slate-500 border border-slate-200' : ''}`}
                         >
-                          <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
-                          <div
-                            className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
-                              isOwnMessage ? 'text-emerald-100' : 'text-slate-400'
-                            }`}
-                          >
-                            <span>{formatMessageTime(msg.created_at)}</span>
-                            {isOwnMessage && (
-                              <span>
-                                {msg.isPending ? (
-                                  <Clock className="h-3 w-3 inline text-emerald-200" />
-                                ) : msg.is_read ? (
-                                  <CheckCheck className="h-3.5 w-3.5 inline text-teal-200" />
-                                ) : (
-                                  <Check className="h-3 w-3 inline text-emerald-200" />
+                          {isEditingThis ? (
+                            <div className="space-y-2 min-w-[220px]">
+                              <input
+                                type="text"
+                                value={editInputText}
+                                onChange={(e) => setEditInputText(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleSaveEdit(msg.id);
+                                  if (e.key === 'Escape') handleCancelEdit();
+                                }}
+                                className="w-full rounded-lg bg-white/20 text-white px-2.5 py-1.5 text-xs outline-none border border-white/40 placeholder-white/60 focus:bg-white/30"
+                                autoFocus
+                              />
+                              <div className="flex items-center justify-end gap-1.5 text-[10px]">
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEdit}
+                                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-white font-medium"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEdit(msg.id)}
+                                  disabled={actionLoading}
+                                  className="px-2 py-0.5 rounded bg-white text-emerald-800 font-bold hover:bg-emerald-50 shadow-xs"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="leading-relaxed whitespace-pre-wrap">{msg.message}</p>
+                              <div
+                                className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
+                                  isOwnMessage ? 'text-emerald-100' : 'text-slate-400'
+                                }`}
+                              >
+                                {msg.is_edited && !msg.is_deleted && (
+                                  <span className="text-[9px] opacity-80 mr-0.5 italic">(edited)</span>
                                 )}
-                              </span>
-                            )}
-                          </div>
+                                <span>{formatMessageTime(msg.created_at)}</span>
+                                {isOwnMessage && !msg.is_deleted && (
+                                  <span>
+                                    {msg.isPending ? (
+                                      <Clock className="h-3 w-3 inline text-emerald-200" />
+                                    ) : msg.is_read ? (
+                                      <CheckCheck className="h-3.5 w-3.5 inline text-teal-200" title="Seen" />
+                                    ) : (
+                                      <Check className="h-3 w-3 inline text-emerald-200/80" title="Sent" />
+                                    )}
+                                  </span>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     );

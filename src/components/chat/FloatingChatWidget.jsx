@@ -107,18 +107,45 @@ export default function FloatingChatWidget({ onNavigateToFullChat }) {
         const afterId = lastMessageIdRef.current;
         const res = await api.getChatMessages(thread.thread_id, afterId);
         const incoming = res?.data || [];
-        if (incoming.length > 0) {
-          setMessages((prev) => {
-            const existingIds = new Set(prev.map((m) => m.id));
-            const newMsgs = incoming.filter((m) => !existingIds.has(m.id));
+        const lastReadId = Number(res?.last_read_message_id) || 0;
+        const deletedIds = new Set((res?.deleted_message_ids || []).map(Number));
+
+        setMessages((prev) => {
+          let updated = prev;
+
+          // Real-time double tick
+          if (lastReadId > 0) {
+            updated = updated.map((m) =>
+              !m.is_read && m.id <= lastReadId ? { ...m, is_read: true } : m
+            );
+          }
+
+          // Mark deleted
+          if (deletedIds.size > 0) {
+            updated = updated.map((m) =>
+              deletedIds.has(m.id) && !m.is_deleted
+                ? { ...m, is_deleted: true, message: 'This message was deleted' }
+                : m
+            );
+          }
+
+          if (incoming.length > 0) {
+            const existingIds = new Set(updated.map((m) => m.id));
+            const newMsgs = incoming
+              .filter((m) => !existingIds.has(m.id))
+              .map((m) => ({
+                ...m,
+                is_read: m.is_read || (lastReadId > 0 && m.id <= lastReadId),
+              }));
+
             if (newMsgs.length > 0) {
               lastMessageIdRef.current = newMsgs[newMsgs.length - 1].id;
               setTimeout(() => scrollToBottom(true), 50);
-              return [...prev, ...newMsgs];
+              return [...updated, ...newMsgs];
             }
-            return prev;
-          });
-        }
+          }
+          return updated;
+        });
       } catch {
         // silent
       }
@@ -138,10 +165,11 @@ export default function FloatingChatWidget({ onNavigateToFullChat }) {
     setInputText('');
     setSending(true);
 
+    const currentUserId = currentUser?.user_id || currentUser?.id;
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage = {
       id: tempId,
-      sender_id: currentUser.id,
+      sender_id: currentUserId,
       receiver_id: thread.user_id,
       message: text,
       created_at: new Date().toISOString(),
@@ -278,7 +306,11 @@ export default function FloatingChatWidget({ onNavigateToFullChat }) {
               </div>
             ) : (
               messages.map((msg) => {
-                const isMine = msg.sender_id === currentUser.id;
+                const currentUserId = currentUser?.user_id || currentUser?.id;
+                const isMine =
+                  Number(msg.sender_id) === Number(currentUserId) ||
+                  Number(msg.sender_id) === Number(currentUser?.id) ||
+                  Number(msg.sender_id) === Number(currentUser?.user_id);
                 const timeStr = msg.created_at
                   ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                   : '';
@@ -289,25 +321,28 @@ export default function FloatingChatWidget({ onNavigateToFullChat }) {
                     className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed break-words shadow-sm ${
+                      className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed break-words shadow-xs ${
                         isMine
-                          ? 'bg-teal-600 text-white rounded-br-xs'
-                          : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
-                      } ${msg.isPending ? 'opacity-70' : ''}`}
+                          ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-tr-xs'
+                          : 'bg-white text-slate-800 border border-slate-200 rounded-tl-xs'
+                      } ${msg.isPending ? 'opacity-70' : ''} ${msg.is_deleted ? 'italic opacity-60 bg-slate-100 text-slate-500 border border-slate-200' : ''}`}
                     >
                       <p className="whitespace-pre-wrap">{msg.message}</p>
                     </div>
 
                     <div className="flex items-center gap-1 mt-0.5 px-1 text-[9px] text-slate-400">
+                      {msg.is_edited && !msg.is_deleted && (
+                        <span className="italic mr-0.5">(edited)</span>
+                      )}
                       <span>{timeStr}</span>
-                      {isMine && (
+                      {isMine && !msg.is_deleted && (
                         <span>
                           {msg.isPending ? (
                             <Clock className="h-2.5 w-2.5 text-slate-400" />
                           ) : msg.is_read ? (
-                            <CheckCheck className="h-2.5 w-2.5 text-teal-600" />
+                            <CheckCheck className="h-2.5 w-2.5 text-teal-600" title="Seen" />
                           ) : (
-                            <Check className="h-2.5 w-2.5 text-slate-400" />
+                            <Check className="h-2.5 w-2.5 text-slate-400" title="Sent" />
                           )}
                         </span>
                       )}

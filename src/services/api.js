@@ -754,6 +754,13 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+  updateChatMessage: (id, payload) => request(`/chat/messages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }),
+  deleteChatMessage: (id) => request(`/chat/messages/${id}`, {
+    method: 'DELETE',
+  }),
   markChatAsRead: (threadId) => request(`/chat/threads/${threadId}/read`, {
     method: 'POST',
   }),
