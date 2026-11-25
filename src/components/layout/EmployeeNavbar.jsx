@@ -13,7 +13,9 @@ import {
   KeyRound,
   Trash2,
   X,
+  MessageSquare,
 } from 'lucide-react';
+import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import { getIndiaDateString } from '../../utils/date';
@@ -58,6 +60,27 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [punchFeedback, setPunchFeedback] = useState(null);
   const [isPunching, setIsPunching] = useState(false);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchChatUnread = async () => {
+      try {
+        const res = await api.getChatUnreadCount();
+        if (isMounted && res?.data) {
+          setChatUnreadCount(Number(res.data.unread_count) || 0);
+        }
+      } catch (e) {
+        // quiet error
+      }
+    };
+    fetchChatUnread();
+    const interval = setInterval(fetchChatUnread, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
   const matches = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return [];
@@ -140,6 +163,9 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
     } else if (eventKey.startsWith('lead.')) {
       targetPath = '/leads';
       targetTab = 'leads';
+    } else if (eventKey.startsWith('chat.')) {
+      targetPath = '/chat';
+      targetTab = 'chat';
     }
 
     navigate(targetPath);
@@ -319,6 +345,23 @@ export default function EmployeeNavbar({ onMenuToggle, onNavigate }) {
             </div>
           )}
         </div>
+
+        {/* Live Chat Shortcut */}
+        <button
+          type="button"
+          onClick={() => navigateTo('chat')}
+          className="relative rounded-xl p-2 text-slate-600 transition hover:bg-teal-50 hover:text-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-200"
+          aria-label={`Live Chat${chatUnreadCount > 0 ? ` (${chatUnreadCount} unread)` : ''}`}
+          title="Open Live Chat with Super Admin"
+        >
+          <MessageSquare className="h-5 w-5" />
+          {chatUnreadCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-teal-600 px-1 text-[9px] font-black text-white shadow-sm ring-2 ring-white animate-pulse">
+              {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+            </span>
+          )}
+        </button>
+
         <div>
           <button
             type="button"

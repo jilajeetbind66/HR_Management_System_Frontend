@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
 import EmployeeNavbar from './EmployeeNavbar';
 import Sidebar from './Sidebar';
+import FloatingChatWidget from '../chat/FloatingChatWidget';
 import { useHRMS } from '../../context/HRMSContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -89,6 +90,11 @@ export default function AppLayout({ activeTab, onTabSelect, children }) {
           ) : children}
         </main>
       </div>
+
+      {/* Floating Quick Live Chat Widget (shown when not on full /chat page) */}
+      {activeTab !== 'chat' && (
+        <FloatingChatWidget onNavigateToFullChat={onTabSelect} />
+      )}
     </div>
   );
 }

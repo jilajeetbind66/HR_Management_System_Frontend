@@ -20,6 +20,7 @@ const allModules = [
   'helpdesk',
   'announcements',
   'reports',
+  'chat',
   'platform',
   'account',
 ];
@@ -27,23 +28,23 @@ const allModules = [
 const modulesByRole = {
   employee: [
     'dashboard', 'developer_space', 'my_projects', 'documents', 'attendance',
-    'leaves', 'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'account',
+    'leaves', 'payslips', 'expenses', 'performance', 'training', 'helpdesk', 'announcements', 'chat', 'account',
   ],
   manager: [
     'dashboard', 'developer_space', 'projects', 'employees', 'documents', 'attendance', 'leaves',
-    'payslips', 'expenses', 'lifecycle', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'account',
+    'payslips', 'expenses', 'lifecycle', 'performance', 'training', 'helpdesk', 'announcements', 'reports', 'chat', 'account',
   ],
   hr_admin: [
     'dashboard', 'developer_space', 'projects', 'leads', 'employees', 'organization', 'documents', 'attendance',
-    'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
+    'leaves', 'payroll', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'chat', 'account',
   ],
   hr_executive: [
     'dashboard', 'developer_space', 'projects', 'employees', 'organization', 'documents', 'attendance',
-    'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'account',
+    'leaves', 'payslips', 'recruitment', 'lifecycle', 'training', 'reports', 'helpdesk', 'announcements', 'chat', 'account',
   ],
-  recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'announcements', 'account'],
-  payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'announcements', 'reports', 'account'],
-  auditor: ['dashboard', 'developer_space', 'employees', 'organization', 'payroll', 'payslips', 'announcements', 'reports', 'platform', 'account'],
+  recruiter: ['dashboard', 'developer_space', 'payslips', 'recruitment', 'helpdesk', 'announcements', 'chat', 'account'],
+  payroll_admin: ['dashboard', 'developer_space', 'payroll', 'payslips', 'announcements', 'reports', 'chat', 'account'],
+  auditor: ['dashboard', 'developer_space', 'employees', 'organization', 'payroll', 'payslips', 'announcements', 'reports', 'platform', 'chat', 'account'],
   super_admin: allModules,
 };
 
@@ -79,6 +80,7 @@ const moduleLabels = {
   helpdesk: 'Helpdesk & SLA',
   announcements: 'Announcements',
   reports: 'Analytics & Reports',
+  chat: 'Live Chat',
   platform: 'Platform & Audit Logs',
   account: 'Account & Security',
 };
