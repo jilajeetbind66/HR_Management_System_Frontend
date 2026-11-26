@@ -38,6 +38,7 @@ export default function AccountSettingsView() {
     name: '',
   });
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [profileSuccess, setProfileSuccess] = useState('');
   const [profileError, setProfileError] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
@@ -107,23 +108,57 @@ export default function AccountSettingsView() {
     }
   };
 
-  // Avatar file upload handler (converts to base64 data URI)
-  const handleAvatarFile = (e) => {
+  // Avatar file upload handler (Uploads to Cloudinary or falls back to base64)
+  const handleAvatarFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileError('Photo size must be less than 2MB.');
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Photo size must be less than 5MB.');
       return;
     }
 
+    setProfileError('');
+    setIsUploadingAvatar(true);
+
+    // Instant local preview
     const reader = new FileReader();
     reader.onloadend = () => {
-      const dataUri = reader.result;
-      setAvatarPreview(dataUri);
-      setPersonalForm((prev) => ({ ...prev, avatar: dataUri }));
+      setAvatarPreview(reader.result);
     };
     reader.readAsDataURL(file);
+
+    try {
+      const targetEmpId = currentUser?.employee_id || (currentUser?.role === 'super_admin' ? currentUser?.id : null);
+      const response = await api.uploadFile(file, 'employee_photos', {
+        employeeId: targetEmpId,
+      });
+
+      const uploadedUrl = response?.data?.url || response?.data?.secure_url;
+      if (uploadedUrl) {
+        setAvatarPreview(uploadedUrl);
+        setPersonalForm((prev) => ({ ...prev, avatar: uploadedUrl }));
+        setProfileSuccess('Photo uploaded successfully! Click Save to apply.');
+        setTimeout(() => setProfileSuccess(''), 3000);
+      } else {
+        const base64Reader = new FileReader();
+        base64Reader.onloadend = () => {
+          setPersonalForm((prev) => ({ ...prev, avatar: base64Reader.result }));
+        };
+        base64Reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.warn('Direct upload fallback:', err);
+      const base64Reader = new FileReader();
+      base64Reader.onloadend = () => {
+        const dataUri = base64Reader.result;
+        setAvatarPreview(dataUri);
+        setPersonalForm((prev) => ({ ...prev, avatar: dataUri }));
+      };
+      base64Reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const submitPasswordChange = async (event) => {
@@ -215,7 +250,9 @@ export default function AccountSettingsView() {
             )}
             <label
               htmlFor="avatar-upload"
-              className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 transition"
+              className={`absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 transition ${
+                isUploadingAvatar ? 'animate-pulse opacity-70' : ''
+              }`}
               title="Upload new profile photo"
             >
               <Camera className="h-3.5 w-3.5" />
@@ -390,19 +427,46 @@ export default function AccountSettingsView() {
                 </div>
               </label>
 
-              <label className="block text-xs font-medium text-slate-700">
-                Profile Avatar (Image URL or upload above)
-                <input
-                  type="text"
-                  placeholder="https://..."
-                  value={personalForm.avatar}
-                  onChange={(e) => {
-                    setPersonalForm({ ...personalForm, avatar: e.target.value });
-                    setAvatarPreview(e.target.value);
-                  }}
-                  className="mt-1.5 w-full rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
-                />
-              </label>
+              <div className="block text-xs font-medium text-slate-700">
+                <span className="flex items-center justify-between">
+                  <span>Profile Photo</span>
+                  <label
+                    htmlFor="avatar-form-upload"
+                    className="cursor-pointer text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1"
+                  >
+                    <Camera className="h-3.5 w-3.5" />
+                    <span>Upload from device</span>
+                    <input
+                      id="avatar-form-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarFile}
+                      className="hidden"
+                    />
+                  </label>
+                </span>
+                <div className="relative mt-1.5 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Image URL or click Upload"
+                    value={personalForm.avatar}
+                    onChange={(e) => {
+                      setPersonalForm({ ...personalForm, avatar: e.target.value });
+                      setAvatarPreview(e.target.value);
+                    }}
+                    className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-xs text-slate-800 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+                  />
+                  <label
+                    htmlFor="avatar-form-upload"
+                    className={`inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 cursor-pointer shadow-xs transition ${
+                      isUploadingAvatar ? 'opacity-60 cursor-wait' : ''
+                    }`}
+                  >
+                    <Camera className="h-3.5 w-3.5 text-slate-500" />
+                    <span>{isUploadingAvatar ? 'Uploading...' : 'Browse'}</span>
+                  </label>
+                </div>
+              </div>
             </div>
 
             <div className="pt-2">
