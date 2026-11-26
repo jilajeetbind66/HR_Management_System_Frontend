@@ -213,9 +213,27 @@ export default function RecruitmentView() {
   const handleCreateCandidate = async (event) => {
     event.preventDefault();
     setWorkflowError('');
+
+    if (candidateForm.phone) {
+      const cleanCandPhone = candidateForm.phone.replace(/\D/g, '');
+      if (!/^[6-9]\d{9}$/.test(cleanCandPhone)) {
+        setWorkflowError('Phone number must be a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+        return;
+      }
+    }
+
+    if (candidateForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateForm.email.trim())) {
+      setWorkflowError('Please enter a valid candidate email address.');
+      return;
+    }
+
     setSavingRecord(true);
     try {
-      await createCandidate({ ...candidateForm, job_id: Number(candidateForm.job_id) });
+      await createCandidate({
+        ...candidateForm,
+        job_id: Number(candidateForm.job_id),
+        phone: candidateForm.phone ? candidateForm.phone.replace(/\D/g, '') : null,
+      });
       setShowCandidateModal(false);
       setCandidateForm({
         job_id: '',

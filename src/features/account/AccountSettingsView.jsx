@@ -21,6 +21,7 @@ import Card from '../../components/common/Card';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import PasswordInput from '../../components/common/PasswordInput';
+import PhoneInput from '../../components/common/PhoneInput';
 import { userRoleLabels } from '../../config/userRoles';
 
 export default function AccountSettingsView() {
@@ -80,11 +81,18 @@ export default function AccountSettingsView() {
     e?.preventDefault();
     setProfileError('');
     setProfileSuccess('');
+
+    const cleanPhone = personalForm.phone.replace(/\D/g, '');
+    if (cleanPhone && !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setProfileError('Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+      return;
+    }
+
     setIsSavingProfile(true);
 
     try {
       const payload = {
-        phone: personalForm.phone.trim() || null,
+        phone: cleanPhone || null,
         gender: personalForm.gender || 'Other',
         date_of_birth: personalForm.date_of_birth || null,
         avatar: personalForm.avatar.trim() || null,
@@ -391,11 +399,10 @@ export default function AccountSettingsView() {
                 Phone / Mobile Number
                 <div className="relative mt-1.5">
                   <Phone className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="tel"
-                    placeholder="e.g. +91 98765 43210"
+                  <PhoneInput
+                    placeholder="Enter 10-digit mobile number"
                     value={personalForm.phone}
-                    onChange={(e) => setPersonalForm({ ...personalForm, phone: e.target.value })}
+                    onChange={(val) => setPersonalForm({ ...personalForm, phone: val })}
                     className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-xs text-slate-800 outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
                   />
                 </div>

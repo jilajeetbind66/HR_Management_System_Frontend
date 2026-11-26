@@ -333,12 +333,18 @@ export default function EmployeesView() {
 
     setIsSavingHierarchy(true);
     setHierarchyError('');
+    const cleanPhone = hierarchyForm.phone ? hierarchyForm.phone.replace(/\D/g, '') : '';
+    if (cleanPhone && !/^[6-9]\d{9}$/.test(cleanPhone)) {
+      setHierarchyError('Phone number must be a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
+      setIsSavingHierarchy(false);
+      return;
+    }
     try {
       const savedEmployee = await updateEmployeeHierarchy(selectedEmployee.id, {
         first_name: hierarchyForm.first_name.trim(),
         last_name: hierarchyForm.last_name.trim(),
         email: hierarchyForm.email.trim(),
-        phone: hierarchyForm.phone.trim() || null,
+        phone: cleanPhone || null,
         gender: hierarchyForm.gender,
         date_of_birth: hierarchyForm.date_of_birth || null,
         branch_id: Number(hierarchyForm.branch_id),
@@ -392,13 +398,19 @@ export default function EmployeesView() {
 
     setIsSavingCompensation(true);
     setCompensationError('');
+    const cleanIfsc = compensationForm.ifsc_code ? compensationForm.ifsc_code.trim().toUpperCase() : '';
+    if (cleanIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(cleanIfsc)) {
+      setCompensationError('IFSC code must be exactly 11 characters (e.g. SBIN0001234).');
+      setIsSavingCompensation(false);
+      return;
+    }
     try {
       const savedEmployee = await updateEmployeeCompensation(selectedEmployee.id, {
         ...compensationForm,
         ctc_annual: Number(compensationForm.ctc_annual),
         gross_monthly: Number(compensationForm.gross_monthly),
         basic_monthly: Number(compensationForm.basic_monthly),
-        ifsc_code: compensationForm.ifsc_code.trim().toUpperCase(),
+        ifsc_code: cleanIfsc || null,
       });
       setSelectedEmployee(savedEmployee);
       setIsEditingCompensation(false);
@@ -420,10 +432,22 @@ export default function EmployeesView() {
 
     setIsSavingStatutory(true);
     setStatutoryError('');
+    const cleanPan = statutoryForm.pan ? statutoryForm.pan.trim().toUpperCase() : '';
+    if (cleanPan && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(cleanPan)) {
+      setStatutoryError('PAN must be in standard 10-character format (e.g. ABCDE1234F).');
+      setIsSavingStatutory(false);
+      return;
+    }
+    const cleanUan = statutoryForm.uan ? statutoryForm.uan.trim() : '';
+    if (cleanUan && !/^\d{12}$/.test(cleanUan)) {
+      setStatutoryError('UAN must be exactly 12 numeric digits.');
+      setIsSavingStatutory(false);
+      return;
+    }
     try {
       const savedEmployee = await updateEmployeeStatutory(selectedEmployee.id, {
-        pan: statutoryForm.pan ? statutoryForm.pan.trim().toUpperCase() : null,
-        uan: statutoryForm.uan ? statutoryForm.uan.trim() : null,
+        pan: cleanPan || null,
+        uan: cleanUan || null,
         pf_account_no: statutoryForm.pf_account_no ? statutoryForm.pf_account_no.trim() : null,
         pf_applicable: Boolean(statutoryForm.pf_applicable),
         esi_applicable: Boolean(statutoryForm.esi_applicable),
@@ -527,6 +551,11 @@ export default function EmployeesView() {
     if (!newEmp.first_name || !newEmp.last_name || !newEmp.email || !newEmp.branch_id
       || !newEmp.department || !newEmp.designation || !newEmp.date_of_joining) {
       setFormError('Complete the required employee, organization, and joining-date fields.');
+      return;
+    }
+    const cleanAddPhone = newEmp.phone ? newEmp.phone.replace(/\D/g, '') : '';
+    if (cleanAddPhone && !/^[6-9]\d{9}$/.test(cleanAddPhone)) {
+      setFormError('Phone number must be a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.');
       return;
     }
     setFormError(null);
