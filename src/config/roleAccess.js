@@ -79,12 +79,12 @@ const moduleLabels = {
   assets: 'Asset Register',
   performance: 'Performance & Goals',
   training: 'Training & LMS',
-  helpdesk: 'Helpdesk & SLA',
+  helpdesk: 'Support & Helpdesk',
   announcements: 'Announcements',
   reports: 'Analytics & Reports',
   chat: 'Live Chat',
   platform: 'Platform & Audit Logs',
-  account: 'Account & Security',
+  account: 'My Profile & Settings',
 };
 
 const permissions = {
@@ -130,9 +130,19 @@ export function getDashboardLabel(role) {
 }
 
 export function getModuleLabel(role, module) {
-  return module === 'dashboard'
-    ? getDashboardLabel(role)
-    : moduleLabels[module] || module;
+  if (module === 'dashboard') {
+    return getDashboardLabel(role);
+  }
+
+  // Employee-specific self-service naming
+  if (role === 'employee') {
+    if (module === 'leaves') return 'My Leaves';
+    if (module === 'attendance') return 'My Attendance';
+    if (module === 'helpdesk') return 'Support & Helpdesk';
+    if (module === 'account') return 'My Profile & Settings';
+  }
+
+  return moduleLabels[module] || module;
 }
 
 export function getRoleMenuItems(userOrRole) {

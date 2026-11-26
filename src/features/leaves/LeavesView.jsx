@@ -234,7 +234,9 @@ export default function LeavesView() {
             </span>
             <span className="text-xs text-slate-500 font-medium">Accrual Balances & Approval Engine</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">Leave Management & Accrual</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">
+            {currentUser?.role === 'employee' ? 'My Leaves & Balance' : 'Leave Management & Accrual'}
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Casual, Sick, Privilege leaves, holiday sandwich rule tracking, balance ledgers, and multi-tier approval chains.
           </p>

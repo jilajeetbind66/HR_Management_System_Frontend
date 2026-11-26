@@ -631,7 +631,9 @@ export default function AttendanceView() {
             </span>
             <span className="text-xs text-slate-500 font-medium">Web Punches, Biometrics & Regularization</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">Attendance & Time Tracking</h1>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">
+            {currentUser?.role === 'employee' ? 'My Attendance & Punches' : 'Attendance & Time Tracking'}
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             One punch-in/out session is supported per employee per India date. Use regularization to correct a missed or incorrect punch; additional sessions are not supported.
           </p>

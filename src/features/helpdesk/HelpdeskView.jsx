@@ -214,7 +214,9 @@ export default function HelpdeskView() {
             </span>
             <span className="text-xs font-medium text-slate-500">Ticket conversations and service-level tracking</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">Employee Helpdesk &amp; Support Tickets</h1>
+          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+            {currentUser?.role === 'employee' ? 'Support & Helpdesk' : 'Employee Helpdesk & Support Tickets'}
+          </h1>
           <p className="mt-0.5 text-xs text-slate-500">
             Track support requests, communicate in a ticket thread, and monitor priority response deadlines.
           </p>
