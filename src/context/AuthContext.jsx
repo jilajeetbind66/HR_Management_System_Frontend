@@ -120,6 +120,23 @@ export function AuthProvider({ children }) {
     return user;
   };
 
+  const updateUserProfile = async (payload) => {
+    try {
+      const response = await api.updateProfile(payload);
+      const user = response?.data;
+      if (user) {
+        setCurrentUser(user);
+        setCachedUser(user);
+      }
+      return { success: true, user, message: response?.message };
+    } catch (error) {
+      return {
+        success: false,
+        message: error?.data?.message || error.message || 'Unable to update profile.',
+      };
+    }
+  };
+
   const logout = async () => {
     try {
       if (isAuthenticated) await api.logout();
@@ -148,6 +165,7 @@ export function AuthProvider({ children }) {
       setActiveBranch: handleSetActiveBranch,
       login,
       changePassword,
+      updateUserProfile,
       refreshCurrentUser,
       logout,
       hasPermission,

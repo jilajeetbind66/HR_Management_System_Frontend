@@ -520,29 +520,38 @@ export default function Navbar({ onMenuToggle, onNavigate }) {
         </div>
 
         {/* Current User Info */}
-        <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-          {currentUser?.avatar && !avatarLoadFailed ? (
-            <img
-              src={currentUser.avatar}
-              alt=""
-              onError={() => setAvatarLoadFailed(true)}
-              className="h-8 w-8 rounded-full border border-slate-300 object-cover ring-2 ring-teal-50"
-            />
-          ) : (
-            <span
-              aria-label={`${currentUser?.name || 'User'} profile initials`}
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-teal-200 bg-[#0f172a] text-[10px] font-bold text-white ring-2 ring-teal-50"
-            >
-              {initials}
-            </span>
-          )}
-          <div className="hidden xl:block text-left">
-            <p className="text-xs font-bold text-slate-800 leading-tight">
-              {currentUser?.first_name} {currentUser?.last_name}
-            </p>
-            <p className="text-[10px] text-slate-400 font-medium">
-              {[currentUser?.employee_code, currentUser?.branch_name?.split(' ')[0]].filter(Boolean).join(' • ') || currentUser?.email}
-            </p>
+        <div className="flex items-center gap-1 pl-2 border-l border-slate-200">
+          <div
+            onClick={() => {
+              if (typeof onNavigate === 'function') onNavigate('account');
+              navigate('/account');
+            }}
+            className="flex items-center gap-2 cursor-pointer hover:bg-slate-100/70 p-1 rounded-xl transition"
+            title="My Profile & Account Settings"
+          >
+            {currentUser?.avatar && !avatarLoadFailed ? (
+              <img
+                src={currentUser.avatar}
+                alt=""
+                onError={() => setAvatarLoadFailed(true)}
+                className="h-8 w-8 rounded-full border border-slate-300 object-cover ring-2 ring-teal-50"
+              />
+            ) : (
+              <span
+                aria-label={`${currentUser?.name || 'User'} profile initials`}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-teal-200 bg-[#0f172a] text-[10px] font-bold text-white ring-2 ring-teal-50"
+              >
+                {initials}
+              </span>
+            )}
+            <div className="hidden xl:block text-left">
+              <p className="text-xs font-bold text-slate-800 leading-tight">
+                {currentUser?.first_name} {currentUser?.last_name}
+              </p>
+              <p className="text-[10px] text-slate-400 font-medium">
+                {[currentUser?.employee_code, currentUser?.branch_name?.split(' ')[0]].filter(Boolean).join(' • ') || currentUser?.email}
+              </p>
+            </div>
           </div>
 
           {!isNavyWorkspace && !isHrWorkspace && (

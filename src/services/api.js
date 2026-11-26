@@ -162,6 +162,10 @@ export const api = {
     }),
   }),
   currentUser: () => request('/auth/me'),
+  updateProfile: (payload) => request('/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  }),
   logout: () => request('/auth/logout', { method: 'POST' }),
   getNotifications: () => request('/notifications'),
   markNotificationRead: (notificationId) => request(`/notifications/${notificationId}/read`, {
