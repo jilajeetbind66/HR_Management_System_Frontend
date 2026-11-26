@@ -278,10 +278,16 @@ export default function AccountSettingsView() {
           <div className="flex-1 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
               <h1 className="text-xl font-bold text-slate-900">{currentUser?.name}</h1>
-              <span className="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700 border border-teal-200/70">
-                {userRoleLabels[currentUser?.role] || currentUser?.role}
-              </span>
-              {currentUser?.employee_code && (
+              {currentUser?.role === 'super_admin' ? (
+                <span className="inline-flex items-center rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-800 border border-purple-200">
+                  Founder & System Owner
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-teal-50 px-2.5 py-0.5 text-xs font-semibold text-teal-700 border border-teal-200/70">
+                  {userRoleLabels[currentUser?.role] || currentUser?.role}
+                </span>
+              )}
+              {currentUser?.role !== 'super_admin' && currentUser?.employee_code && (
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
                   {currentUser.employee_code}
                 </span>
@@ -289,9 +295,11 @@ export default function AccountSettingsView() {
             </div>
 
             <p className="mt-1 text-xs text-slate-500">
-              {[currentUser?.designation, currentUser?.department, currentUser?.branch_name]
-                .filter(Boolean)
-                .join(' • ') || 'Employee Portal'}
+              {currentUser?.role === 'super_admin'
+                ? 'Primary Organization Founder & Super Administrator'
+                : [currentUser?.designation, currentUser?.department, currentUser?.branch_name]
+                    .filter(Boolean)
+                    .join(' • ') || 'Employee Portal'}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-slate-600">
@@ -333,20 +341,22 @@ export default function AccountSettingsView() {
             }`}
           >
             <Briefcase className="h-4 w-4" />
-            Job & Hierarchy
+            {currentUser?.role === 'super_admin' ? 'System Governance' : 'Job & Hierarchy'}
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('statutory')}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition shrink-0 ${
-              activeTab === 'statutory'
-                ? 'border-emerald-600 text-emerald-700'
-                : 'border-transparent text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <CreditCard className="h-4 w-4" />
-            Statutory & Tax
-          </button>
+          {currentUser?.role !== 'super_admin' && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('statutory')}
+              className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-semibold transition shrink-0 ${
+                activeTab === 'statutory'
+                  ? 'border-emerald-600 text-emerald-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <CreditCard className="h-4 w-4" />
+              Statutory & Tax
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setActiveTab('security')}
@@ -490,52 +500,91 @@ export default function AccountSettingsView() {
         </Card>
       )}
 
-      {/* Tab 2: Job & Hierarchy (Read-Only) */}
+      {/* Tab 2: Job & Hierarchy (or System Governance for Super Admin) */}
       {activeTab === 'job' && (
-        <Card
-          title="Employment & Organization Details"
-          subtitle="Official company records maintained by HR. Changes require HR administrator verification."
-        >
-          <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            <Lock className="h-4 w-4 shrink-0 text-slate-400" />
-            <span>These official employment fields are locked for self-editing to maintain organizational compliance.</span>
-          </div>
+        currentUser?.role === 'super_admin' ? (
+          <Card
+            title="System Authority & Organization Governance"
+            subtitle="Root organization leadership and system ownership profile."
+          >
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-900">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-purple-700" />
+              <span>You are authenticated as the Primary Organization Founder & Super Administrator with full unrestricted governance.</span>
+            </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-medium text-slate-500">Employee Code</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.employee_code || '-'}</p>
+            <div className="grid gap-4 sm:grid-cols-2 text-xs">
+              <div>
+                <p className="font-medium text-slate-500">Ownership Authority</p>
+                <p className="mt-1 font-bold text-slate-900">Primary Founder & System Owner</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-500">Organization Scope</p>
+                <p className="mt-1 font-bold text-teal-800">All Branches (Organization-Wide / HQ)</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-500">System Role</p>
+                <p className="mt-1 font-bold text-purple-700 uppercase">SUPER ADMIN (ROOT OWNER)</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-500">Module Access</p>
+                <p className="mt-1 font-bold text-slate-800">All 25 System Modules (Full Control)</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-500">Workforce Status</p>
+                <p className="mt-1 font-bold text-emerald-700">Executive Master (Independent of Staff Punching)</p>
+              </div>
+              <div>
+                <p className="font-medium text-slate-500">Reporting Chain</p>
+                <p className="mt-1 font-bold text-slate-800">Board of Directors / Primary Ownership</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Official Designation</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.designation || '-'}</p>
+          </Card>
+        ) : (
+          <Card
+            title="Employment & Organization Details"
+            subtitle="Official company records maintained by HR. Changes require HR administrator verification."
+          >
+            <div className="mb-4 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <Lock className="h-4 w-4 shrink-0 text-slate-400" />
+              <span>These official employment fields are locked for self-editing to maintain organizational compliance.</span>
             </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Department</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.department || '-'}</p>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-medium text-slate-500">Employee Code</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.employee_code || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Official Designation</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.designation || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Department</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.department || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Branch Office</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.branch_name || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Employment Type</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.employment_type || 'Full-Time Permanent'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Date of Joining</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.date_of_joining || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">Probation Status</p>
+                <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.probation_status || 'Confirmed'}</p>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">System Access Role</p>
+                <p className="mt-1 text-xs font-bold text-teal-800">{userRoleLabels[currentUser?.role] || currentUser?.role}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Branch Office</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.branch_name || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Employment Type</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.employment_type || 'Full-Time Permanent'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Date of Joining</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.date_of_joining || '-'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">Probation Status</p>
-              <p className="mt-1 text-xs font-bold text-slate-800">{currentUser?.probation_status || 'Confirmed'}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500">System Access Role</p>
-              <p className="mt-1 text-xs font-bold text-teal-800">{userRoleLabels[currentUser?.role] || currentUser?.role}</p>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        )
       )}
 
       {/* Tab 3: Statutory & Tax (Read-Only) */}

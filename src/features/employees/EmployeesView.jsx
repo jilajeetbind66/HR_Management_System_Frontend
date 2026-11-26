@@ -148,8 +148,9 @@ export default function EmployeesView() {
   const [newEmp, setNewEmp] = useState(initialEmpState);
 
   const canManageEmployees = hasPermission('employees.manage');
+  const isSuperAdminSelected = selectedEmployee?.role === 'super_admin';
   const canEditHierarchy = ['super_admin', 'hr_admin'].includes(currentUser?.role);
-  const canArchiveSelectedEmployee = (
+  const canArchiveSelectedEmployee = !isSuperAdminSelected && (
     currentUser?.role === 'super_admin'
     || (
       currentUser?.role === 'hr_admin'
@@ -779,6 +780,11 @@ export default function EmployeesView() {
                         <div className="font-semibold text-slate-900 flex items-center gap-1.5">
                           {emp.first_name} {emp.last_name}
                           <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 rounded">{emp.employee_code}</span>
+                          {emp.role === 'super_admin' && (
+                            <span className="font-semibold text-[9px] bg-purple-100 text-purple-800 border border-purple-200 px-1.5 py-0.5 rounded-full">
+                              Super Admin / Owner
+                            </span>
+                          )}
                         </div>
                         {currentUser?.role !== 'manager' && (
                           <p className="text-[11px] text-slate-400 truncate max-w-[220px]" title={emp.email}>{emp.email}</p>
@@ -919,7 +925,14 @@ export default function EmployeesView() {
                 </span>
               )}
               <div>
-                <h3 className="text-base font-bold text-slate-900">{selectedEmployee.first_name} {selectedEmployee.last_name}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-bold text-slate-900">{selectedEmployee.first_name} {selectedEmployee.last_name}</h3>
+                  {selectedEmployee.role === 'super_admin' && (
+                    <span className="rounded-full bg-purple-100 border border-purple-200 px-2.5 py-0.5 text-[10px] font-bold text-purple-800">
+                      Founder & System Owner
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-teal-600 font-medium">{selectedEmployee.designation} • {selectedEmployee.department}</p>
                 {currentUser?.role !== 'manager' && (
                   <p className="text-[11px] text-slate-400 mt-0.5">
@@ -1052,6 +1065,56 @@ export default function EmployeesView() {
                     </div>
                   </div>
                 )}
+                {selectedEmployee.role === 'super_admin' ? (
+                  <div className="space-y-3">
+                    <div className="rounded-xl border border-purple-200 bg-gradient-to-r from-purple-50 via-indigo-50 to-teal-50 p-3.5 shadow-sm">
+                      <div className="flex items-center gap-2 text-purple-900">
+                        <ShieldCheck className="h-4 w-4 text-purple-700" />
+                        <span className="text-xs font-bold uppercase tracking-wider">Root Organization Authority</span>
+                      </div>
+                      <p className="mt-1 text-xs text-purple-800 leading-relaxed">
+                        This account represents the primary organization founder and root system administrator with unrestricted privileges across all company operations, branches, and financial controls.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Organization Scope</span>
+                        <span className="font-bold text-teal-800">All Branches (Organization-Wide / HQ)</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Reporting Authority</span>
+                        <span className="font-semibold text-slate-800">Board of Directors / Primary Owner</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Designation & Department</span>
+                        <span className="font-semibold text-slate-800">{selectedEmployee.designation || 'Director of Engineering'} • {selectedEmployee.department || 'Executive Leadership'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Founding / Start Date</span>
+                        <span className="font-semibold text-slate-800">{selectedEmployee.date_of_joining}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Employment Category</span>
+                        <span className="font-semibold text-slate-800">Founder & Managing Director</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Attendance & Biometrics</span>
+                        <span className="inline-flex items-center gap-1 font-bold text-teal-700">
+                          <span className="w-2 h-2 rounded-full bg-teal-500" /> Executive Exempt (No penalty deductions)
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">System Role</span>
+                        <span className="uppercase font-bold text-purple-700">SUPER ADMIN (ROOT OWNER)</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-bold">Probation Status</span>
+                        <span className="font-semibold text-emerald-700">Exempt (Founding Authority)</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-bold">Branch Office</span>
@@ -1114,6 +1177,7 @@ export default function EmployeesView() {
                     )}
                   </div>
                 </div>
+                )}
                 {canEditHierarchy && (
                   <div className="flex justify-between gap-2">
                     {!isEditingHierarchy
@@ -1148,9 +1212,11 @@ export default function EmployeesView() {
                         </Button>
                       </>
                     ) : (
-                      <Button type="button" variant="secondary" onClick={beginHierarchyEdit}>
-                        Edit hierarchy & role
-                      </Button>
+                      (!isSuperAdminSelected || currentUser?.role === 'super_admin') && (
+                        <Button type="button" variant="secondary" onClick={beginHierarchyEdit}>
+                          {isSuperAdminSelected ? 'Edit profile contact' : 'Edit hierarchy & role'}
+                        </Button>
+                      )
                     )}
                     </div>
                   </div>
@@ -1159,8 +1225,8 @@ export default function EmployeesView() {
             )}
 
             {activeProfileTab === 'job' && canManageLeadAccess && selectedEmployee && (
-              <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 shadow-sm">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              isSuperAdminSelected ? (
+                <div className="rounded-xl border border-teal-200 bg-teal-50/80 p-4 shadow-sm">
                   <div className="flex items-start gap-3">
                     <div className="mt-0.5 rounded-lg bg-teal-600 p-2 text-white shadow-sm">
                       <TrendingUp className="h-4 w-4" />
@@ -1168,47 +1234,70 @@ export default function EmployeesView() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
-                          Lead Management Access
+                          Lead Management & CRM Master Access
                         </span>
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                          selectedEmployee.has_lead_access
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-slate-200 text-slate-700 border border-slate-300'
-                        }`}>
-                          {selectedEmployee.has_lead_access ? 'Enabled' : 'Disabled'}
+                        <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-teal-200 text-teal-900 border border-teal-300">
+                          Always Enabled (Owner Privilege)
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-teal-800">
-                        When enabled, the Lead Management section appears in this employee's dashboard and sidebar navigation, permitting them to manage assigned leads.
+                      <p className="mt-1 text-xs text-teal-800 leading-relaxed">
+                        As Organization Owner and Root Super Admin, you have unrestricted master access to all client pipelines, lead conversions, and sales metrics across all branches.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 self-end sm:self-center">
-                    <button
-                      type="button"
-                      disabled={isUpdatingLeadAccess}
-                      onClick={() => handleToggleLeadAccess(selectedEmployee.id, !selectedEmployee.has_lead_access)}
-                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 ${
-                        selectedEmployee.has_lead_access ? 'bg-teal-600' : 'bg-slate-300'
-                      }`}
-                      role="switch"
-                      aria-checked={Boolean(selectedEmployee.has_lead_access)}
-                      aria-label="Toggle Lead Management Access"
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                          selectedEmployee.has_lead_access ? 'translate-x-5' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                  </div>
                 </div>
-                {leadAccessSuccess && (
-                  <div className="mt-2.5 rounded-lg bg-emerald-100/90 px-3 py-1.5 text-xs font-semibold text-emerald-900">
-                    ✓ {leadAccessSuccess}
+              ) : (
+                <div className="rounded-xl border border-teal-100 bg-teal-50/60 p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-lg bg-teal-600 p-2 text-white shadow-sm">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                            Lead Management Access
+                          </span>
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            selectedEmployee.has_lead_access
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-200 text-slate-700 border border-slate-300'
+                          }`}>
+                            {selectedEmployee.has_lead_access ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 text-xs text-teal-800">
+                          When enabled, the Lead Management section appears in this employee's dashboard and sidebar navigation, permitting them to manage assigned leads.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 self-end sm:self-center">
+                      <button
+                        type="button"
+                        disabled={isUpdatingLeadAccess}
+                        onClick={() => handleToggleLeadAccess(selectedEmployee.id, !selectedEmployee.has_lead_access)}
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-600 focus:ring-offset-2 ${
+                          selectedEmployee.has_lead_access ? 'bg-teal-600' : 'bg-slate-300'
+                        }`}
+                        role="switch"
+                        aria-checked={Boolean(selectedEmployee.has_lead_access)}
+                        aria-label="Toggle Lead Management Access"
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                            selectedEmployee.has_lead_access ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
+                  {leadAccessSuccess && (
+                    <div className="mt-2.5 rounded-lg bg-emerald-100/90 px-3 py-1.5 text-xs font-semibold text-emerald-900">
+                      ✓ {leadAccessSuccess}
+                    </div>
+                  )}
+                </div>
+              )
             )}
 
             {/* TAB CONTENT: STATUTORY (Architecture Section 7.4 & 8) */}

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
+import { getIndiaDateString } from '../../utils/date';
 
 const getDateKey = (date) => String(date || '').slice(0, 10);
 
@@ -256,11 +257,12 @@ export default function EmployeeDashboard({ onNavigate }) {
     leaveBalances,
     regularizationRequests,
     announcements,
+    holidays,
   } = useHRMS();
   const employeeId = Number(currentUser?.employee_id);
   const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const todayKey = getIndiaDateString(today);
+  const monthKey = todayKey.slice(0, 7);
   const firstName = currentUser?.first_name || currentUser?.name?.split(' ')[0] || 'there';
   const myProjects = projects.filter((project) => Number(project.assigned_employee_id) === employeeId);
   const myAttendance = attendance.filter((record) => Number(record.employee_id) === employeeId);
@@ -268,20 +270,61 @@ export default function EmployeeDashboard({ onNavigate }) {
   const myRegularizations = regularizationRequests.filter(
     (request) => Number(request.employee_id) === employeeId
   );
+
+  const isSuperAdminUser = currentUser?.role === 'super_admin';
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth(); // 0-indexed
+  const todayDay = today.getDate();
+
   const monthAttendance = myAttendance.filter((record) => getDateKey(record.date).startsWith(monthKey));
   const getStatusCount = (status) => monthAttendance.filter(
     (record) => String(record.status || '').toLowerCase() === status
   ).length;
   const presentDays = getStatusCount('present');
-  const absentDays = getStatusCount('absent');
   const halfDays = monthAttendance.filter(
     (record) => String(record.status || '').toLowerCase().includes('half')
   ).length;
   const shortHoursDays = getStatusCount('short hours');
+
+  // Dates with punch records in the current month
+  const punchDates = new Set(
+    monthAttendance
+      .filter((r) => r.punch_in || String(r.status || '').toLowerCase() === 'present' || String(r.status || '').toLowerCase().includes('half'))
+      .map((r) => getDateKey(r.date))
+  );
+
+  // Approved leave dates
+  const approvedLeaves = myLeaves.filter((l) => String(l.status || '').toLowerCase() === 'approved');
+
+  let calculatedAbsentDays = 0;
+  let workingDaysPassed = 0;
+
+  if (!isSuperAdminUser) {
+    for (let d = 1; d <= todayDay; d++) {
+      const dKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dObj = new Date(currentYear, currentMonth, d);
+      const isSun = dObj.getDay() === 0;
+      const isHol = Array.isArray(holidays) && holidays.some((h) => (h.holiday_date || h.date) === dKey);
+
+      if (!isSun && !isHol) {
+        workingDaysPassed++;
+        const hasLeave = approvedLeaves.some((l) => dKey >= getDateKey(l.from_date) && dKey <= getDateKey(l.to_date));
+        const hasPunch = punchDates.has(dKey);
+
+        if (!hasLeave && !hasPunch) {
+          calculatedAbsentDays++;
+        }
+      }
+    }
+  }
+
+  const absentDays = isSuperAdminUser ? 0 : calculatedAbsentDays;
   const otherDays = Math.max(0, monthAttendance.length - presentDays - absentDays - halfDays - shortHoursDays);
-  const attendancePercentage = monthAttendance.length
-    ? Math.round((presentDays / monthAttendance.length) * 100)
-    : 0;
+  const attendancePercentage = isSuperAdminUser
+    ? 100
+    : (workingDaysPassed > 0
+      ? Math.min(100, Math.round(((presentDays + halfDays * 0.5) / workingDaysPassed) * 100))
+      : (monthAttendance.length ? Math.round((presentDays / monthAttendance.length) * 100) : 100));
   const myBalance = leaveBalances?.[employeeId] || leaveBalances?.[String(employeeId)] || null;
   const balanceFields = ['cl', 'sl', 'pl', 'comp_off'];
   const hasLeaveBalance = Boolean(myBalance);

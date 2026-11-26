@@ -5,6 +5,7 @@ import {
   Bell,
   Building2,
   CalendarDays,
+  CircleAlert,
   Clock3,
   FileText,
   FolderKanban,
@@ -14,6 +15,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import { canReviewLeave } from '../../utils/leaveApproval';
+import { getIndiaDateString } from '../../utils/date';
 
 const dateKey = (date) => String(date || '').slice(0, 10);
 
@@ -93,9 +95,9 @@ function PanelHeader({ icon: Icon, title, action, onAction }) {
 
 export default function ManagerDashboard({ onNavigate }) {
   const { currentUser, activeBranch } = useAuth();
-  const { employees, projects, attendance, leaveRequests, announcements } = useHRMS();
+  const { employees, projects, attendance, leaveRequests, announcements, holidays } = useHRMS();
+  const todayKey = getIndiaDateString();
   const today = new Date();
-  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const firstName = currentUser.first_name || currentUser.name?.split(' ')[0] || 'Manager';
   const isBranchScoped = Boolean(activeBranch && activeBranch !== 'All Branches');
 
@@ -119,11 +121,40 @@ export default function ManagerDashboard({ onNavigate }) {
     canReviewLeave(leave, currentUser)
     && (!isBranchScoped || teamMemberIds.has(Number(leave.employee_id)))
   ));
-  const presentToday = attendance.filter(
-    (record) => teamMemberIds.has(Number(record.employee_id))
-      && dateKey(record.date) === todayKey
-      && String(record.status || '').toLowerCase() === 'present'
-  ).length;
+
+  const presentTeamIds = new Set(
+    attendance
+      .filter(
+        (record) =>
+          teamMemberIds.has(Number(record.employee_id))
+          && dateKey(record.date) === todayKey
+          && (record.punch_in || String(record.status || '').toLowerCase() === 'present')
+      )
+      .map((record) => Number(record.employee_id))
+  );
+  const presentToday = teamMembers.filter((emp) => presentTeamIds.has(Number(emp.id))).length;
+
+  const onLeaveTeamIds = new Set(
+    (leaveRequests || [])
+      .filter(
+        (leave) =>
+          teamMemberIds.has(Number(leave.employee_id))
+          && String(leave.status || '').toLowerCase() === 'approved'
+          && todayKey >= dateKey(leave.from_date)
+          && todayKey <= dateKey(leave.to_date)
+      )
+      .map((leave) => Number(leave.employee_id))
+  );
+  const onLeaveToday = teamMembers.filter((emp) => onLeaveTeamIds.has(Number(emp.id)) && !presentTeamIds.has(Number(emp.id))).length;
+
+  const isSunday = today.getDay() === 0;
+  const isHoliday = Array.isArray(holidays) && holidays.some((h) => (h.holiday_date || h.date) === todayKey);
+  const isNonWorkingDay = isSunday || isHoliday;
+
+  const teamAbsentToday = isNonWorkingDay
+    ? 0
+    : Math.max(0, teamMembers.length - presentToday - onLeaveToday);
+
   const latestAnnouncements = announcements.slice(0, 4);
   const activeTeamProjectsWithDeadlines = activeTeamProjects
     .map((project) => ({
@@ -152,6 +183,24 @@ export default function ManagerDashboard({ onNavigate }) {
       module: 'employees',
     },
     {
+      title: 'Present Today',
+      value: presentToday,
+      note: teamMembers.length ? `${Math.round((presentToday / teamMembers.length) * 100)}% attendance rate` : 'Team attendance records',
+      badge: 'Today',
+      icon: Clock3,
+      tone: 'emerald',
+      module: 'attendance',
+    },
+    {
+      title: 'Team Absents Today',
+      value: teamAbsentToday,
+      note: isNonWorkingDay ? (isSunday ? 'Week Off' : 'Holiday') : (teamAbsentToday > 0 ? `${teamAbsentToday} unpunched today` : 'Full attendance'),
+      badge: teamAbsentToday > 0 ? 'Unscheduled' : 'Accounted',
+      icon: CircleAlert,
+      tone: teamAbsentToday > 0 ? 'rose' : 'emerald',
+      module: 'attendance',
+    },
+    {
       title: 'Team Projects',
       value: activeTeamProjects.length,
       note: isBranchScoped ? `${activeBranch} projects` : 'Assigned active projects',
@@ -168,15 +217,6 @@ export default function ManagerDashboard({ onNavigate }) {
       icon: FileText,
       tone: 'amber',
       module: 'leaves',
-    },
-    {
-      title: 'Present Today',
-      value: presentToday,
-      note: isBranchScoped ? `${activeBranch} attendance` : 'Team attendance records',
-      badge: 'Today',
-      icon: Clock3,
-      tone: 'rose',
-      module: 'attendance',
     },
   ];
 
@@ -207,7 +247,7 @@ export default function ManagerDashboard({ onNavigate }) {
         </div>
       </section>
 
-      <section aria-label="Team overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section aria-label="Team overview" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {stats.map((stat) => (
           <ManagerStatCard key={stat.title} {...stat} onNavigate={onNavigate} />
         ))}

@@ -8,6 +8,7 @@ import ManagerDashboard from './ManagerDashboard';
 import RecruiterDashboard from './RecruiterDashboard';
 import { canAccessModule, getPanelName } from '../../config/roleAccess';
 import { canReviewLeave } from '../../utils/leaveApproval';
+import { getIndiaDateString } from '../../utils/date';
 import {
   ArrowRight,
   Banknote,
@@ -64,6 +65,16 @@ const panelCopy = {
       ['organization', 'Company Masters'],
     ],
   },
+  super_admin: {
+    title: 'Executive Command Center',
+    description: 'Real-time organization workforce health, live attendance, and operations overview.',
+    links: [
+      ['employees', 'Employee Directory'],
+      ['attendance', 'Live Attendance'],
+      ['payroll', 'Payroll Runs'],
+      ['platform', 'Platform & Audit'],
+    ],
+  },
 };
 
 export default function RoleDashboard({ onNavigate }) {
@@ -77,6 +88,7 @@ export default function RoleDashboard({ onNavigate }) {
     auditLogs,
     branches,
     announcements,
+    holidays,
   } = useHRMS();
   const role = currentUser?.role;
   if (role === 'employee') {
@@ -92,6 +104,7 @@ export default function RoleDashboard({ onNavigate }) {
   const selectedBranchObj = activeBranch && activeBranch !== 'All Branches'
     ? branches.find((b) => b.name === activeBranch)
     : null;
+  const isBranchScoped = Boolean(selectedBranchObj);
   const scopedEmployees = selectedBranchObj
     ? employees.filter((e) => Number(e.branch_id) === Number(selectedBranchObj.id) || e.branch_name === selectedBranchObj.name)
     : employees;
@@ -101,27 +114,90 @@ export default function RoleDashboard({ onNavigate }) {
   const myProjects = projects.filter(project => Number(project.assigned_employee_id) === Number(currentUser.employee_id));
   const myAttendance = attendance.filter(record => Number(record.employee_id) === Number(currentUser.employee_id));
   const pendingLeaves = leaveRequests.filter(leave => canReviewLeave(leave, currentUser));
-  const employeeCount = scopedEmployees.filter(employee => String(employee.status || '').toLowerCase() === 'active').length || scopedEmployees.length;
-  const today = new Date().toISOString().slice(0, 10);
+
+  const isExecutiveExempt = (emp) =>
+    emp.role === 'super_admin' ||
+    String(emp.designation || '').toLowerCase().includes('director') ||
+    String(emp.designation || '').toLowerCase().includes('owner');
+
+  const activeScopedEmployees = scopedEmployees.filter(
+    (employee) => String(employee.status || '').toLowerCase() === 'active'
+  );
+  const employeeCount = activeScopedEmployees.length || scopedEmployees.length;
+  // Tracked workforce: active employees excluding executive exempt (e.g. Super Admin / Owner)
+  const trackedEmployees = activeScopedEmployees.filter((emp) => !isExecutiveExempt(emp));
+  const totalTrackedCount = trackedEmployees.length;
+
+  const today = getIndiaDateString();
+  const todayDateObj = new Date();
+  const isSunday = todayDateObj.getDay() === 0;
+  const isHoliday = Array.isArray(holidays) && holidays.some((h) => (h.holiday_date || h.date) === today);
+  const isNonWorkingDay = isSunday || isHoliday;
+
   const scopedAttendance = selectedBranchObj
     ? attendance.filter(record => scopedEmployeeIds.has(Number(record.employee_id)))
     : attendance;
-  const presentToday = scopedAttendance.filter(record => record.date === today && record.status === 'Present').length;
-  const isHrRole = ['hr_admin', 'hr_executive', 'recruiter'].includes(role);
-  const absentToday = scopedAttendance.filter(
-    record => record.date === today && String(record.status || '').toLowerCase() === 'absent'
+
+  // Tracked staff who punched in today
+  const presentTodayIds = new Set(
+    scopedAttendance
+      .filter(record => record.date === today && (record.punch_in || String(record.status || '').toLowerCase() === 'present'))
+      .map(record => Number(record.employee_id))
+  );
+  const presentToday = trackedEmployees.filter(emp => presentTodayIds.has(Number(emp.id))).length;
+
+  // Tracked staff who have approved leave covering today
+  const onLeaveTodayIds = new Set(
+    (leaveRequests || [])
+      .filter(
+        (leave) =>
+          String(leave.status || '').toLowerCase() === 'approved' &&
+          today >= leave.from_date &&
+          today <= leave.to_date
+      )
+      .map((leave) => Number(leave.employee_id))
+  );
+  const onLeaveToday = trackedEmployees.filter(
+    (emp) => onLeaveTodayIds.has(Number(emp.id)) && !presentTodayIds.has(Number(emp.id))
   ).length;
+
+  // Real-Time Absent: Tracked Staff minus Presents minus Approved Leaves (0 on Sunday/Holiday)
+  const absentToday = isNonWorkingDay
+    ? 0
+    : Math.max(0, totalTrackedCount - presentToday - onLeaveToday);
+
+  const isExecutiveOrHr = ['super_admin', 'hr_admin', 'hr_executive', 'recruiter'].includes(role);
   const latestPendingLeaves = pendingLeaves.slice(0, 4);
   const latestAnnouncements = announcements.slice(0, 3);
+
   const attendanceByDay = Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (6 - index));
-    const dateKey = date.toISOString().slice(0, 10);
-    const records = scopedAttendance.filter(record => record.date === dateKey);
+    const dateKey = getIndiaDateString(date);
+    const dayOfWeek = date.getDay();
+    const dayIsSunday = dayOfWeek === 0;
+    const dayIsHoliday = Array.isArray(holidays) && holidays.some(h => (h.holiday_date || h.date) === dateKey);
+    const dayIsNonWorking = dayIsSunday || dayIsHoliday;
+
+    const dayPresentIds = new Set(
+      scopedAttendance
+        .filter(record => record.date === dateKey && (record.punch_in || String(record.status || '').toLowerCase() === 'present'))
+        .map(record => Number(record.employee_id))
+    );
+    const dayPresents = trackedEmployees.filter(emp => dayPresentIds.has(Number(emp.id))).length;
+
+    const dayLeaveIds = new Set(
+      (leaveRequests || [])
+        .filter(leave => String(leave.status || '').toLowerCase() === 'approved' && dateKey >= leave.from_date && dateKey <= leave.to_date)
+        .map(leave => Number(leave.employee_id))
+    );
+    const dayLeaves = trackedEmployees.filter(emp => dayLeaveIds.has(Number(emp.id)) && !dayPresentIds.has(Number(emp.id))).length;
+    const dayAbsents = dayIsNonWorking ? 0 : Math.max(0, totalTrackedCount - dayPresents - dayLeaves);
+
     return {
       label: date.toLocaleDateString('en-IN', { weekday: 'short' }),
-      present: records.filter(record => String(record.status || '').toLowerCase() === 'present').length,
-      absent: records.filter(record => String(record.status || '').toLowerCase() === 'absent').length,
+      present: dayPresents,
+      absent: dayAbsents,
     };
   });
   const maxAttendance = Math.max(1, ...attendanceByDay.map(day => day.present + day.absent));
@@ -180,19 +256,52 @@ export default function RoleDashboard({ onNavigate }) {
     ];
   const availableLinks = panel.links.filter(([module]) => canAccessModule(role, module));
 
-  if (isHrRole) {
-    const hrStats = [
-      { title: 'Total Employees', value: employeeCount, icon: Users, tone: 'emerald' },
-      { title: 'Today Presents', value: presentToday, icon: CalendarCheck, tone: 'emerald' },
-      { title: 'Today Absents', value: absentToday, icon: CircleAlert, tone: 'amber' },
-      { title: 'Pending Leave', value: pendingLeaves.length, icon: CalendarDays, tone: 'rose' },
-    ];
+  if (isExecutiveOrHr) {
+    const hrStats = role === 'super_admin'
+      ? [
+        {
+          title: isBranchScoped ? `Total Staff (${selectedBranchObj.name.replace(' Branch', '')})` : 'Total Organization Staff',
+          value: employeeCount,
+          icon: Users,
+          tone: 'emerald',
+          subtext: `${totalTrackedCount} active staff tracked`,
+        },
+        {
+          title: 'Today Presents',
+          value: presentToday,
+          icon: CalendarCheck,
+          tone: 'emerald',
+          subtext: totalTrackedCount ? `${Math.round((presentToday / totalTrackedCount) * 100)}% attendance rate` : '0%',
+        },
+        {
+          title: 'Today Absents',
+          value: absentToday,
+          icon: CircleAlert,
+          tone: absentToday > 0 ? 'rose' : 'emerald',
+          subtext: isNonWorkingDay ? (isSunday ? 'Week Off' : 'Holiday') : (absentToday > 0 ? `${absentToday} unpunched today` : 'All staff accounted'),
+        },
+        {
+          title: 'On Leave Today',
+          value: onLeaveToday,
+          icon: CalendarDays,
+          tone: 'blue',
+          subtext: `${pendingLeaves.length} leave requests pending`,
+        },
+      ]
+      : [
+        { title: 'Total Employees', value: employeeCount, icon: Users, tone: 'emerald', subtext: 'Active workforce' },
+        { title: 'Today Presents', value: presentToday, icon: CalendarCheck, tone: 'emerald', subtext: 'Punched in today' },
+        { title: 'Today Absents', value: absentToday, icon: CircleAlert, tone: absentToday > 0 ? 'rose' : 'emerald', subtext: isNonWorkingDay ? 'Non-working day' : (absentToday > 0 ? `${absentToday} unpunched` : 'Zero absents') },
+        { title: 'Pending Leave', value: pendingLeaves.length, icon: CalendarDays, tone: 'rose', subtext: 'Awaiting approval' },
+      ];
 
     return (
       <div className="space-y-5">
         <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-700">HR workspace</p>
+            <p className={`text-[11px] font-bold uppercase tracking-[0.18em] ${role === 'super_admin' ? 'text-teal-700' : 'text-emerald-700'}`}>
+              {role === 'super_admin' ? 'Super Admin Command Center' : 'HR Operations Workspace'}
+            </p>
             <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{panel.title}</h1>
             <p className="mt-1 text-sm text-slate-500">{panel.description}</p>
           </div>
@@ -202,7 +311,11 @@ export default function RoleDashboard({ onNavigate }) {
                 key={module}
                 type="button"
                 onClick={() => onNavigate(module)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                  role === 'super_admin'
+                    ? 'border-teal-200 bg-white text-teal-800 hover:bg-teal-50 focus:ring-teal-500'
+                    : 'border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50 focus:ring-emerald-500'
+                }`}
               >
                 {label}
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -211,21 +324,22 @@ export default function RoleDashboard({ onNavigate }) {
           </div>
         </section>
 
-        <section aria-label="HR overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {hrStats.map(({ title, value, icon: Icon, tone }) => (
+        <section aria-label="Workforce overview" className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {hrStats.map(({ title, value, icon: Icon, tone, subtext }) => (
             <article key={title} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <h2 className="text-xs font-semibold text-slate-500">{title}</h2>
                 <span className={`rounded-lg p-2 ${
                   tone === 'emerald' ? 'bg-emerald-50 text-emerald-700'
                     : tone === 'amber' ? 'bg-amber-50 text-amber-700'
-                      : 'bg-rose-50 text-rose-700'
+                      : tone === 'blue' ? 'bg-blue-50 text-blue-700'
+                        : 'bg-rose-50 text-rose-700'
                 }`}>
                   <Icon className="h-4 w-4" />
                 </span>
               </div>
               <p className="mt-3 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-              <p className="mt-1 text-[11px] text-slate-400">From current HRMS records</p>
+              <p className="mt-1 text-[11px] text-slate-400">{subtext || 'From current HRMS records'}</p>
             </article>
           ))}
         </section>

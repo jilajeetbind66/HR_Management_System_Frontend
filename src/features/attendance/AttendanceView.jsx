@@ -418,6 +418,9 @@ export default function AttendanceView() {
         );
 
         let cell = { status: '—', text: '—', color: 'text-slate-300', bg: 'bg-slate-50', hours: 0, isLate: false };
+        const isExecutiveExempt = emp.role === 'super_admin' ||
+          String(emp.designation || '').toLowerCase().includes('director') ||
+          String(emp.designation || '').toLowerCase().includes('owner');
 
         if (attRec && attRec.punch_in) {
           const hours = parseFloat(attRec.work_hours || 0);
@@ -437,6 +440,8 @@ export default function AttendanceView() {
         } else if (isSunday) {
           weekOffCount++;
           cell = { status: 'WO', text: 'WO', color: 'text-slate-400', bg: 'bg-slate-100', hours: 0, isLate: false };
+        } else if (isExecutiveExempt) {
+          cell = { status: 'EX', text: 'EX', color: 'text-teal-700', bg: 'bg-teal-50 font-bold', hours: 0, isLate: false };
         } else if (dateKey <= todayStr) {
           absentCount++;
           cell = { status: 'A', text: 'A', color: 'text-rose-700', bg: 'bg-rose-100 font-bold', hours: 0, isLate: false };
@@ -452,7 +457,13 @@ export default function AttendanceView() {
         ? Math.floor(lateCount / lateThreshold) * 0.5
         : 0;
 
-      const payableDays = Math.max(0, presentCount + (halfDayCount * 0.5) + leaveCount + weekOffCount - penaltyCount);
+      const isExecutiveExempt = emp.role === 'super_admin' ||
+        String(emp.designation || '').toLowerCase().includes('director') ||
+        String(emp.designation || '').toLowerCase().includes('owner');
+
+      const payableDays = isExecutiveExempt
+        ? totalDaysInMonth
+        : Math.max(0, presentCount + (halfDayCount * 0.5) + leaveCount + weekOffCount - penaltyCount);
 
       return {
         employee: emp,
@@ -1175,7 +1186,7 @@ export default function AttendanceView() {
               ? `Muster Roll Ledger — ${monthNames[selectedMonth - 1] || selectedMonth} ${selectedYear}`
               : `Employee Attendance Matrix — ${selectedEmployeeObj?.first_name} ${selectedEmployeeObj?.last_name} (${monthNames[selectedMonth - 1] || selectedMonth} ${selectedYear})`}
             subtitle={selectedEmployeeId === 'all'
-              ? "P = Present · HD = Half Day (<4.5 hrs) · L = Approved Leave · WO = Week Off (Sunday) · A = Absent"
+              ? "P = Present · HD = Half Day (<4.5 hrs) · L = Approved Leave · WO = Week Off (Sunday) · EX = Executive Exempt · A = Absent"
               : `${selectedEmployeeObj?.employee_code || ''} · ${selectedEmployeeObj?.designation || ''} · ${selectedEmployeeObj?.branch_name || ''} · 1 to ${totalDaysInMonth} Day Attendance Grid`}
             bodyClassName="p-0 overflow-hidden"
           >
@@ -1268,6 +1279,7 @@ export default function AttendanceView() {
                 <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-purple-200 border border-purple-400" /> L: Approved Leave</span>
                 <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-200 border border-amber-400" /> HD: Half Day (&lt;4.5h)</span>
                 <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-slate-200 border border-slate-300" /> WO: Week Off</span>
+                <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-teal-100 border border-teal-400" /> EX: Exempt</span>
                 <span className="inline-flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-rose-200 border border-rose-400" /> A: Absent</span>
               </div>
               <div className="text-[11px] font-medium text-slate-500">
