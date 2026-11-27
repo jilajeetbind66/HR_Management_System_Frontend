@@ -54,7 +54,27 @@ const formatRoleLabel = (role) => role
   ? role.split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ')
   : '';
 
-const validateProjectDates = ({ start_date, planned_end_date }, showRequiredErrors = false) => {
+const isDateSunday = (dateStr) => {
+  if (!dateStr) return false;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getDay() === 0;
+};
+
+const getNextMonday = (dateStr) => {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const day = date.getDay();
+  const daysToAdd = day === 0 ? 1 : (8 - day);
+  date.setDate(date.getDate() + daysToAdd);
+  return date.toISOString().substring(0, 10);
+};
+
+const validateProjectDates = (
+  { start_date, planned_end_date, is_weekend_emergency, emergency_reason },
+  showRequiredErrors = false
+) => {
   const errors = {};
   if (showRequiredErrors && !start_date) errors.start_date = 'Start Date is required.';
   if (showRequiredErrors && !planned_end_date) {
@@ -62,6 +82,18 @@ const validateProjectDates = ({ start_date, planned_end_date }, showRequiredErro
   } else if (start_date && planned_end_date && planned_end_date < start_date) {
     errors.planned_end_date = 'Planned Baseline End Date must be on or after Start Date.';
   }
+
+  if (!is_weekend_emergency) {
+    if (isDateSunday(start_date)) {
+      errors.start_date = 'Start Date is on a Sunday (Weekly Off). Shift to Monday or enable Emergency Weekend Assignment.';
+    }
+    if (isDateSunday(planned_end_date)) {
+      errors.planned_end_date = 'Deadline cannot be on a Sunday (Weekly Off). Shift to Friday/Monday or enable Emergency Weekend Assignment.';
+    }
+  } else if (showRequiredErrors && !emergency_reason?.trim()) {
+    errors.emergency_reason = 'An emergency reason/justification is required for weekend assignments.';
+  }
+
   return errors;
 };
 
@@ -152,7 +184,11 @@ export default function ProjectsView() {
     assigned_employee_id: '',
     priority: 'Medium',
     start_date: new Date().toISOString().substring(0, 10),
-    planned_end_date: ''
+    planned_end_date: '',
+    is_weekend_emergency: false,
+    emergency_reason: '',
+    weekend_benefit_type: 'comp_off',
+    weekend_benefit_amount: '',
   };
 
   const [newProject, setNewProject] = useState(initialProjectState);
@@ -249,12 +285,19 @@ export default function ProjectsView() {
       const saved = await createProject(
         {
           ...newProject,
-          assigned_employee_id: Number(newProject.assigned_employee_id)
+          assigned_employee_id: Number(newProject.assigned_employee_id),
+          is_weekend_emergency: Boolean(newProject.is_weekend_emergency),
+          emergency_reason: newProject.is_weekend_emergency ? newProject.emergency_reason.trim() : null,
+          weekend_benefit_type: newProject.is_weekend_emergency ? newProject.weekend_benefit_type : null,
+          weekend_benefit_amount: newProject.is_weekend_emergency && newProject.weekend_benefit_type === 'allowance'
+            ? Number(newProject.weekend_benefit_amount)
+            : null,
         },
         `${currentUser.first_name} ${currentUser.last_name} (${currentUser.role})`
       );
 
-      setProjectSuccessToast(`Project ${saved?.project_code || ''} (${newProject.name}) created & assigned successfully in database!`);
+      const successPrefix = newProject.is_weekend_emergency ? '🚨 Emergency Weekend Project' : 'Project';
+      setProjectSuccessToast(`${successPrefix} ${saved?.project_code || ''} (${newProject.name}) created & assigned successfully!`);
       setTimeout(() => setProjectSuccessToast(null), 4000);
       setShowCreateModal(false);
       setNewProject(initialProjectState);
@@ -266,6 +309,7 @@ export default function ProjectsView() {
         ...validateProjectDates(newProject, true),
         ...(backendErrors.start_date ? { start_date: backendErrors.start_date[0] } : {}),
         ...(backendErrors.planned_end_date ? { planned_end_date: backendErrors.planned_end_date[0] } : {}),
+        ...(backendErrors.emergency_reason ? { emergency_reason: backendErrors.emergency_reason[0] } : {}),
       });
       const msg = err?.data?.message || err.message || "Failed to save project to database. Ensure Laravel server is running.";
       setProjectFormError(msg);
@@ -568,6 +612,25 @@ export default function ProjectsView() {
                         </Badge>
                         {project.project_type && (
                           <Badge variant="neutral" size="sm">{project.project_type}</Badge>
+                        )}
+                        {Boolean(project.is_weekend_emergency) && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                            🚨 Weekend Emergency
+                          </span>
+                        )}
+                        {Boolean(project.is_weekend_emergency) && project.weekend_benefit_type === 'comp_off' && (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                            project.benefit_credited_at
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-amber-100 text-amber-800 border border-amber-300'
+                          }`}>
+                            {project.benefit_credited_at ? '✓ +1 Comp-Off Credited' : '🎁 +1 Comp-Off on Delivery'}
+                          </span>
+                        )}
+                        {Boolean(project.is_weekend_emergency) && project.weekend_benefit_type === 'allowance' && (
+                          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                            💰 Allowance ₹{project.weekend_benefit_amount}
+                          </span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">{project.description}</p>
@@ -1181,6 +1244,185 @@ export default function ProjectsView() {
               <span className="text-[10px] text-slate-400 mt-0.5 block">This initial due date is immutable in history.</span>
             </div>
           </div>
+
+          {/* Sunday / Non-Working Day Warning Banner */}
+          {(isDateSunday(newProject.start_date) || isDateSunday(newProject.planned_end_date)) && !newProject.is_weekend_emergency && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3.5 text-xs text-amber-900">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                <div className="space-y-1.5 flex-1">
+                  <p className="font-bold">
+                    Sunday Detected (Company Weekly Off):
+                  </p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    {isDateSunday(newProject.start_date) && isDateSunday(newProject.planned_end_date)
+                      ? 'Both Start Date and Deadline fall on a Sunday. Standard company practice is to schedule work across business days.'
+                      : isDateSunday(newProject.start_date)
+                      ? 'Start Date falls on a Sunday. Standard company policy is to schedule tasks starting on Monday.'
+                      : 'Deadline falls on a Sunday. Setting deadlines on week-offs creates unfair overdue pressure on employees.'}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {isDateSunday(newProject.start_date) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMon = getNextMonday(newProject.start_date);
+                          const updated = { ...newProject, start_date: nextMon };
+                          setNewProject(updated);
+                          setProjectFieldErrors(validateProjectDates(updated));
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-300 transition"
+                      >
+                        Shift Start to Monday ({getNextMonday(newProject.start_date)})
+                      </button>
+                    )}
+                    {isDateSunday(newProject.planned_end_date) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextMon = getNextMonday(newProject.planned_end_date);
+                          const updated = { ...newProject, planned_end_date: nextMon };
+                          setNewProject(updated);
+                          setProjectFieldErrors(validateProjectDates(updated));
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-amber-200 px-2.5 py-1 text-[11px] font-bold text-amber-900 hover:bg-amber-300 transition"
+                      >
+                        Shift Deadline to Monday ({getNextMonday(newProject.planned_end_date)})
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = {
+                          ...newProject,
+                          is_weekend_emergency: true,
+                          priority: 'Urgent',
+                        };
+                        setNewProject(updated);
+                        setProjectFieldErrors(validateProjectDates(updated));
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-rose-700 transition"
+                    >
+                      🚨 Enable Emergency Weekend Assignment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Emergency Weekend Assignment Protocol Box */}
+          {newProject.is_weekend_emergency && (
+            <div className="rounded-xl border border-rose-300 bg-gradient-to-br from-rose-50 via-amber-50/40 to-white p-3.5 text-xs space-y-3 shadow-2xs">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-white font-bold text-xs shrink-0">
+                    🚨
+                  </span>
+                  <div>
+                    <span className="font-bold text-rose-900 uppercase tracking-wide text-[11px] block">
+                      Emergency Weekend Assignment Protocol Active
+                    </span>
+                    <span className="text-[10px] text-rose-700 block">
+                      Work scheduled on weekly off. Priority is set to Urgent and employee compensation is enabled.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = { ...newProject, is_weekend_emergency: false };
+                    setNewProject(updated);
+                    setProjectFieldErrors(validateProjectDates(updated));
+                  }}
+                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 underline shrink-0"
+                >
+                  Cancel Weekend Emergency
+                </button>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Emergency Justification / Reason <span className="text-rose-600">*</span>:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newProject.emergency_reason}
+                  placeholder="e.g. Critical production bug patch, server migration, or urgent client release"
+                  onChange={(e) => {
+                    const updated = { ...newProject, emergency_reason: e.target.value };
+                    setNewProject(updated);
+                    setProjectFieldErrors(validateProjectDates(updated));
+                  }}
+                  className={`w-full p-2 rounded-lg border bg-white ${projectFieldErrors.emergency_reason ? 'border-rose-500' : 'border-slate-300'}`}
+                />
+                {projectFieldErrors.emergency_reason && (
+                  <p className="mt-1 text-xs text-rose-700">{projectFieldErrors.emergency_reason}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-800 mb-1">
+                  Employee Weekend Compensation & Benefit:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <label className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition ${newProject.weekend_benefit_type === 'comp_off' ? 'border-teal-500 bg-teal-50/80 text-teal-900 font-bold' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <input
+                      type="radio"
+                      name="weekend_benefit"
+                      checked={newProject.weekend_benefit_type === 'comp_off'}
+                      onChange={() => setNewProject({ ...newProject, weekend_benefit_type: 'comp_off' })}
+                      className="mt-0.5 text-teal-600"
+                    />
+                    <div>
+                      <span className="block text-xs">Compensatory Off</span>
+                      <span className="block text-[10px] font-normal text-slate-500">+1 Day Leave auto-credited upon completion</span>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition ${newProject.weekend_benefit_type === 'allowance' ? 'border-teal-500 bg-teal-50/80 text-teal-900 font-bold' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <input
+                      type="radio"
+                      name="weekend_benefit"
+                      checked={newProject.weekend_benefit_type === 'allowance'}
+                      onChange={() => setNewProject({ ...newProject, weekend_benefit_type: 'allowance' })}
+                      className="mt-0.5 text-teal-600"
+                    />
+                    <div>
+                      <span className="block text-xs">Weekend Allowance</span>
+                      <span className="block text-[10px] font-normal text-slate-500">Financial stipend in monthly payroll</span>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition ${newProject.weekend_benefit_type === 'recognition' ? 'border-teal-500 bg-teal-50/80 text-teal-900 font-bold' : 'border-slate-200 bg-white text-slate-700'}`}>
+                    <input
+                      type="radio"
+                      name="weekend_benefit"
+                      checked={newProject.weekend_benefit_type === 'recognition'}
+                      onChange={() => setNewProject({ ...newProject, weekend_benefit_type: 'recognition' })}
+                      className="mt-0.5 text-teal-600"
+                    />
+                    <div>
+                      <span className="block text-xs">Special Recognition</span>
+                      <span className="block text-[10px] font-normal text-slate-500">Ownership honor & appraisal points</span>
+                    </div>
+                  </label>
+                </div>
+                {newProject.weekend_benefit_type === 'allowance' && (
+                  <div className="mt-2">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Allowance Amount (₹):</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 1500"
+                      value={newProject.weekend_benefit_amount}
+                      onChange={(e) => setNewProject({ ...newProject, weekend_benefit_amount: e.target.value })}
+                      className="w-full p-2 rounded-lg border border-slate-300 bg-white text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
             <Button

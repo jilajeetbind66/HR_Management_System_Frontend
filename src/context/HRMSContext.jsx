@@ -416,6 +416,10 @@ export function HRMSProvider({ children }) {
       assigned_employee_id: Number(projectData.assigned_employee_id),
       start_date: projectData.start_date,
       planned_end_date: projectData.planned_end_date,
+      is_weekend_emergency: Boolean(projectData.is_weekend_emergency),
+      emergency_reason: projectData.emergency_reason || null,
+      weekend_benefit_type: projectData.weekend_benefit_type || null,
+      weekend_benefit_amount: projectData.weekend_benefit_amount || null,
     });
     await refreshProjectData();
     return response?.data;

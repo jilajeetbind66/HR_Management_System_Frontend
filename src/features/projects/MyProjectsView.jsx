@@ -142,6 +142,27 @@ export default function MyProjectsView() {
                   {(project.status || 'unassigned').replaceAll('_', ' ')}
                 </span>
               </div>
+              {Boolean(project.is_weekend_emergency) && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                    🚨 Emergency Weekend Task
+                  </span>
+                  {project.weekend_benefit_type === 'comp_off' && (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                      project.benefit_credited_at
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    }`}>
+                      {project.benefit_credited_at ? '✓ +1 Comp-Off Leave Credited' : '🎁 Benefit: +1 Comp-Off Leave on Delivery'}
+                    </span>
+                  )}
+                  {project.weekend_benefit_type === 'allowance' && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      💰 Weekend Allowance: ₹{project.weekend_benefit_amount}
+                    </span>
+                  )}
+                </div>
+              )}
               {project.description && <p className="mt-3 text-sm text-slate-600">{project.description}</p>}
               {project.assigned_by && (
                 <p className="mt-2 text-xs text-slate-500">
