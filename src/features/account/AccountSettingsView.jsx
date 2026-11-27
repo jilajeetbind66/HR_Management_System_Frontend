@@ -95,10 +95,10 @@ export default function AccountSettingsView() {
         phone: cleanPhone || null,
         gender: personalForm.gender || 'Other',
         date_of_birth: personalForm.date_of_birth || null,
-        avatar: personalForm.avatar.trim() || null,
+        avatar: personalForm.avatar ? personalForm.avatar.trim() : null,
       };
 
-      if (currentUser?.role === 'super_admin' && personalForm.name.trim()) {
+      if (currentUser?.role === 'super_admin' && personalForm.name?.trim()) {
         payload.name = personalForm.name.trim();
       }
 
@@ -142,12 +142,24 @@ export default function AccountSettingsView() {
         employeeId: targetEmpId,
       });
 
-      const uploadedUrl = response?.data?.url || response?.data?.secure_url;
+      const uploadedUrl =
+        response?.data?.file_url ||
+        response?.data?.url ||
+        response?.data?.secure_url ||
+        response?.file_url ||
+        response?.url;
+
       if (uploadedUrl) {
         setAvatarPreview(uploadedUrl);
         setPersonalForm((prev) => ({ ...prev, avatar: uploadedUrl }));
-        setProfileSuccess('Photo uploaded successfully! Click Save to apply.');
-        setTimeout(() => setProfileSuccess(''), 3000);
+        // Automatically save the avatar into the user profile for seamless instant update
+        try {
+          await updateUserProfile({ avatar: uploadedUrl });
+          setProfileSuccess('Profile photo uploaded and saved successfully!');
+        } catch {
+          setProfileSuccess('Photo uploaded successfully! Click Save to apply.');
+        }
+        setTimeout(() => setProfileSuccess(''), 4000);
       } else {
         const base64Reader = new FileReader();
         base64Reader.onloadend = () => {
