@@ -712,10 +712,27 @@ export default function LeadManagementView() {
                               <span
                                 key={emp.id}
                                 title={`${emp.name} (${emp.designation || 'Staff'})`}
-                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-800 shadow-2xs"
+                                className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-800 shadow-2xs"
                               >
-                                <span className="h-4 w-4 rounded-full bg-teal-100 text-teal-800 font-bold text-[9px] flex items-center justify-center">
-                                  {emp.first_name?.[0]}
+                                {emp.avatar ? (
+                                  <img
+                                    src={emp.avatar}
+                                    alt={emp.name}
+                                    className="h-4 w-4 rounded-full object-cover border border-slate-200 shrink-0"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      if (e.currentTarget.nextElementSibling) {
+                                        e.currentTarget.nextElementSibling.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                ) : null}
+                                <span
+                                  className={`h-4 w-4 rounded-full bg-teal-100 text-teal-800 font-bold text-[9px] items-center justify-center shrink-0 uppercase ${
+                                    emp.avatar ? 'hidden' : 'flex'
+                                  }`}
+                                >
+                                  {emp.first_name?.[0] || emp.name?.[0] || 'U'}
                                 </span>
                                 {emp.name}
                               </span>
@@ -952,6 +969,26 @@ export default function LeadManagementView() {
                         onChange={() => toggleEmployeeAssignment(emp.id)}
                         className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-4 w-4"
                       />
+                      {emp.avatar ? (
+                        <img
+                          src={emp.avatar}
+                          alt={`${emp.first_name} ${emp.last_name}`}
+                          className="h-6 w-6 rounded-full object-cover border border-slate-200 shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className={`h-6 w-6 rounded-full bg-teal-100 text-teal-800 font-bold text-[10px] items-center justify-center shrink-0 uppercase ${
+                          emp.avatar ? 'hidden' : 'flex'
+                        }`}
+                      >
+                        {emp.first_name?.[0]}{emp.last_name?.[0]}
+                      </span>
                       <div className="flex-1 text-xs">
                         <span className="font-semibold text-slate-900">{emp.first_name} {emp.last_name}</span>
                         <span className="text-slate-400 ml-1.5 font-mono text-[10px]">({emp.employee_code})</span>
@@ -1143,6 +1180,26 @@ export default function LeadManagementView() {
                       onChange={() => toggleEmployeeAssignment(emp.id)}
                       className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-4 w-4"
                     />
+                    {emp.avatar ? (
+                      <img
+                        src={emp.avatar}
+                        alt={`${emp.first_name} ${emp.last_name}`}
+                        className="h-6 w-6 rounded-full object-cover border border-slate-200 shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          if (e.currentTarget.nextElementSibling) {
+                            e.currentTarget.nextElementSibling.style.display = 'flex';
+                          }
+                        }}
+                      />
+                    ) : null}
+                    <span
+                      className={`h-6 w-6 rounded-full bg-teal-100 text-teal-800 font-bold text-[10px] items-center justify-center shrink-0 uppercase ${
+                        emp.avatar ? 'hidden' : 'flex'
+                      }`}
+                    >
+                      {emp.first_name?.[0]}{emp.last_name?.[0]}
+                    </span>
                     <div className="flex-1 text-xs">
                       <span className="font-semibold text-slate-900">{emp.first_name} {emp.last_name}</span>
                       <span className="text-slate-400 ml-1.5 font-mono text-[10px]">({emp.employee_code})</span>
@@ -1481,7 +1538,24 @@ export default function LeadManagementView() {
                     className="flex items-center justify-between p-3 bg-white hover:bg-slate-50/80 transition"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-teal-800 font-bold text-xs">
+                      {emp.avatar ? (
+                        <img
+                          src={emp.avatar}
+                          alt={`${emp.first_name} ${emp.last_name}`}
+                          className="h-8 w-8 rounded-full object-cover border border-slate-200 shrink-0"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                            if (e.currentTarget.nextElementSibling) {
+                              e.currentTarget.nextElementSibling.style.display = 'flex';
+                            }
+                          }}
+                        />
+                      ) : null}
+                      <div
+                        className={`h-8 w-8 items-center justify-center rounded-full bg-teal-100 text-teal-800 font-bold text-xs shrink-0 uppercase ${
+                          emp.avatar ? 'hidden' : 'flex'
+                        }`}
+                      >
                         {emp.first_name?.[0]}{emp.last_name?.[0]}
                       </div>
                       <div>
