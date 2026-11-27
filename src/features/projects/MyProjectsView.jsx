@@ -4,6 +4,7 @@ import { useHRMS } from '../../context/HRMSContext';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
 import { Calendar, Search, Send, Sliders } from 'lucide-react';
+import { calculateProjectWorkingDays } from './ProjectsView';
 
 const nextDate = (date) => {
   if (!date) return '';
@@ -249,14 +250,25 @@ export default function MyProjectsView() {
                   </ol>
                 </details>
               )}
-              <dl className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <dl className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50/70 p-3 rounded-lg border border-slate-100">
                 <div>
-                  <dt className="text-slate-500">Start date</dt>
-                  <dd className="mt-1 font-medium text-slate-800">{project.start_date || '—'}</dd>
+                  <dt className="text-slate-400 font-bold uppercase text-[10px]">Start date</dt>
+                  <dd className="mt-1 font-semibold text-slate-800">{project.start_date || '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Active deadline</dt>
-                  <dd className="mt-1 font-medium text-slate-800">{project.active_due_date || project.planned_end_date || '—'}</dd>
+                  <dt className="text-slate-400 font-bold uppercase text-[10px]">Active deadline</dt>
+                  <dd className="mt-1 font-semibold text-slate-800">{project.active_due_date || project.planned_end_date || '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-slate-400 font-bold uppercase text-[10px]">Working Days Effort</dt>
+                  <dd className="mt-1 font-bold text-teal-800">
+                    {calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency))?.workingDays ?? '—'} Working Days
+                    {calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency))?.sundaysCount > 0 && (
+                      <span className="block text-[10px] font-normal text-slate-500">
+                        ({calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency)).sundaysCount} Sun off excluded)
+                      </span>
+                    )}
+                  </dd>
                 </div>
               </dl>
               <p className="mt-3 text-xs text-slate-500">

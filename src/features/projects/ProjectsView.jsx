@@ -71,6 +71,35 @@ const getNextMonday = (dateStr) => {
   return date.toISOString().substring(0, 10);
 };
 
+export const calculateProjectWorkingDays = (startDateStr, endDateStr, isEmergency = false) => {
+  if (!startDateStr || !endDateStr || endDateStr < startDateStr) return null;
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  const [ey, em, ed] = endDateStr.split('-').map(Number);
+  const start = new Date(sy, sm - 1, sd);
+  const end = new Date(ey, em - 1, ed);
+
+  let calendarDays = 0;
+  let sundaysCount = 0;
+  const curr = new Date(start);
+
+  while (curr <= end) {
+    calendarDays++;
+    if (curr.getDay() === 0) {
+      sundaysCount++;
+    }
+    curr.setDate(curr.getDate() + 1);
+  }
+
+  const workingDays = isEmergency ? calendarDays : Math.max(1, calendarDays - sundaysCount);
+
+  return {
+    calendarDays,
+    workingDays,
+    sundaysCount,
+    isEmergency,
+  };
+};
+
 const validateProjectDates = (
   { start_date, planned_end_date, is_weekend_emergency, emergency_reason },
   showRequiredErrors = false
@@ -785,6 +814,18 @@ export default function ProjectsView() {
                         <span className="text-[10px] text-emerald-600 block">Accepted on {project.actual_completed_at.substring(0, 10)}</span>
                       )}
                     </div>
+
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Working Days Effort</span>
+                      <span className="font-bold text-teal-800 block mt-1">
+                        {calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency))?.workingDays ?? '—'} Working Days
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency))?.sundaysCount > 0
+                          ? `Excludes ${calculateProjectWorkingDays(project.start_date, project.active_due_date || project.planned_end_date, Boolean(project.is_weekend_emergency)).sundaysCount} Sun off`
+                          : (project.is_weekend_emergency ? 'Emergency Weekend' : 'Full schedule')}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Pending Extension Notice if any */}
@@ -1244,6 +1285,39 @@ export default function ProjectsView() {
               <span className="text-[10px] text-slate-400 mt-0.5 block">This initial due date is immutable in history.</span>
             </div>
           </div>
+
+          {/* Live Working Days Duration Counter */}
+          {calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency) && (
+            <div className="rounded-xl border border-teal-200 bg-teal-50/80 p-3 text-xs text-teal-950 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="rounded-lg bg-teal-600 p-1.5 text-white shadow-xs">
+                    <CalendarClock className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-900 block">
+                      Allocated Working Days: <span className="text-teal-700 text-sm font-extrabold">{calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).workingDays} Working Day{calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).workingDays > 1 ? 's' : ''}</span>
+                    </span>
+                    <span className="text-[11px] text-slate-500">
+                      Total Span: {calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).calendarDays} Calendar Days ({newProject.start_date} → {newProject.planned_end_date})
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  {calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).sundaysCount > 0 && !newProject.is_weekend_emergency && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                      ☕ {calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).sundaysCount} Sunday{calculateProjectWorkingDays(newProject.start_date, newProject.planned_end_date, newProject.is_weekend_emergency).sundaysCount > 1 ? 's' : ''} (Week Off) Excluded
+                    </span>
+                  )}
+                  {newProject.is_weekend_emergency && (
+                    <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300">
+                      🚨 Includes Emergency Weekend Duty
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Sunday / Non-Working Day Warning Banner */}
           {(isDateSunday(newProject.start_date) || isDateSunday(newProject.planned_end_date)) && !newProject.is_weekend_emergency && (
