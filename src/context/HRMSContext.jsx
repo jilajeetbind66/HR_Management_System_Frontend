@@ -454,11 +454,13 @@ export function HRMSProvider({ children }) {
     await refreshProjectData();
   };
 
-  const reviewProjectCompletion = async (projectId, decision, reviewNote) => {
+  const reviewProjectCompletion = async (projectId, decision, reviewNote, appreciation = {}) => {
     await api.acceptProjectCompletion(
       findAssignmentId(projectId),
       decision === 'accept' ? 'accept' : 'return',
-      reviewNote
+      reviewNote,
+      undefined,
+      appreciation
     );
     await refreshProjectData();
   };

@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Button from '../../components/common/Button';
 import Modal from '../../components/common/Modal';
-import { Calendar, Search, Send, Sliders } from 'lucide-react';
+import { Award, Calendar, Search, Send, Sliders, Star } from 'lucide-react';
 import { calculateProjectWorkingDays } from './ProjectsView';
 
 const nextDate = (date) => {
@@ -274,6 +274,49 @@ export default function MyProjectsView() {
               <p className="mt-3 text-xs text-slate-500">
                 Extensions: {extensionCounts.pending || 0} pending · {extensionCounts.approved || 0} approved · {extensionCounts.rejected || 0} rejected
               </p>
+
+              {project.status === 'completed' && (project.delivery_timeliness || project.appreciation_rating || project.appreciation_badge || project.appreciation_note) && (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 via-teal-50/70 to-amber-50/50 p-3 text-xs space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {project.delivery_timeliness === 'early' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold">
+                          ⚡ Early Delivery ({project.days_ahead_or_late}d ahead)
+                        </span>
+                      )}
+                      {project.delivery_timeliness === 'on_time' && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-600 text-white px-2.5 py-0.5 text-[10px] font-bold">
+                          ✅ On-Time Delivery
+                        </span>
+                      )}
+                      {project.appreciation_badge && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold">
+                          <Award className="h-3 w-3 text-amber-600" />
+                          {project.appreciation_badge}
+                        </span>
+                      )}
+                    </div>
+                    {project.appreciation_rating && (
+                      <div className="flex items-center gap-0.5" title={`${project.appreciation_rating}/5 Stars`}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`h-3.5 w-3.5 ${star <= Number(project.appreciation_rating) ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {project.appreciation_note && (
+                    <p className="text-[11px] text-slate-700 italic">
+                      "{project.appreciation_note}"
+                      {project.appreciated_by && (
+                        <span className="not-italic text-slate-500 font-semibold"> — {project.appreciated_by}</span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
               {(currentUser.role === 'super_admin'
                 || Number(project.assigned_employee_id) === Number(currentUser.employee_id))
                 && !['completed', 'cancelled'].includes(project.status) && (

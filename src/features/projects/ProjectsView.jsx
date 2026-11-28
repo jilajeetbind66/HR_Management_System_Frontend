@@ -27,7 +27,11 @@ import {
   History,
   Info,
   CalendarClock,
-  Building2
+  Building2,
+  Award,
+  Star,
+  Megaphone,
+  Sparkles
 } from 'lucide-react';
 
 const PROJECT_PRIORITY_PRESENTATION = {
@@ -188,6 +192,10 @@ export default function ProjectsView() {
 
   const [showReviewCompletionModal, setShowReviewCompletionModal] = useState(false);
   const [completionReviewNote, setCompletionReviewNote] = useState('');
+  const [appreciationRating, setAppreciationRating] = useState(5);
+  const [appreciationBadge, setAppreciationBadge] = useState('');
+  const [appreciationNote, setAppreciationNote] = useState('');
+  const [publishAnnouncement, setPublishAnnouncement] = useState(false);
   const [deliverableUploads, setDeliverableUploads] = useState([]);
   const [deliverableUploadError, setDeliverableUploadError] = useState('');
   const [deliverableUploadRefresh, setDeliverableUploadRefresh] = useState(0);
@@ -418,9 +426,21 @@ export default function ProjectsView() {
     if (!selectedProject) return;
     setProjectFormError(null);
     try {
-      await reviewProjectCompletion(selectedProject.id, decision, completionReviewNote);
+      const appreciationPayload = decision === 'accept'
+        ? {
+            appreciation_rating: appreciationRating || null,
+            appreciation_badge: appreciationBadge || null,
+            appreciation_note: appreciationNote.trim() || null,
+            publish_announcement: publishAnnouncement,
+          }
+        : {};
+      await reviewProjectCompletion(selectedProject.id, decision, completionReviewNote, appreciationPayload);
       setShowReviewCompletionModal(false);
       setCompletionReviewNote('');
+      setAppreciationRating(5);
+      setAppreciationBadge('');
+      setAppreciationNote('');
+      setPublishAnnouncement(false);
     } catch (error) {
       setProjectFormError(error?.data?.message || error.message || 'Unable to review project completion.');
     }
@@ -827,6 +847,50 @@ export default function ProjectsView() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Delivery Timeliness & Appreciation Recognition Strip */}
+                  {project.status === 'completed' && (project.delivery_timeliness || project.appreciation_rating || project.appreciation_badge || project.appreciation_note) && (
+                    <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-emerald-50 via-teal-50/70 to-amber-50/50 border border-emerald-200 flex flex-col gap-1.5 text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {project.delivery_timeliness === 'early' && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold shadow-2xs">
+                              ⚡ Early Delivery ({project.days_ahead_or_late}d ahead)
+                            </span>
+                          )}
+                          {project.delivery_timeliness === 'on_time' && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-teal-600 text-white px-2.5 py-0.5 text-[10px] font-bold shadow-2xs">
+                              ✅ On-Time Delivery
+                            </span>
+                          )}
+                          {project.appreciation_badge && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold">
+                              <Award className="h-3 w-3 text-amber-600" />
+                              {project.appreciation_badge}
+                            </span>
+                          )}
+                        </div>
+                        {project.appreciation_rating && (
+                          <div className="flex items-center gap-0.5 text-amber-500" title={`${project.appreciation_rating}/5 Stars`}>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`h-3.5 w-3.5 ${star <= Number(project.appreciation_rating) ? 'fill-amber-400 text-amber-500' : 'text-slate-300'}`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {project.appreciation_note && (
+                        <p className="text-[11px] text-slate-700 italic">
+                          "{project.appreciation_note}"
+                          {project.appreciated_by && (
+                            <span className="not-italic text-slate-500 font-semibold"> — {project.appreciated_by}</span>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Pending Extension Notice if any */}
                   {hasPendingExtension && (
@@ -1790,13 +1854,119 @@ export default function ProjectsView() {
           <div>
             <label className="block font-semibold text-slate-700 mb-1">Review Feedback Note:</label>
             <textarea
-              rows="3"
+              rows="2"
               value={completionReviewNote}
               onChange={(e) => setCompletionReviewNote(e.target.value)}
               placeholder="Feedback notes upon acceptance or revision instructions if returning..."
               className="w-full p-2.5 rounded-lg border border-slate-200"
             />
           </div>
+
+          {/* Appreciation & Recognition Section (Upon Acceptance) */}
+          {(() => {
+            const dueStr = selectedProject?.active_due_date || selectedProject?.planned_end_date;
+            const subStr = (selectedProject?.submitted_at || new Date().toISOString()).substring(0, 10);
+            let timeliness = null;
+            let diffDays = 0;
+            if (dueStr) {
+              diffDays = Math.round((new Date(dueStr) - new Date(subStr)) / (1000 * 60 * 60 * 24));
+              timeliness = diffDays > 0 ? 'early' : (diffDays === 0 ? 'on_time' : 'late');
+            }
+            const badges = ['On-Time Champion', 'Speed Star', 'Quality Excellence', 'Ownership Hero'];
+            return (
+              <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 via-white to-amber-50/60 p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-950">
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    <span>Appreciate & Recognize Employee</span>
+                  </div>
+                  {timeliness === 'early' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-bold">
+                      ⚡ Early Delivery ({diffDays} day{diffDays > 1 ? 's' : ''} ahead!)
+                    </span>
+                  )}
+                  {timeliness === 'on_time' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-600 text-white px-2.5 py-0.5 text-[10px] font-bold">
+                      ✅ On-Time Delivery
+                    </span>
+                  )}
+                  {timeliness === 'late' && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 text-slate-700 px-2.5 py-0.5 text-[10px] font-semibold">
+                      ⏰ Delivered {Math.abs(diffDays)}d after deadline
+                    </span>
+                  )}
+                </div>
+
+                {/* Star Rating */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Delivery Quality Rating (1–5 Stars):</label>
+                  <div className="flex items-center gap-1.5">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setAppreciationRating(star)}
+                        className={`p-1 rounded-lg border transition ${
+                          star <= appreciationRating
+                            ? 'bg-amber-50 border-amber-300 text-amber-500'
+                            : 'bg-white border-slate-200 text-slate-300 hover:text-amber-300'
+                        }`}
+                      >
+                        <Star className={`h-4 w-4 ${star <= appreciationRating ? 'fill-amber-400' : ''}`} />
+                      </button>
+                    ))}
+                    <span className="ml-1 text-[11px] font-bold text-slate-600">{appreciationRating}/5</span>
+                  </div>
+                </div>
+
+                {/* Kudos Badge Selector */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Award Kudos Badge (Optional):</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {badges.map((badge) => (
+                      <button
+                        key={badge}
+                        type="button"
+                        onClick={() => setAppreciationBadge(appreciationBadge === badge ? '' : badge)}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold border transition ${
+                          appreciationBadge === badge
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300'
+                        }`}
+                      >
+                        <Award className="h-3 w-3" />
+                        {badge}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Appreciation Message */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Appreciation Note for Employee:</label>
+                  <input
+                    type="text"
+                    value={appreciationNote}
+                    onChange={(e) => setAppreciationNote(e.target.value)}
+                    placeholder="e.g., Great speed and clean implementation ahead of deadline!"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs"
+                  />
+                </div>
+
+                {/* Publish Announcement Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] font-medium text-slate-700 pt-1">
+                  <input
+                    type="checkbox"
+                    checked={publishAnnouncement}
+                    onChange={(e) => setPublishAnnouncement(e.target.checked)}
+                    className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 h-4 w-4"
+                  />
+                  <Megaphone className="h-3.5 w-3.5 text-teal-600" />
+                  <span>Publish appreciation shoutout in Company Announcements</span>
+                </label>
+              </div>
+            );
+          })()}
 
           <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
             <Button variant="secondary" onClick={() => handleReviewCompletion('return')}>

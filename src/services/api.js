@@ -391,10 +391,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ deliverable_link: deliverableLink, submission_note: submissionNote }),
     }),
-  acceptProjectCompletion: (assignmentId, decision, remarks, acceptedBy) =>
+  acceptProjectCompletion: (assignmentId, decision, remarks, acceptedBy, appreciation = {}) =>
     request(`/project-assignments/${assignmentId}/accept`, {
       method: 'POST',
-      body: JSON.stringify({ decision, remarks, accepted_by: acceptedBy }),
+      body: JSON.stringify({
+        decision,
+        remarks,
+        accepted_by: acceptedBy,
+        ...(appreciation?.appreciation_rating ? { appreciation_rating: appreciation.appreciation_rating } : {}),
+        ...(appreciation?.appreciation_badge ? { appreciation_badge: appreciation.appreciation_badge } : {}),
+        ...(appreciation?.appreciation_note ? { appreciation_note: appreciation.appreciation_note } : {}),
+        ...(appreciation?.publish_announcement ? { publish_announcement: true } : {}),
+      }),
     }),
   assessProjectPenalty: (assignmentId, reason) => request(`/project-assignments/${assignmentId}/penalties`, {
     method: 'POST',
