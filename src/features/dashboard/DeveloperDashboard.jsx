@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { formatWorkDuration } from '../attendance/AttendanceView';
 import { useAuth } from '../../context/AuthContext';
 import { useHRMS } from '../../context/HRMSContext';
 import Card from '../../components/common/Card';
@@ -670,7 +671,7 @@ export default function DeveloperDashboard({ onNavigate }) {
                   </div>
                   <p className="text-[11px] text-slate-500">
                     {myPunch?.punch_out 
-                      ? `Punched out at ${myPunch.punch_out} • Work Hours: ${myPunch.work_hours || '0.00'} hrs` 
+                      ? `Punched out at ${myPunch.punch_out} • Work Hours: ${formatWorkDuration(myPunch.work_hours, myPunch.punch_in, myPunch.punch_out)}` 
                       : myPunch 
                         ? `Punched in via ${myPunch.location || 'Branch'} • Shift in progress` 
                         : "Click below to clock in for today's work shift"}

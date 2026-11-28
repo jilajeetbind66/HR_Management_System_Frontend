@@ -41,6 +41,50 @@ const parseTimeToMinutes = (timeStr) => {
   return hours * 60 + minutes;
 };
 
+export const formatWorkDuration = (workHours, punchIn = null, punchOut = null) => {
+  let totalMinutes = null;
+  if (punchIn && punchOut) {
+    const inMins = parseTimeToMinutes(punchIn);
+    const outMins = parseTimeToMinutes(punchOut);
+    if (inMins !== null && outMins !== null) {
+      totalMinutes = outMins >= inMins ? outMins - inMins : (24 * 60 - inMins) + outMins;
+    }
+  }
+  if (totalMinutes === null) {
+    totalMinutes = Math.max(0, Math.round(Number(workHours || 0) * 60));
+  }
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+};
+
+const getWorkedMinutes = (workHours, punchIn = null, punchOut = null) => {
+  if (punchIn && punchOut) {
+    const inMins = parseTimeToMinutes(punchIn);
+    const outMins = parseTimeToMinutes(punchOut);
+    if (inMins !== null && outMins !== null) {
+      return outMins >= inMins ? outMins - inMins : (24 * 60 - inMins) + outMins;
+    }
+  }
+  return Math.max(0, Math.round(Number(workHours || 0) * 60));
+};
+
+const getShiftDutyMinutes = (shift, role = null) => {
+  if (!shift) return 7 * 60;
+  const isStaffShift = Boolean(
+    shift.staff_shift_enabled &&
+    role &&
+    Array.isArray(shift.staff_applied_roles) &&
+    shift.staff_applied_roles.includes(role)
+  );
+  const startStr = isStaffShift ? (shift.staff_start_time || '10:00 AM') : (shift.start_time || '09:30 AM');
+  const endStr = isStaffShift ? (shift.staff_end_time || '07:00 PM') : (shift.end_time || '06:30 PM');
+  const startMins = parseTimeToMinutes(startStr);
+  const endMins = parseTimeToMinutes(endStr);
+  if (startMins === null || endMins === null) return 7 * 60;
+  return endMins > startMins ? endMins - startMins : (24 * 60 - startMins) + endMins;
+};
+
 const staffRolesList = [
   { id: 'manager', label: 'Managers', desc: 'Engineering & Project Managers' },
   { id: 'hr_admin', label: 'HR Admins', desc: 'Head of HR & People Operations' },
@@ -427,7 +471,18 @@ export default function AttendanceView() {
           const late = getLateArrivalInfo(attRec.punch_in, shiftSettings, emp.role);
           if (late.isLate) lateCount++;
 
-          if (hours > 0 && hours < 4.5) {
+          const dutyHours = getShiftDutyMinutes(shiftSettings, emp.role) / 60;
+          const fullDayMin = shiftSettings?.full_day_min_hours !== null && shiftSettings?.full_day_min_hours !== undefined && shiftSettings?.full_day_min_hours !== ''
+            ? Number(shiftSettings.full_day_min_hours)
+            : Math.max(1, Number((dutyHours - 0.5).toFixed(2)));
+          const halfDayMin = shiftSettings?.half_day_min_hours !== null && shiftSettings?.half_day_min_hours !== undefined && shiftSettings?.half_day_min_hours !== ''
+            ? Number(shiftSettings.half_day_min_hours)
+            : Number((dutyHours / 2).toFixed(2));
+
+          if (hours > 0 && hours < halfDayMin) {
+            absentCount++;
+            cell = { status: 'A', text: 'A', color: 'text-rose-700', bg: 'bg-rose-100 font-bold', hours, isLate: late.isLate };
+          } else if (hours > 0 && hours < fullDayMin) {
             halfDayCount++;
             cell = { status: 'HD', text: 'HD', color: 'text-amber-700', bg: 'bg-amber-100 font-bold', hours, isLate: late.isLate };
           } else {
@@ -898,9 +953,25 @@ export default function AttendanceView() {
                       </td>
                       <td className="px-4 py-3 font-medium">
                         {att.punch_out ? (
-                          <span>{att.work_hours} hrs</span>
+                          (() => {
+                            const workedMins = getWorkedMinutes(att.work_hours, att.punch_in, att.punch_out);
+                            const dutyMins = getShiftDutyMinutes(shiftSettings, emp?.role);
+                            const extraMins = workedMins - dutyMins;
+                            return (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-semibold text-slate-800">
+                                  {formatWorkDuration(att.work_hours, att.punch_in, att.punch_out)}
+                                </span>
+                                {extraMins >= 15 && (
+                                  <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                    +{Math.floor(extraMins / 60)}h {String(extraMins % 60).padStart(2, '0')}m Extra
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
                         ) : isMissingPunchOut ? (
-                          <span className="text-slate-400">0.00 hrs</span>
+                          <span className="text-slate-400">0h 00m</span>
                         ) : (
                           <span className="text-teal-600">In Progress</span>
                         )}
@@ -1246,7 +1317,7 @@ export default function AttendanceView() {
                             <td
                               key={d}
                               className={`p-1 text-center border-r border-slate-100 text-[10px] ${cell.bg}`}
-                              title={`Day ${d}: ${cell.status === 'P' ? 'Present' : cell.status === 'L' ? 'Leave' : cell.status === 'HD' ? 'Half Day' : cell.status === 'WO' ? 'Week Off' : cell.status === 'A' ? 'Absent' : 'Future'}${cell.hours ? ` (${cell.hours} hrs)` : ''}${cell.isLate ? ' · Late' : ''}`}
+                              title={`Day ${d}: ${cell.status === 'P' ? 'Present' : cell.status === 'L' ? 'Leave' : cell.status === 'HD' ? 'Half Day' : cell.status === 'WO' ? 'Week Off' : cell.status === 'A' ? 'Absent' : 'Future'}${cell.hours ? ` (${formatWorkDuration(cell.hours)})` : ''}${cell.isLate ? ' · Late' : ''}`}
                             >
                               <span className={cell.color}>{cell.text}</span>
                             </td>
@@ -1372,6 +1443,65 @@ export default function AttendanceView() {
                       <span className="text-[10px] text-slate-400 mt-0.5 block">Working Window</span>
                     </div>
                   </div>
+
+                  {/* Live Auto-Calculated Duty Hours & Attendance Slabs */}
+                  {(() => {
+                    const dutyMins = getShiftDutyMinutes(shiftSettings, null);
+                    const dutyHrs = Number((dutyMins / 60).toFixed(2));
+                    const autoFull = Math.max(1, Number((dutyHrs - 0.5).toFixed(2)));
+                    const autoHalf = Number((dutyHrs / 2).toFixed(2));
+                    const activeFull = shiftSettings.full_day_min_hours !== null && shiftSettings.full_day_min_hours !== undefined && shiftSettings.full_day_min_hours !== ''
+                      ? shiftSettings.full_day_min_hours
+                      : '';
+                    const activeHalf = shiftSettings.half_day_min_hours !== null && shiftSettings.half_day_min_hours !== undefined && shiftSettings.half_day_min_hours !== ''
+                      ? shiftSettings.half_day_min_hours
+                      : '';
+
+                    return (
+                      <div className="mt-4 rounded-xl border border-teal-200 bg-teal-50/70 p-3.5 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-bold text-teal-950">
+                            Auto-Calculated Duty Duration: <span className="text-teal-700">{Math.floor(dutyMins / 60)}h {String(dutyMins % 60).padStart(2, '0')}m</span>
+                          </span>
+                          <span className="text-[11px] text-teal-800 font-medium">
+                            Present: ≥ {activeFull !== '' ? activeFull : autoFull}h · Half Day: {activeHalf !== '' ? activeHalf : autoHalf}h – {activeFull !== '' ? activeFull : autoFull}h · Extra Badge: &gt; {dutyHrs}h
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Full Day Min Hours (Auto: {autoFull}h):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.25"
+                              min="1"
+                              max="24"
+                              placeholder={`Auto (${autoFull})`}
+                              value={activeFull}
+                              onChange={(e) => setShiftSettings((p) => ({ ...p, full_day_min_hours: e.target.value }))}
+                              className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                              Half Day Min Hours (Auto: {autoHalf}h):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.25"
+                              min="0.5"
+                              max="24"
+                              placeholder={`Auto (${autoHalf})`}
+                              value={activeHalf}
+                              onChange={(e) => setShiftSettings((p) => ({ ...p, half_day_min_hours: e.target.value }))}
+                              className="w-full rounded-lg border border-slate-200 p-2 font-medium text-slate-800 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-3 border-t border-slate-200/70">
                     <div className="bg-amber-50/70 p-3.5 rounded-xl border border-amber-200/80">
